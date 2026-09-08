@@ -14,9 +14,9 @@ The website is not a browser implementation of microphone capture, accessibility
 
 ## Current channel: early access
 
-As checked on 8 September 2026, Voice 1.2.1 and StageMark 1.2.0 are Apple Silicon builds with a macOS 14 deployment target. The actual QA machine was macOS 26.5.1; older supported OS versions still need independent testing. Voice's first launch downloads/prepares the English speech model. Downloaded binaries do not require developer tools.
+As checked on 8 September 2026, Voice 1.2.2 and StageMark 1.2.1 are Apple Silicon builds with a macOS 14 deployment target. The actual QA machine was macOS 26.5.1; older supported OS versions still need independent testing. Voice's first launch downloads/prepares the English speech model. Downloaded binaries do not require developer tools.
 
-Both are ad-hoc signed, not Developer ID signed or Apple-notarized. There was no valid code-signing identity on the release Mac at the time of this check. This is suitable for an explicitly labelled early-testing path, not a claim of frictionless general distribution. Use Apple's app-specific opening guidance; do not recommend disabling Gatekeeper or stripping quarantine flags.
+Both early-access release candidates are Developer ID signed, Apple-notarised and stapled. Apple returned Accepted with no issues, and the final extracted packages passed Gatekeeper as Notarized Developer ID. Source builds remain ad-hoc signed. Independent fresh-Mac testing is still needed before treating the channel as generally validated; retain that limitation in early-access release notes.
 
 There is no automatic updater. Users quit the app and replace the copy in Applications. Settings/history/boards remain outside the app bundle. Website links pin a version and its checksum so feedback can identify exactly what was tested. A checksum detects changed bytes; it is not a substitute for an identified developer signature or notarization.
 

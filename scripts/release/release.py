@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import plistlib
 import re
+import shutil
 import subprocess
 import tempfile
 
@@ -114,6 +115,9 @@ def main():
             run(executable, *check)
         upload = staging / "notarization.zip"
         run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, upload)
+        # Keep the exact submitted bytes for recovery if Apple's service or
+        # stapler fails after acceptance. This is not the final release ZIP.
+        shutil.copy2(upload, output / "submission.zip")
         # Submit once, persist the ID before waiting, so an interrupted run can
         # be recovered through notarytool info/log without duplicate submissions.
         submission = json.loads(run("xcrun", "notarytool", "submit", upload,

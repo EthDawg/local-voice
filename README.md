@@ -20,7 +20,7 @@ Workbench is an open-source collection of small native Mac utilities: **[Voice](
 
 First contribution? Fix a confusing instruction, test a workflow on your Mac, improve keyboard access, or take a small Swift change. You do not need to be a Swift expert. [The contributor guide](CONTRIBUTING.md) takes you from choosing an issue to opening your first pull request. Documentation can be edited directly on GitHub without a Mac.
 
-We are early: expect rough edges, locally signed releases, and a small maintainer team. The [open issues](https://github.com/EthDawg/local-voice/issues) are the live backlog; `good first issue` marks bounded starting points and `help wanted` marks broader work. [Discuss larger ideas](https://github.com/EthDawg/local-voice/discussions) before investing heavily. We welcome documentation, accessibility, design, bug reports, and testing as well as code.
+We are early: expect rough edges and a small maintainer team. The [open issues](https://github.com/EthDawg/local-voice/issues) are the live backlog; `good first issue` marks bounded starting points and `help wanted` marks broader work. [Discuss larger ideas](https://github.com/EthDawg/local-voice/discussions) before investing heavily. We welcome documentation, accessibility, design, bug reports, and testing as well as code.
 
 ## Install from source
 
@@ -61,7 +61,7 @@ The model is downloaded from FluidInference on Hugging Face during setup. FluidA
 
 Drafts, originals, the dictionary, voice preferences, and recent transcripts are stored in `~/Library/Application Support/LocalVoice/state.json`, readable by the current user. Successful microphone recordings and temporary readings are deleted. Failed microphone recordings remain temporarily available for Retry until the next recording or app exit. The clipboard retains copied transcripts; automatic paste can restore its previous contents after confirmed insertion. Imported audio is not copied into history.
 
-This is an early community project with locally signed builds, not an Apple-notarized distribution. Building on your Mac avoids a separate downloaded-binary installation flow. Code changes can cause macOS to ask for permissions again.
+Official Voice 1.2.2 early-access downloads are Developer ID signed and Apple-notarised. Get the versioned download and trial guide from [the Workbench website](https://workbench-mac.vercel.app). Source builds remain ad-hoc signed and do not need paid Apple membership. Code or signing changes can cause macOS to ask for permissions again.
 
 If Accessibility is switched on but Voice still shows **Enable automatic paste**, macOS may have retained permission for an earlier build. Quit Voice, open **System Settings → Privacy & Security → Accessibility**, select only **Workbench Voice**, remove that entry with **−**, then use **+** to add `~/Applications/Workbench Voice.app` again. Reopen Voice and check for **Automatic paste ready**. This was required and verified after the local build update. Ad-hoc signatures identify a specific build, as explained in [Apple's code-signing requirements](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
 
