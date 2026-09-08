@@ -20,15 +20,11 @@ Both early-access release candidates are Developer ID signed, Apple-notarised an
 
 There is no automatic updater. Users quit the app and replace the copy in Applications. Settings/history/boards remain outside the app bundle. Website links pin a version and its checksum so feedback can identify exactly what was tested. A checksum detects changed bytes; it is not a substitute for an identified developer signature or notarization.
 
-## Next release gate: ordinary download and open
+## Remaining gate: independent first-run testing
 
-Apple Developer Program membership and a valid Developer ID Application identity were verified on 8 September 2026. Keep certificate private keys and notarization credentials out of Git, issues, chat, website files, and release assets. The repeatable workflow is in [scripts/release](../scripts/release/README.md). Publication still requires every gate below:
+Apple Developer Program membership, signing, notarisation, stapling and local package verification are complete. The repeatable workflow is in [scripts/release](../scripts/release/README.md). Signed early-access prereleases are ready for independent testers; general availability still needs a separate Mac or clean account to exercise browser download, Gatekeeper and first-run permissions.
 
-- Obtain a **Developer ID Application** identity on the release Mac, or a suitably protected release environment.
-- Extend packaging to sign nested code and the app with a secure timestamp and hardened runtime. Check Voice's audio-input entitlement and actual speech/recording/paste behavior under that runtime. Do not use `--deep` as a substitute for correct nested-code signing.
-- Submit the archive with Apple's `notarytool` or Xcode, inspect the result/log, staple the accepted ticket to the app, and repackage the stapled app.
-- Verify signatures and the ticket. Download through a browser onto a separate Mac or clean account so quarantine and first-run permissions are genuinely exercised. Test Voice model setup, microphone, optional paste, and StageMark drawing/shortcuts; a local rebuild does not prove this experience.
-- Publish a new versioned release and checksum, then update website links and remove the early-signing notice only after that downloaded build passes.
+Test Voice model setup, live microphone capture, optional paste and StageMark drawing/shortcuts. A local rebuild or automated speech round trip does not prove this experience. Record the OS, app version and observed outcome in the release gate issue. Publish versioned checksums and verify the public download before changing the website links.
 
 Keep the existing bundle identifiers and storage locations so current testers retain their data. Consider a signed updater only when repeated releases make manual replacement a real burden.
 

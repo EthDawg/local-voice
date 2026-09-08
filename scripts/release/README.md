@@ -34,7 +34,12 @@ new candidate. No final ZIP or checksum is emitted before successful acceptance,
 stapling and Gatekeeper assessment. The local build script's ad-hoc ZIP is a
 development artifact, not the signed release output.
 
-## Native acceptance before publication
+## Native acceptance before general availability
+
+Signed early-access prereleases may be published for independent testing once
+signing, notarisation, packaging and local regressions pass. Their notes must
+identify the remaining fresh-Mac and live workflow checks below. Do not describe
+those checks as completed or the release as generally validated.
 
 - Confirm the packaged version and expected developer identity.
 - Download the candidate through a browser on a separate Mac or clean account.
