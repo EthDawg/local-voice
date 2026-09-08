@@ -1,5 +1,7 @@
 # Workbench distribution website
 
+Public site: https://workbench-mac.vercel.app
+
 A small static website for downloading the native apps, trying a real workflow, and preparing a user-experience report or coding-agent handoff. This is the shared website for both apps; GitHub Releases own binaries and issues own feedback. No browser reimplementation, backend, analytics, or stored feedback.
 
 ## Local development

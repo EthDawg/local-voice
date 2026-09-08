@@ -4,7 +4,7 @@ Workbench is free and MIT licensed. Public downloads and open-source contributio
 
 ## The path for users
 
-1. The shared Vercel website (`site/` in this repository) explains the apps and links versioned downloads.
+1. The [shared Vercel website](https://workbench-mac.vercel.app) (`site/` in this repository) explains the apps and links versioned downloads.
 2. GitHub Releases own the app ZIPs, release notes and SHA-256 checksums. No binary copies are hosted on the website.
 3. A tester installs one app on an Apple Silicon Mac and follows a short real workflow.
 4. The website prepares an observation (“task / expected / observed / environment / impact”) for the relevant repository or the tester's coding agent. GitHub issues remain the only work queue.
