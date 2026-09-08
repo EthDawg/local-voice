@@ -5,7 +5,8 @@ without visual edits. Icon masters are 1024 × 1024 RGB PNG; supplied size varia
 are included and packaged into the application ICNS.
 
 The original promotional images are 1586 × 992, which Apple does not accept as a
-Mac screenshot size. Use the prepared 1440 × 900 exports for upload.
+Mac screenshot size. The matching *-1440x900.png files are upload copies resized locally with the
+maintainer’s explicit approval. The complete image is retained without cropping.
 
 These are promotional composites. Before final App Review, check the visible
 controls and shortcuts against the submitted build. Voice's automatic paste is
