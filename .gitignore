@@ -7,3 +7,6 @@ dist/
 *.m4a
 *.log
 test-results/
+
+site/public/
+site/.vercel/

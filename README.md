@@ -1,5 +1,7 @@
 # Workbench Voice
 
+**[Download the apps, try a workflow, and share feedback](https://workbench-mac.vercel.app)**
+
 ![Workbench — small native Mac tools](docs/assets/workbench.svg)
 
 [![CI](https://github.com/EthDawg/local-voice/actions/workflows/ci.yml/badge.svg)](https://github.com/EthDawg/local-voice/actions/workflows/ci.yml)
