@@ -23,7 +23,7 @@ Checked on 2026-09-08 on an Apple Silicon Mac with 16 GB RAM, macOS 26.5.1, and 
 
 ## Limits of verification
 
-Automatic paste into other applications remains optional and was not enabled or tested, because it requires additional Accessibility access. The global shortcut registered without a conflict; capture was exercised with the app's microphone control. No claim is made that simulated paste works in every target application. Clipboard delivery remains the default.
+The original release was tested with clipboard delivery. Automatic paste was subsequently enabled and exercised in the Workbench 1.1 follow-up below. No claim is made that paste works in every target application. The global shortcut registered without a conflict; live microphone capture was exercised with the app's microphone control.
 
 Recognition tests cover a clean synthetic English passage and a short live microphone sample. This is not an accent/noise benchmark or a long-recording stress test. Other macOS versions and other hardware were not independently tested.
 
@@ -48,8 +48,16 @@ Tested on this Apple Silicon Mac running macOS 26.5.1. The installed signed bina
 - Native menu layout, editor, shared Dark appearance, and return to the Mac’s System appearance were visually checked. An initial popover inheritance issue was fixed with an explicit SwiftUI theme modifier.
 - StageMark-to-Voice navigation was exercised. Voice’s clipboard fallback was verified in a new TextEdit document: the complete cleaned result was available for manual paste.
 - Spotlight metadata resolves exactly the two canonical installed apps, named Workbench Voice and Workbench StageMark. Both declare the Utilities category. This proves index discovery; a screenshot of Spotlight results was not obtained.
-- Automatic insertion and clipboard restoration require the user’s macOS Accessibility grant. That grant and its live end-to-end test remain pending. The app currently copies safely and shows the enable action. No successful automatic insertion is claimed here.
+- Automatic insertion and clipboard restoration passed the follow-up below after the user-approved Accessibility repair. The installed app is left with Paste automatically, clipboard restoration, Light cleanup, and Toggle activation enabled.
 
 The native speech round-trip and M4A re-transcription pass on the installed build. CoreML still prints the upstream E5RT shape diagnostic during loading, without preventing successful inference. No cloud account or server is required.
 
-Follow-up UI verification: Voice opened StageMark from the shared switcher. With both apps running, choosing Dark in StageMark immediately updated Voice; choosing System in Voice updated StageMark. The temporary TextEdit document was saved locally, checked against the exact test transcript, and moved to Trash; the temporary file and its provisional iCloud document no longer exist. Accessibility approval and direct-paste verification are still pending.
+Follow-up UI verification: Voice opened StageMark from the shared switcher. With both apps running, choosing Dark in StageMark immediately updated Voice; choosing System in Voice updated StageMark. The initial temporary TextEdit document was saved locally, checked against the exact test transcript, and moved to Trash; the temporary file and its provisional iCloud document no longer exist.
+
+### Accessibility and delivery follow-up
+
+System Settings initially showed Workbench Voice enabled while the installed app's trust check still failed. Relaunching and adding the same app without removing the old entry did not fix it. With explicit user approval, removing only the stale Voice entry and re-adding the exact installed app changed Voice's status to **Automatic paste ready**. The installed app uses an ad-hoc signature whose designated requirement is tied to its code hash; README now includes recovery instructions for local updates.
+
+The real **Paste last transcript** action then confirmed insertion with **Pasted into ChatGPT.** This status requires a changed Accessibility field value containing the complete transcript. The automation operated TextEdit in the background, so the actual destination was the foreground Codex app, reported by macOS as ChatGPT. No Return/send action was issued. The user was informed that the test sample might remain in that message draft; the UI tools cannot edit Codex itself.
+
+Clipboard restoration was independently checked through TextEdit: copying `WORKBENCH_CLIPBOARD_CHECK` before delivery and manually pasting afterward produced that exact sentinel, rather than the transcript. The local scratch document was saved, closed, verified to contain only that sentinel, and moved to Trash. The earlier denied-permission and changed-focus attempts retained a copied transcript without insertion. These checks cover the production delivery path shared by dictation and Paste last transcript; they do not constitute a new microphone-to-paste recording test or a matrix of target apps.
