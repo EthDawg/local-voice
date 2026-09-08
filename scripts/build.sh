@@ -15,7 +15,7 @@ for bundle in "$BIN_DIR"/*.bundle; do
     ditto "$bundle" "$APP_DIR/Contents/Resources/$(basename "$bundle")"
 done
 cp "$PROJECT_DIR/scripts/Info.plist" "$APP_DIR/Contents/Info.plist"
-if [ ! -f "$PROJECT_DIR/scripts/AppIcon.icns" ] || [ "$PROJECT_DIR/scripts/icon.swift" -nt "$PROJECT_DIR/scripts/AppIcon.icns" ]; then
+if [ ! -f "$PROJECT_DIR/scripts/AppIcon.icns" ]; then
     swift "$PROJECT_DIR/scripts/icon.swift" "$PACKAGE_DIR/AppIcon.iconset"
     iconutil -c icns "$PACKAGE_DIR/AppIcon.iconset" -o "$PROJECT_DIR/scripts/AppIcon.icns"
 fi
