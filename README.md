@@ -26,15 +26,17 @@ We are early: expect rough edges and a small maintainer team. The [open issues](
 
 Requires an Apple Silicon Mac, macOS 14 or later, Xcode Command Line Tools (Swift 6.2 or later, with the macOS 26 SDK), and an internet connection for the initial dependency/model download. Developed and tested on macOS 26.5.1; older supported OS versions are not yet independently tested.
 
+The persistent Preview installer also needs a Developer ID Application signing identity in Keychain. Compiling and running the development checks does not require an Apple membership.
+
 ```sh
 git clone https://github.com/EthDawg/local-voice.git
 cd local-voice
 bash scripts/install.sh
 ```
 
-The installer verifies the build and speech engine before replacing an existing installation. It preserves the previous app as a rollback ZIP. It builds and locally signs `Workbench Voice.app`, installs it in `~/Applications`, downloads and prepares the English model, runs a real speech/transcription/export round-trip, then opens the app. The first model preparation can take several minutes. Afterward, it works offline. It does not start automatically at login.
+The installer builds and signs `Workbench Voice Preview.app`, verifies its identity and signature, and installs it in `~/Applications` alongside production. It preserves the previous Preview as a rollback ZIP and opens the new Preview unless you pass `--no-open`. Speech-model preparation happens when the app opens; the first model download can take several minutes. Afterward, speech processing works offline. The installer does not run the speech round-trip tests or start the app automatically at login.
 
-For updates, quit the app, pull the repository, and run the installer again. User drafts and history live outside the app bundle.
+For updates, quit Preview, pull the repository, and run the installer again with the same signing identity. Its data and settings stay in place. Production updates use an explicitly selected notarised archive; see [Preview and production updates](scripts/release/README.md). Run `bash scripts/test.sh` for the automated checks.
 
 ## Use it
 
@@ -62,13 +64,13 @@ Audio is processed locally. Recordings are made only after a button or shortcut 
 
 The model is downloaded from FluidInference on Hugging Face during setup. FluidAudio caches it in the user's Application Support directory. No audio, transcript, clipboard content, or telemetry is uploaded by this app.
 
-Drafts, originals, the dictionary, voice preferences, and recent transcripts are stored in `~/Library/Application Support/LocalVoice/state.json`, readable by the current user. Successful microphone recordings and temporary readings are deleted. Failed microphone recordings remain temporarily available for Retry until the next recording or app exit. The clipboard retains copied transcripts; automatic paste can restore its previous contents after confirmed insertion. Imported audio is not copied into history.
+Drafts, originals, the dictionary, reading settings, and recent transcripts are stored in `~/Library/Application Support/LocalVoice/state.json` for production and `~/Library/Application Support/LocalVoice Preview/state.json` for Preview, readable by the current user. Preview copies missing production settings and saved data once on first launch, then keeps its own state. Successful microphone recordings and temporary readings are deleted. Failed microphone recordings remain temporarily available for Retry until the next recording or app exit. The clipboard retains copied transcripts; automatic paste can restore its previous contents after confirmed insertion. Imported audio is not copied into history.
 
 The demo library is saved separately as `demo-library.json` beside the session, with current-user file permissions. It contains up to 2,000 resources and 16 MB of metadata. Prompts, links and notes are ordinary local text, not a password vault. Local access bookmarks are kept on this Mac and excluded from exchange files. Unreadable library data pauses saving rather than being overwritten.
 
-Official Voice 1.2.2 early-access downloads are Developer ID signed and Apple-notarised. Get the versioned download and trial guide from [the Workbench website](https://workbench-mac.vercel.app). Source builds remain ad-hoc signed and do not need paid Apple membership. Code or signing changes can cause macOS to ask for permissions again.
+Official Voice 1.2.2 early-access downloads are Developer ID signed and Apple-notarised. Get the versioned download and trial guide from [the Workbench website](https://workbench-mac.vercel.app). The default Preview installer uses Developer ID signing. Raw `bash scripts/build.sh` packages use disposable ad-hoc signing; they are not the persistent Preview update workflow.
 
-If Accessibility is switched on but Voice still shows **Enable automatic paste**, macOS may have retained permission for an earlier build. Quit Voice, open **System Settings → Privacy & Security → Accessibility**, select only **Workbench Voice**, remove that entry with **−**, then use **+** to add `~/Applications/Workbench Voice.app` again. Reopen Voice and check for **Automatic paste ready**. This was required and verified after the local build update. Ad-hoc signatures identify a specific build, as explained in [Apple's code-signing requirements](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
+Preview has its own initial Microphone and optional Accessibility permissions. Keep its signing identity, bundle ID, and installed path consistent across updates; macOS controls permission retention. If automatic paste needs attention, check the entry for the exact edition you are running. Clipboard delivery remains available. Removing permission entries or clearing app data is not a release step. The historical ad-hoc permission repair is recorded in [validation history](docs/validation.md).
 
 ## Development and checks
 
