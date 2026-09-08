@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
+<title id="title">Workbench: small native Mac tools</title><desc id="desc">Voice for dictation and reading. StageMark for drawing and presenting. Local processing, shared controls, open source.</desc>
+<rect width="1200" height="300" rx="24" fill="#142329"/>
+<circle cx="1110" cy="30" r="225" fill="#1a3339"/>
+<g fill="#c0f5df"><rect x="62" y="60" width="38" height="6" rx="3"/><rect x="62" y="73" width="26" height="6" rx="3"/></g>
+<g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"><text x="62" y="139" font-size="56" font-weight="650" fill="#f4faf7">Workbench</text><text x="64" y="181" font-size="24" fill="#afc5c7">Small native Mac tools. Made to be yours.</text><text x="64" y="242" font-size="17" fill="#c0f5df">LOCAL PROCESSING  /  SHARED CONTROLS  /  OPEN SOURCE</text>
+<rect x="753" y="57" width="168" height="188" rx="20" fill="#284047"/><rect x="945" y="57" width="198" height="188" rx="20" fill="#284047"/>
+<g stroke="#b5f4d8" stroke-width="7" stroke-linecap="round"><path d="M799 117v22m18-42v62m18-83v104m18-81v58m18-40v24"/><path d="m1017 151 44-44 16 16-44 44-25 9z" fill="none"/><path d="m1052 116 16 16"/></g>
+<text x="837" y="211" text-anchor="middle" font-size="21" fill="#f4faf7">Voice</text><text x="1044" y="211" text-anchor="middle" font-size="21" fill="#f4faf7">StageMark</text></g></svg>

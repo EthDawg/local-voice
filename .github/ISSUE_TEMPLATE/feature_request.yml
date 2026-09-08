@@ -1,0 +1,26 @@
+name: Small improvement or idea
+description: Describe a useful outcome and a manageable first step.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What are you trying to do?
+      description: Describe the user problem and your current workaround.
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: What would a small first improvement look like?
+      description: Include a concrete example. Alternatives are welcome.
+    validations:
+      required: true
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: Would you like to help?
+      options:
+        - "I can test or give feedback"
+        - "I would like to contribute a change"
+        - "I am sharing an idea"
