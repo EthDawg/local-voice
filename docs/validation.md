@@ -51,3 +51,5 @@ Tested on this Apple Silicon Mac running macOS 26.5.1. The installed signed bina
 - Automatic insertion and clipboard restoration require the user’s macOS Accessibility grant. That grant and its live end-to-end test remain pending. The app currently copies safely and shows the enable action. No successful automatic insertion is claimed here.
 
 The native speech round-trip and M4A re-transcription pass on the installed build. CoreML still prints the upstream E5RT shape diagnostic during loading, without preventing successful inference. No cloud account or server is required.
+
+Follow-up UI verification: Voice opened StageMark from the shared switcher. With both apps running, choosing Dark in StageMark immediately updated Voice; choosing System in Voice updated StageMark. The temporary TextEdit document was saved locally, checked against the exact test transcript, and moved to Trash; the temporary file and its provisional iCloud document no longer exist. Accessibility approval and direct-paste verification are still pending.
