@@ -9,7 +9,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     @Published var preferences = VoicePreferences.load() {
         didSet {
             preferences.save()
-            if oldValue.dictationShortcut != preferences.dictationShortcut || oldValue.controlsShortcut != preferences.controlsShortcut { onShortcutsChanged?() }
+            if oldValue.dictationShortcut != preferences.dictationShortcut || oldValue.controlsShortcut != preferences.controlsShortcut || oldValue.libraryShortcut != preferences.libraryShortcut { onShortcutsChanged?() }
         }
     }
     @Published var rawTranscript = ""
@@ -20,6 +20,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     @Published var shortcutFailures: [UInt32: String] = [:]
     @Published var quickTab = "Dictate"
     @Published var page = "dictate"
+    @Published var libraryFocusToken = UUID()
     @Published var phase: Phase = .idle
     @Published var ready = false
     @Published var preparing = false
@@ -44,6 +45,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     let engine = RecognitionEngine()
     let cleanupEngine = CleanupEngine()
     let store = StateStore()
+    let library = DemoLibraryModel()
     private var loaded = false
     private var recorder: AVAudioRecorder?
     private var recordURL: URL?
@@ -233,6 +235,8 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         TextDelivery.copy(transcript)
         status = "Copied to clipboard."
     }
+    func showLibrary() { libraryFocusToken = UUID(); page = "library"; onShowEditor?("library") }
+    func savePrompt(_ text: String) { guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }; showLibrary(); library.newPrompt(text) }
     func copyCapture(_ item: Transcript) { TextDelivery.copy(item.text); status = "Transcript copied." }
     func showPanelPreview() {
         guard phase == .idle else { return }

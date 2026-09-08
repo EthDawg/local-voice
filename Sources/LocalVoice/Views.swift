@@ -29,6 +29,7 @@ struct ContentView: View {
                     switch model.page {
                     case "speak": speak
                     case "history": history
+                    case "library": DemoLibraryView(library: model.library, model: model)
                     case "dictionary": DictionaryView(model: model)
                     case "settings": settings
                     case "shortcuts": shortcuts
@@ -39,7 +40,7 @@ struct ContentView: View {
                     Circle().fill(model.phase == .recording ? .red : mint).frame(width: 6, height: 6)
                     Text(model.status).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2)
                     Spacer()
-                    Text("WORKBENCH VOICE  /  1.2").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(.tertiary)
+                    Text("WORKBENCH VOICE  /  \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development")\(Workbench.isPreview ? " PREVIEW" : "")").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(.tertiary)
                 }
             }.padding(32).background(ink)
         }
@@ -64,6 +65,7 @@ struct ContentView: View {
             nav("speak", "Read aloud", "speaker.wave.2")
             Divider().padding(.vertical, 14)
             nav("history", "Recent transcripts", "clock")
+            nav("library", "Demo library", "square.stack.3d.up")
             nav("dictionary", "Your dictionary", "text.book.closed")
             nav("shortcuts", "Shortcuts", "command")
             nav("settings", "Settings", "slider.horizontal.3")
@@ -134,6 +136,7 @@ struct ContentView: View {
                 Button { model.copyTranscript() } label: { Label("Copy text", systemImage: "doc.on.doc") }.buttonStyle(PrimaryButton()).disabled(model.transcript.isEmpty)
                 Button("Clean text") { model.cleanCurrentDraft() }.disabled(model.transcript.isEmpty || model.phase != .idle)
                 Button("Save text…") { model.exportTranscript() }.disabled(model.transcript.isEmpty)
+                Button("Save prompt") { model.savePrompt(model.transcript) }.disabled(model.transcript.isEmpty)
                 Spacer()
                 if model.canRetry { Button("Retry transcription") { model.retryTranscription() } }
                 Button { model.importAudio() } label: { Label("Import audio…", systemImage: "arrow.up.doc") }.disabled(!model.ready || model.phase != .idle)

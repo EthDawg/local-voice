@@ -8,7 +8,7 @@ Workbench is a collection of small native Mac utilities. Each tool has one job, 
 - Both declare `public.app-category.utilities`. macOS owns Spotlight’s result grouping; applications cannot create a custom Workbench result category. The shared name provides reliable suite discovery within Apps.
 - Keep the existing bundle identifiers and storage domains when renaming an app. Voice remains `com.ethdawg.localvoice`; StageMark remains `local.ethan.StageMark`.
 - Icons use a slate background, mint symbol, and rounded square. Each symbol identifies the app: waveform for Voice, pencil for StageMark.
-- Keep a single installed copy. Build archives contain the app; temporary unpacked bundles are removed after packaging. Installers retain the prior version as a ZIP for rollback.
+- Keep one installed copy per channel. Stable apps retain their existing identifiers. Preview adds ` Preview` to the app name and `.preview` to its bundle ID, runs from `~/Applications`, and uses separate preferences and saved data. Build archives contain the app; temporary unpacked bundles are removed after packaging. Installers retain the prior version as a ZIP for rollback.
 
 ## Everyday controls
 
@@ -20,11 +20,11 @@ All primary shortcuts are editable and conflicts are reported. Voice uses Contro
 
 `Workbench.swift` is the small shared shell, currently copied identically into both repositories. Compare its hash before shipping a shell change and update both apps together. It supplies colours, header, switcher, appearance picker, and SwiftUI appearance modifier. The latter matters because status-item popovers do not consistently inherit `NSApp.appearance`.
 
-System, Light, and Dark are persisted in the `com.ethdawg.workbench` preference suite, key `appearance`. A distributed notification updates the other running app immediately. App-specific settings stay in the app’s existing domain. Use native surfaces, primary/secondary text, restrained mint/teal accents, and clear disabled controls. Do not force a dark theme on the user’s tools.
+System, Light, and Dark are persisted in the `com.ethdawg.workbench` preference suite, key `appearance`; Preview uses `com.ethdawg.workbench.preview` with its own notification name. A distributed notification updates the other running app immediately. App-specific settings stay in the app’s existing domain. Use native surfaces, primary/secondary text, restrained mint/teal accents, and clear disabled controls. Do not force a dark theme on the user’s tools.
 
 ## Handoff and user control
 
-The Workbench switcher opens the installed sibling app. StageMark ends the active drawing interaction and commits text before handing off; saved boards remain intact. Voice closes its panel and stops playback before switching, and disables the switch while recording or processing.
+The Workbench switcher opens the installed sibling app in the same channel. StageMark ends the active drawing interaction and commits text before handing off; saved boards remain intact. Voice closes its panel and stops playback before switching, and disables the switch while recording or processing.
 
 Dictation captures its starting app and focused accessibility element. Automatic delivery rechecks both immediately before pasting. If either changed, access is missing, or the field is secure, copy instead and explain the result. Never press Return or submit a message. Restore the earlier clipboard only after insertion is verified and the app still owns the clipboard change; otherwise retain the transcript for recovery.
 
@@ -35,3 +35,7 @@ The editor always exposes the original transcript. Cleanup must be optional and 
 Use the naming, native shell, appearance suite, category, and handoff rules above. Choose shortcuts that do not conflict with installed suite apps. Keep a small independent application rather than requiring a new platform service. Verify the actual installed app: menu layout, light/dark appearance, Spotlight name, shortcuts, focus restoration, state migration, and interaction with its siblings. A successful compile alone is insufficient.
 
 References: [Apple Spotlight guidance](https://support.apple.com/guide/mac-help/search-with-spotlight-mchlp1008/mac), [Launch Services keys](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/LaunchServicesKeys.html).
+
+## Local testing and updates
+
+`install.sh` / `install.zsh` install a signed Preview by default, alongside production. The shared `scripts/release/preview.py` is mirrored with its installer regression tests. Preview seeds missing settings and known saved-data files from production on first launch only, then writes exclusively to its own app support folder. Keep the same Developer ID, bundle ID and installation path across updates. Never reset TCC or erase app data as a release step. Run one edition at a time for global shortcut testing. Voice shares the public FluidAudio model cache but isolates all user-authored state. The Mac App Store sandbox candidate remains a separate distribution workflow.

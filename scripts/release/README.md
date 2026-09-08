@@ -1,3 +1,19 @@
+# Preview and production
+
+Local development installs **Workbench Voice Preview** into `~/Applications`. It has a separate name, executable, bundle ID, app preferences, shared appearance domain and Application Support directory. Keep production installed. Open one edition at a time when using its global shortcuts; macOS only gives each shortcut to one owner.
+
+```sh
+bash scripts/install.sh --no-open
+```
+
+Run the same command for the next update after quitting Preview. The installer uses the existing Developer ID certificate in Keychain, validates the replacement, keeps a rollback ZIP, and swaps only the Preview bundle. It never deletes app data or resets system permissions. The first Preview launch copies missing app settings and known saved-data files from production once; later updates preserve the Preview's own changes. Production is never written. Voice reuses the public FluidAudio model cache to avoid another download; transcripts and library metadata are separate.
+
+Preview has its own initial macOS permission prompts. Consistent signing identity, bundle ID and installed path keep later releases eligible to retain those grants; macOS controls the final decision. `--ad-hoc` is only for disposable contributor builds and is refused by the normal installer. If more than one Developer ID exists, select its public SHA-1 fingerprint with `--identity`. No private key or password belongs in command arguments.
+
+`bash scripts/build.sh --preview` only builds the ZIP. `python3 scripts/release/preview.py install --archive "PATH_TO_PREVIEW.zip" --no-open` installs an existing signed candidate. StageMark Preview contains both Apple Silicon and Intel slices by default; `--native` opts into a local architecture build. Voice remains Apple Silicon because its recognition backend has not been verified on Intel.
+
+These local signed candidates are not notarized public downloads. Publication remains the explicit release process below. To update production in place from a finished release, pass `--production --archive "PATH_TO_NOTARIZED_ZIP"` to the installer. It verifies the selected bundle ID, Developer ID signature, notarization ticket and Gatekeeper before replacing the installed app. Production updates never build an ad-hoc replacement.
+
 # Developer ID releases
 
 Run from an interactive release Mac, with the installed copy of the app quit.

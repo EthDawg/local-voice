@@ -2,6 +2,10 @@
 set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
+if [ "${1:-}" = "--preview" ]; then
+    shift
+    exec python3 scripts/release/preview.py build "$@"
+fi
 swift build -c release --disable-sandbox
 BIN_DIR="$(swift build -c release --show-bin-path --disable-sandbox)"
 mkdir -p "$PROJECT_DIR/dist"

@@ -61,7 +61,7 @@ struct SavedState: Codable {
 
 struct StateStore {
     let url: URL
-    init(directory: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("LocalVoice")) {
+    init(directory: URL = Workbench.supportDirectory(component: "LocalVoice")) {
         url = directory.appendingPathComponent("state.json")
     }
     func load() throws -> SavedState {
