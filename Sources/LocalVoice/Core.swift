@@ -35,6 +35,20 @@ struct Transcript: Codable, Identifiable {
     var cleanupMethod: String? = nil
 }
 
+enum TranscriptHistory {
+    static let limit = 100
+    static func adding(_ capture: Transcript, to history: [Transcript]) -> [Transcript] {
+        // Separate recordings remain separate even when their words are identical.
+        Array(([capture] + history.filter { $0.id != capture.id }).prefix(limit))
+    }
+    static func matching(_ history: [Transcript], query: String) -> [Transcript] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return query.isEmpty ? history : history.filter {
+            $0.text.localizedCaseInsensitiveContains(query) || ($0.rawText?.localizedCaseInsensitiveContains(query) ?? false)
+        }
+    }
+}
+
 struct SavedState: Codable {
     var draft = ""
     var speechText = ""

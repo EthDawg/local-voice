@@ -27,6 +27,23 @@ enum CoreChecks {
         let restored = try store.load()
         try check(restored.draft == original.draft && restored.speechText == original.speechText, "draft and reading restored")
         try check(restored.history.first?.text == "A thought" && restored.history.first?.seconds == 3.25, "history restored")
+        let earlier = Transcript(text: "Same words", seconds: 2, rawText: "Um, same words", cleanupMethod: "Light")
+        let later = Transcript(text: "Same words", seconds: 4, rawText: "Same words")
+        let captures = TranscriptHistory.adding(later, to: [earlier])
+        try check(captures.count == 2 && captures[0].id == later.id && captures[1].id == earlier.id, "repeated words remain distinct captures in newest-first order")
+        var many: [Transcript] = []
+        for i in 0...TranscriptHistory.limit { many = TranscriptHistory.adding(Transcript(text: "Capture \(i)", seconds: 1), to: many) }
+        try check(many.count == TranscriptHistory.limit && many.first?.text == "Capture 100" && many.last?.text == "Capture 1", "bounded history retains the newest 100 captures")
+        try store.save(SavedState(draft: "Independently edited draft", history: captures))
+        let recovered = try store.load()
+        try check(recovered.history.map(\.id) == captures.map(\.id) && recovered.history.last?.rawText == earlier.rawText, "multiple captures and originals survive saving an unrelated draft")
+        try check(TranscriptHistory.matching(captures, query: "UM,").map(\.id) == [earlier.id], "search finds original wording without requiring exact case")
+        try check(TranscriptHistory.matching(captures, query: " ").count == 2, "clearing history search restores every capture")
+        let screen = NSRect(x: 0, y: 30, width: 1440, height: 870)
+        let moved = NSPoint(x: 100, y: 320)
+        try check(CapturePanelPlacement.origin(saved: moved, screens: [screen], preferred: screen) == moved, "dictation panel preserves a user-chosen visible position")
+        let recoveredOrigin = CapturePanelPlacement.origin(saved: NSPoint(x: 5000, y: -900), screens: [screen], preferred: screen)
+        try check(screen.contains(NSRect(origin: recoveredOrigin, size: CapturePanelPlacement.size)), "dictation panel recovers onto a connected display")
         try check(restored.replacements == original.replacements && restored.voice == "Daniel" && restored.rate == 210, "dictionary and voice preferences restored")
         let permissions = try FileManager.default.attributesOfItem(atPath: store.url.path)[.posixPermissions] as? NSNumber
         try check(permissions?.intValue == 0o600, "state file private to current user")

@@ -15,8 +15,7 @@ struct ContentView: View {
                 HStack {
                     Label("ON YOUR MAC", systemImage: "lock.shield").font(.system(size: 10, weight: .semibold)).tracking(1.6).foregroundStyle(mint)
                     Spacer()
-                    Text(model.preferences.dictationShortcut.label).font(.system(size: 12, weight: .medium, design: .monospaced)).foregroundStyle(.secondary)
-                    Text("to dictate").font(.system(size: 12)).foregroundStyle(.secondary)
+                    ShortcutControl(model: model, id: 1, title: "Dictation").frame(width: 300)
                 }
                 if let error = model.error {
                     HStack(alignment: .top, spacing: 10) {
@@ -32,6 +31,7 @@ struct ContentView: View {
                     case "history": history
                     case "dictionary": DictionaryView(model: model)
                     case "settings": settings
+                    case "shortcuts": shortcuts
                     default: dictate
                     }
                 }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -39,7 +39,7 @@ struct ContentView: View {
                     Circle().fill(model.phase == .recording ? .red : mint).frame(width: 6, height: 6)
                     Text(model.status).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2)
                     Spacer()
-                    Text("WORKBENCH VOICE  /  1.1").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(.tertiary)
+                    Text("WORKBENCH VOICE  /  1.2").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(.tertiary)
                 }
             }.padding(32).background(ink)
         }
@@ -65,7 +65,8 @@ struct ContentView: View {
             Divider().padding(.vertical, 14)
             nav("history", "Recent transcripts", "clock")
             nav("dictionary", "Your dictionary", "text.book.closed")
-            nav("settings", "Setup", "slider.horizontal.3")
+            nav("shortcuts", "Shortcuts", "command")
+            nav("settings", "Settings", "slider.horizontal.3")
             Spacer()
             WorkbenchSwitcher { model.stopPlayback() }.disabled(model.phase != .idle)
             VStack(alignment: .leading, spacing: 9) {
@@ -174,34 +175,22 @@ struct ContentView: View {
     }
 
     private var history: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            heading("Pick up a thought.", "Every completed capture is saved here, with its original words.")
+            CaptureHistoryView(model: model)
+        }
+    }
+
+    private var shortcuts: some View {
         VStack(alignment: .leading, spacing: 24) {
-            heading("Pick up a thought.", "Your last 30 transcripts, saved only on this Mac. Original recordings are discarded after transcription.")
-            if model.history.isEmpty {
-                VStack(spacing: 12) { Image(systemName: "clock").font(.system(size: 32)).foregroundStyle(mint); Text("Your first thought starts here."); Text("Record or import audio to create a transcript.").foregroundStyle(.secondary).font(.system(size: 12)) }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(model.history) { item in
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack { Text(item.date, format: .dateTime.month(.abbreviated).day().hour().minute()); Spacer(); Text("\(TextRules.wordCount(item.text)) words · \(time(item.seconds))") }.font(.system(size: 10)).foregroundStyle(.secondary)
-                                Text(item.text).font(.system(size: 13)).lineLimit(4).lineSpacing(4).frame(maxWidth: .infinity, alignment: .leading)
-                                HStack {
-                                    Button("Open transcript") { model.openTranscript(item) }
-                                    Button("Read aloud") { model.speechText = item.text; model.page = "speak" }
-                                    Spacer()
-                                    Button { model.removeTranscript(item) } label: { Image(systemName: "trash") }.accessibilityLabel("Remove transcript")
-                                }.font(.system(size: 11)).buttonStyle(.borderless)
-                            }.padding(18).background(panelColor, in: RoundedRectangle(cornerRadius: 12))
-                        }
-                    }
-                }
-            }
+            heading("Make it your shortcut.", "Change keys here or directly in quick controls, just like StageMark.")
+            VoiceShortcutSettings(model: model).padding(22).background(panelColor, in: RoundedRectangle(cornerRadius: 14))
+            Spacer()
         }
     }
 
     private var settings: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        ScrollView { VStack(alignment: .leading, spacing: 24) {
             heading("Ready, set, speak.", "A few simple controls. Everything else is taken care of.")
             VStack(alignment: .leading, spacing: 22) {
                 settingRow("Speech model", model.modelMessage, "cpu") {
@@ -212,7 +201,12 @@ struct ContentView: View {
                 Divider()
                 settingRow("Microphone", "Workbench Voice records only when you start a recording.", "mic") { Button("Open settings") { model.openMicrophoneSettings() } }
                 Divider()
-                VoiceOptions(model: model)
+                VoiceOptions(model: model, showShortcut: false)
+                Divider()
+                VoiceShortcutSettings(model: model)
+                Divider()
+                Button("Position dictation panel…") { model.showPanelPreview() }.disabled(model.phase != .idle)
+                Text("Drag the grip on the panel. Its position is remembered between recordings and app launches.").font(.caption).foregroundStyle(.secondary)
                 Divider()
                 WorkbenchAppearancePicker()
             }.padding(22).background(panelColor, in: RoundedRectangle(cornerRadius: 14))
@@ -220,7 +214,7 @@ struct ContentView: View {
             Text("Audio is processed on your Mac. No account, API key, analytics, or subscription. The initial model download uses the internet; dictation and reading then work offline. Drafts, your dictionary, and recent transcripts are stored in Application Support/LocalVoice.")
                 .font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(5).textSelection(.enabled)
             Spacer()
-        }
+        } }
     }
     private func settingRow<Accessory: View>(_ title: String, _ subtitle: String, _ icon: String, @ViewBuilder accessory: () -> Accessory) -> some View {
         HStack(spacing: 14) {
@@ -278,16 +272,5 @@ struct PrimaryButton: ButtonStyle {
 struct WaveBars: View {
     let level: Double
     var body: some View { HStack(spacing: 3) { ForEach(0..<16) { index in RoundedRectangle(cornerRadius: 2).fill(mint).frame(width: 3, height: 3 + level * Double([10, 18, 12, 22, 15, 24, 16, 10][index % 8])) } }.animation(.easeOut(duration: 0.1), value: level) }
-}
-struct RecordingOverlay: View {
-    @ObservedObject var model: AppModel
-    var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: model.phase == .recording ? "mic.fill" : "waveform").foregroundStyle(model.phase == .recording ? .red : mint)
-            if model.phase == .recording { WaveBars(level: model.level); Text(time(model.elapsed)).monospacedDigit() }
-            else { ProgressView().controlSize(.small); Text(model.phase == .cleaning ? "Tidying…" : "Transcribing…") }
-            Text(model.preferences.capture == .hold ? "Release to finish" : model.preferences.dictationShortcut.label).foregroundStyle(.secondary)
-        }.font(.system(size: 12, weight: .medium)).padding(18).background(.ultraThickMaterial, in: Capsule()).workbenchTheme()
-    }
 }
 func time(_ seconds: Double) -> String { String(format: "%d:%02d", max(0, Int(seconds)) / 60, max(0, Int(seconds)) % 60) }

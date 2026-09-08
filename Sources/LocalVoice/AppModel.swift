@@ -15,6 +15,8 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     @Published var rawTranscript = ""
     @Published var cleanupMethod = ""
     @Published var editingShortcut: UInt32?
+    @Published var shortcutRecordingMessage: String?
+    @Published var previewingPanel = false
     @Published var shortcutFailures: [UInt32: String] = [:]
     @Published var quickTab = "Dictate"
     @Published var page = "dictate"
@@ -62,6 +64,10 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     var onMenuRecording: (() -> Void)?
     var onCloseMenu: (() -> Void)?
     var onPasteLast: (() -> Void)?
+    var onPasteTranscript: ((String) -> Void)?
+    var onCancelShortcut: (() -> Void)?
+    var onResetShortcuts: (() -> Void)?
+    var onResetPanel: (() -> Void)?
     var voices: [String] = []
 
     override init() {
@@ -104,6 +110,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     func toggleRecording(fromShortcut: Bool = false, target: TextDelivery.Target? = nil) {
         if phase == .recording { stopRecording(); return }
         guard phase == .idle, ready, !rendering else { return }
+        previewingPanel = false
         stopPlayback()
         let attempt = UUID(); recordingAttempt = attempt
         destination = target ?? (fromShortcut ? TextDelivery.capture() : nil)
@@ -208,8 +215,9 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
                 guard !result.isEmpty else { throw VoiceError.message("No speech was recognised. Try speaking closer to the microphone.") }
                 transcript = result
                 cleanupMethod = cleaned.method
-                history.insert(Transcript(text: result, seconds: duration, rawText: raw, cleanupMethod: cleaned.method), at: 0)
-                history = Array(history.prefix(30)); persist()
+                history = TranscriptHistory.adding(Transcript(text: result, seconds: duration, rawText: raw, cleanupMethod: cleaned.method), to: history)
+                // Commit the capture before focus restoration or clipboard delivery can suspend this task.
+                saveNow()
                 accessibilityGranted = AXIsProcessTrusted()
                 status = await TextDelivery.deliver(result, target: destination, mode: preferences.delivery, restoreClipboard: preferences.restoreClipboard)
                 if temporary { try? FileManager.default.removeItem(at: url); recordURL = nil }
@@ -225,6 +233,12 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         TextDelivery.copy(transcript)
         status = "Copied to clipboard."
     }
+    func copyCapture(_ item: Transcript) { TextDelivery.copy(item.text); status = "Transcript copied." }
+    func showPanelPreview() {
+        guard phase == .idle else { return }
+        previewingPanel = true; onPhaseChange?()
+    }
+    func closePanelPreview() { previewingPanel = false; onPhaseChange?() }
     func cleanCurrentDraft() {
         guard phase == .idle, !transcript.isEmpty else { return }
         let original = transcript

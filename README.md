@@ -21,16 +21,17 @@ For updates, quit the app, pull the repository, and run the installer again. Use
 ## Use it
 
 - **Dictate:** click the microphone, speak, then click Stop. macOS asks for microphone permission the first time.
-- **From another app:** press **Control + Option + Space** to start and again to finish. Choose **Press & hold** in quick controls if you prefer releasing the shortcut to finish. Both shortcuts are editable.
-- **Quick controls:** click the waveform in the menu bar or press **Control + Option + V**. Dictate, Read, and General tabs cover everyday settings; the editor handles longer text.
+- **From another app:** press **Control + Option + Space** to start and again to finish. Choose **Press & hold** in quick controls if you prefer releasing the shortcut to finish. Both shortcuts are editable: click the keycap with the pencil, then press your combination. Escape cancels; Delete disables. Unavailable combinations leave your existing shortcut unchanged.
+- **Quick controls:** click the waveform in the menu bar or press **Control + Option + V**. Dictate, Read, Recent, and Settings tabs cover everyday controls. Both shortcuts are editable in the Settings tab and in the editor’s Shortcuts / Settings pages. Command + comma opens Settings.
 - **Cleanup:** **Light** is the fast default for filler sounds, accidental repetition, explicit corrections, and requested lists. **Original** skips cleanup; **Natural** adds guarded, optional editing with Apple Intelligence on supported macOS 26 Macs, falling back to Light when unavailable or an edit changes checked facts. The **Original…** view retains the unedited transcript. **Clean text** also tidies an existing draft.
 - **Automatic paste:** choose **Paste automatically** and enable macOS Accessibility. Voice attempts paste only if the original app and focused field are still current; secure fields are excluded. It never presses Return. Confirmed insertion can restore your previous clipboard. If focus changes or insertion cannot be confirmed, the transcript stays copied. **Copy to clipboard** is always available.
-- **Paste last transcript:** open quick controls from a text field and use this action to reuse the last transcript.
+- **Capture panel:** click **Finish** to stop recording, or use its real **More** menu to discard. Drag the grip at the left to move it; Voice remembers the position across recordings and launches. Settings → **Position dictation panel…** previews it with the microphone off. The menu can reset its position.
+- **Reuse a capture:** open quick controls from a text field, choose **Recent**, and Copy, Open, or Paste any saved capture. The Dictate tab also shows the latest capture and two preceding captures. Opening an older capture does not relabel it as the latest recording.
 - **Workbench:** both Voice and [StageMark](https://github.com/EthDawg/StageMark) share a suite switcher, appearance settings, and Spotlight prefix. Search **Workbench** to find them.
 - **Read aloud:** choose an installed voice and pace, enter text, and click Listen. Pause, resume, stop, or save an M4A file.
 - **Import audio:** transcribe an audio file up to 30 minutes. Original imported files are never modified.
 - **Dictionary:** replace recognised words or phrases with your preferred spelling. Matches whole words, ignoring case. Dictionary replacements run after cleanup.
-- **Recent transcripts:** the last 30 completed transcripts stay on this Mac.
+- **Recent transcripts:** the last 100 completed captures stay on this Mac, including separate recordings with identical words. Search checks both cleaned and original text. The full history offers original wording and read-aloud actions. Captures are saved before clipboard or paste delivery; existing history survives updates.
 
 Closing the window keeps the app in the menu bar. Use **Quit Workbench Voice** or Command + Q to exit completely.
 
@@ -55,7 +56,7 @@ bash scripts/build.sh
 "$HOME/Applications/Workbench Voice.app/Contents/MacOS/LocalVoice" --transcribe /path/to/audio.m4a
 ```
 
-The self-test synthesizes a known passage with macOS speech, transcribes it with Parakeet, checks key phrases, exports a non-empty M4A, then transcribes that export. Fourteen core checks cover dictionary boundaries and escaping, state persistence, damaged-state behaviour, and input limits. Sixteen additional cleanup checks cover correction and list cases, factual edit rejection, original line breaks, and version-one state migration. `--check-cleanup` exercises the actual optional Apple language model. They run without XCTest or a full Xcode installation. Microphone permission, recording, and UI behaviour also need interactive testing; file round-trips alone do not prove microphone capture.
+The self-test synthesizes a known passage with macOS speech, transcribes it with Parakeet, checks key phrases, exports a non-empty M4A, then transcribes that export. Twenty-one core checks cover dictionary boundaries and escaping, state persistence, damaged-state behaviour, and input limits. Sixteen additional cleanup checks cover correction and list cases, factual edit rejection, original line breaks, and version-one state migration. `--check-cleanup` exercises the actual optional Apple language model. They run without XCTest or a full Xcode installation. Microphone permission, recording, and UI behaviour also need interactive testing; file round-trips alone do not prove microphone capture.
 
 ## Design and credits
 

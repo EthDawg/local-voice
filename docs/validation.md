@@ -61,3 +61,18 @@ System Settings initially showed Workbench Voice enabled while the installed app
 The real **Paste last transcript** action then confirmed insertion with **Pasted into ChatGPT.** This status requires a changed Accessibility field value containing the complete transcript. The automation operated TextEdit in the background, so the actual destination was the foreground Codex app, reported by macOS as ChatGPT. No Return/send action was issued. The user was informed that the test sample might remain in that message draft; the UI tools cannot edit Codex itself.
 
 Clipboard restoration was independently checked through TextEdit: copying `WORKBENCH_CLIPBOARD_CHECK` before delivery and manually pasting afterward produced that exact sentinel, rather than the transcript. The local scratch document was saved, closed, verified to contain only that sentinel, and moved to Trash. The earlier denied-permission and changed-focus attempts retained a copied transcript without insertion. These checks cover the production delivery path shared by dictation and Paste last transcript; they do not constitute a new microphone-to-paste recording test or a matrix of target apps.
+
+## Workbench Voice 1.2.0 — usability follow-up, 8 September 2026
+
+The update is installed in `~/Applications/Workbench Voice.app`. Completion of the final permission and recording checks is still pending.
+
+- Release build, signature verification, 21 core checks, and 16 cleanup checks pass. The installer’s real speech/transcription/M4A round-trip passes on the packaged build.
+- Native input checks pass. In the installed UI, both shortcut recorders accepted a new combination and restored the original defaults. An unmodified key and a duplicate Voice shortcut were rejected without changing the working binding. Both recorders are visible in quick Settings and the main Shortcuts page.
+- Quick controls expose a Recent tab and the Dictate tab exposes the latest three captures. The full history screen and its search field were visually inspected. Searching a phrase returned two distinct repeated captures.
+- Copying an older capture was independently compared with the selected saved entry through the clipboard; it matched exactly and did not overwrite the current draft.
+- All 11 pre-existing history entries, the draft, and dictionary survived installation unchanged. New completed captures are saved synchronously before paste/clipboard delivery, with a 100-entry limit. Automated checks cover order, repeated wording, original text, retention, and independent draft persistence.
+- The native preview panel has working Done and More controls. Its menu opens and provides Reset panel position and Close preview. The preview explicitly keeps the microphone off.
+- The first drag experiment did not persist a position. Replaced the drag implementation with native mouse tracking. Subsequent drag gestures changed the actual window origin and saved it; moving left 200 and down 120 produced that exact position change. Closing and reopening the preview retained the stored position. Bounds recovery for disconnected displays passes the geometry check.
+- Preserved held-shortcut state when closing ordinary quick controls; only ending an actual shortcut-edit session now re-registers hotkeys.
+
+Remaining checks: macOS Touch ID authentication is required to re-add only Workbench Voice’s Accessibility permission after replacing the locally signed executable. The user has already approved this repair; its old entry was reset with the supported app-scoped macOS command. The new entry must be added and Automatic paste ready verified. The final build still needs a brief recording check of the real Finish button and a post-relaunch panel/history check.

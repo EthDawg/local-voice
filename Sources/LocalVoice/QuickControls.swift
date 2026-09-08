@@ -1,6 +1,26 @@
 import AppKit
 import SwiftUI
 
+struct ShortcutKeycap: View {
+    @ObservedObject var model: AppModel
+    var id: UInt32
+    var title: String
+    var body: some View {
+        Button { model.onEditShortcut?(id) } label: {
+            HStack(spacing: 7) {
+                Text(model.editingShortcut == id ? "Press keys…" : (id == 1 ? model.preferences.dictationShortcut : model.preferences.controlsShortcut).label)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                Image(systemName: "pencil").font(.system(size: 10))
+            }.padding(.horizontal, 10).padding(.vertical, 7)
+                .foregroundStyle(model.editingShortcut == id ? Workbench.accent : .primary)
+                .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(model.editingShortcut == id ? Workbench.accent : .clear))
+        }.buttonStyle(.plain).disabled(model.phase != .idle)
+            .accessibilityLabel("Edit \(title.lowercased()) shortcut")
+            .help("Click to change · Escape cancels · Delete disables")
+    }
+}
+
 struct ShortcutControl: View {
     @ObservedObject var model: AppModel
     var id: UInt32
@@ -10,20 +30,38 @@ struct ShortcutControl: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Text(title); Spacer()
-                Button(model.editingShortcut == id ? "Press keys…" : shortcut.label) { model.onEditShortcut?(id) }
-                    .font(.system(size: 11, design: .monospaced)).frame(minWidth: 84)
-                    .accessibilityLabel("Edit \(title.lowercased()) shortcut")
+                if model.editingShortcut == id { Button("Cancel") { model.onCancelShortcut?() }.buttonStyle(.link) }
+                ShortcutKeycap(model: model, id: id, title: title)
             }
-            if model.editingShortcut == id { Text("Use ⌃, ⌥ or ⌘ with a key. Esc cancels; Delete turns it off.").font(.caption).foregroundStyle(.secondary) }
+            if model.editingShortcut == id {
+                Text(model.shortcutRecordingMessage ?? "Press your combination. Use ⌃, ⌥ or ⌘ with a key.")
+                    .font(.caption).foregroundStyle(model.shortcutRecordingMessage == nil ? Color.secondary : .orange)
+            }
             if let failure = model.shortcutFailures[id] { Text(failure).font(.caption).foregroundStyle(.orange) }
         }
     }
 }
-struct VoiceOptions: View {
+
+struct VoiceShortcutSettings: View {
     @ObservedObject var model: AppModel
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Click a shortcut, then press your preferred combination.").font(.caption).foregroundStyle(.secondary)
             ShortcutControl(model: model, id: 1, title: "Dictation")
+            ShortcutControl(model: model, id: 2, title: "Quick controls")
+            Text("Escape cancels. Delete turns a shortcut off. Existing shortcuts stay unchanged if a combination is unavailable.")
+                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Button("Restore default shortcuts") { model.onResetShortcuts?() }
+        }.disabled(model.phase != .idle)
+    }
+}
+
+struct VoiceOptions: View {
+    @ObservedObject var model: AppModel
+    var showShortcut = true
+    var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            if showShortcut { ShortcutControl(model: model, id: 1, title: "Dictation") }
             Picker("Activation", selection: $model.preferences.capture) {
                 ForEach(CaptureMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
@@ -63,9 +101,11 @@ struct VoiceQuickControls: View {
                     .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().accessibilityLabel("More options")
             }
             Picker("Quick controls", selection: $model.quickTab) {
-                ForEach(["Dictate", "Read", "General"], id: \.self) { Text($0).tag($0) }
+                ForEach(["Dictate", "Read", "Recent", "Settings"], id: \.self) { Text($0).tag($0) }
             }.pickerStyle(.segmented).labelsHidden()
-            ScrollView {
+            if model.quickTab == "Recent" {
+                CaptureHistoryView(model: model, compact: true)
+            } else { ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     if let error = model.error {
                         HStack(alignment: .top) { Text(error); Spacer(); Button { model.error = nil } label: { Image(systemName: "xmark") } }
@@ -73,11 +113,11 @@ struct VoiceQuickControls: View {
                     }
                     switch model.quickTab {
                     case "Read": reading
-                    case "General": general
+                    case "Settings": general
                     default: dictation
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 2)
-            }
+            } }
             Divider()
             Text(model.status).font(.system(size: 10)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).lineLimit(3)
             HStack {
@@ -101,15 +141,31 @@ struct VoiceQuickControls: View {
             if model.phase == .requesting { Button("Cancel microphone request") { model.cancelRecording() } }
             VoiceOptions(model: model)
             Divider()
-            if !model.transcript.isEmpty {
-                HStack { Text("LAST TRANSCRIPT").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary); Spacer(); Button("Copy") { model.copyTranscript() }.buttonStyle(.link) }
-                Text(model.transcript).font(.system(size: 11)).lineLimit(5).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+            if let latest = model.history.first {
+                HStack { Text("LATEST CAPTURE").font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary); Spacer(); Button("Copy") { model.copyCapture(latest) }.buttonStyle(.link) }
+                Text(latest.text).font(.system(size: 12)).lineLimit(4).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 HStack {
-                    Button("Edit / original…") { model.onShowEditor?("dictate") }
+                    Button("Open") { model.openTranscript(latest); model.onShowEditor?("dictate") }
                     Spacer()
-                    Button("Paste last transcript") { model.onPasteLast?() }.disabled(model.phase != .idle)
+                    Button("Paste") { model.onPasteTranscript?(latest.text) }.disabled(model.phase != .idle)
                 }
             } else { Text("Start in any text field. Your words return there when you finish.").font(.caption).foregroundStyle(.secondary) }
+            Button { model.quickTab = "Recent" } label: {
+                HStack { Label("Recent transcripts", systemImage: "clock"); Spacer(); Text("\(model.history.count)").monospacedDigit(); Image(systemName: "chevron.right") }
+            }.buttonStyle(.plain).foregroundStyle(Workbench.accent).padding(.vertical, 5)
+            if model.history.count > 1 {
+                ForEach(Array(model.history.dropFirst().prefix(2))) { item in
+                    HStack(alignment: .top, spacing: 8) {
+                        Button { model.openTranscript(item); model.onShowEditor?("dictate") } label: {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.text).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                                Text(item.date, format: .dateTime.hour().minute()).font(.system(size: 9)).foregroundStyle(.secondary)
+                            }
+                        }.buttonStyle(.plain)
+                        Button { model.copyCapture(item) } label: { Image(systemName: "doc.on.doc") }.help("Copy transcript").accessibilityLabel("Copy recent transcript")
+                    }.font(.system(size: 11)).padding(9).background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 7))
+                }
+            }
         }
     }
     private var reading: some View {
@@ -133,7 +189,10 @@ struct VoiceQuickControls: View {
     }
     private var general: some View {
         VStack(alignment: .leading, spacing: 16) {
-            ShortcutControl(model: model, id: 2, title: "Quick controls")
+            VoiceShortcutSettings(model: model)
+            Divider()
+            Button("Position dictation panel…") { model.onCloseMenu?(); model.showPanelPreview() }.disabled(model.phase != .idle)
+            Text("Drag its grip to move it. The position is remembered between recordings.").font(.caption).foregroundStyle(.secondary)
             Toggle("Restore clipboard after confirmed paste", isOn: $model.preferences.restoreClipboard)
             Text("If focus changes or paste cannot be confirmed, the transcript stays on your clipboard.").font(.caption).foregroundStyle(.secondary)
             Divider(); WorkbenchAppearancePicker()
