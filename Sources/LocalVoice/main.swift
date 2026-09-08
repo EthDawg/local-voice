@@ -4,87 +4,142 @@ import Carbon
 import AVFoundation
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     var window: NSWindow!
     var overlay: NSPanel!
     var model: AppModel!
     var statusItem: NSStatusItem!
-    var hotKey: EventHotKeyRef?
-    var handler: EventHandlerRef?
+    let hotkeys = VoiceHotkeys()
+    var popover: NSPopover!
+    var recorderMonitor: Any?
+    var menuTarget: TextDelivery.Target?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        _ = WorkbenchSettings.shared
         model = AppModel()
-        let root = NSHostingController(rootView: ContentView(model: model))
-        window = NSWindow(contentViewController: root)
-        window.title = "Local Voice"
+        window = NSWindow(contentViewController: NSHostingController(rootView: ContentView(model: model)))
+        window.title = "Workbench Voice"
         window.setContentSize(NSSize(width: 1060, height: 760))
         window.minSize = NSSize(width: 900, height: 700)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
-        window.titlebarAppearsTransparent = true
-        window.titleVisibility = .hidden
-        window.isReleasedWhenClosed = false
-        window.center()
-        overlay = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 340, height: 70), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        window.titlebarAppearsTransparent = true; window.titleVisibility = .hidden
+        window.isReleasedWhenClosed = false; window.center()
+        overlay = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 380, height: 70), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         overlay.isFloatingPanel = true; overlay.level = .floating; overlay.isOpaque = false; overlay.backgroundColor = .clear
         overlay.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         overlay.contentView = NSHostingView(rootView: RecordingOverlay(model: model))
+        popover = NSPopover(); popover.behavior = .transient; popover.animates = false; popover.delegate = self
+        popover.contentViewController = NSHostingController(rootView: VoiceQuickControls(model: model)); popover.contentSize = VoiceQuickControls.size
         model.onPhaseChange = { [weak self] in self?.updateRecordingUI() }
-        setupMenus(); registerShortcut(); showWindow()
+        model.onShortcutsChanged = { [weak self] in self?.registerShortcuts() }
+        model.onEditShortcut = { [weak self] id in self?.editShortcut(id) }
+        model.onShowEditor = { [weak self] page in self?.model.page = page; self?.showWindow() }
+        model.onMenuRecording = { [weak self] in self?.menuRecording() }
+        model.onCloseMenu = { [weak self] in self?.closeControls() }
+        model.onPasteLast = { [weak self] in self?.pasteLast() }
+        hotkeys.onKey = { [weak self] id, down in
+            guard let self else { return }
+            if id == 1 { self.model.shortcutChanged(down: down) }
+            else if down { self.toggleControls() }
+        }
+        setupMenus(); registerShortcuts(); showControls()
+    }
+    func registerShortcuts() {
+        guard model.editingShortcut == nil else { return }
+        hotkeys.register(model.preferences); model.shortcutFailures = hotkeys.failures
+    }
+    func editShortcut(_ id: UInt32) {
+        finishEditing(); hotkeys.unregister(); model.editingShortcut = id
+        recorderMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self else { return event }
+            if event.keyCode == 53 { self.finishEditing(); return nil }
+            var shortcut = VoiceShortcut(event: event)
+            if event.keyCode == 51 && shortcut.modifiers == 0 { shortcut.enabled = false }
+            else if shortcut.modifiers & UInt32(controlKey | optionKey | cmdKey) == 0 {
+                self.model.shortcutFailures[id] = "Include Control, Option, or Command."; return nil
+            }
+            let other = id == 1 ? self.model.preferences.controlsShortcut : self.model.preferences.dictationShortcut
+            if shortcut.enabled && shortcut == other { self.model.shortcutFailures[id] = "That shortcut is already assigned in Voice."; return nil }
+            if id == 1 { self.model.preferences.dictationShortcut = shortcut }
+            else { self.model.preferences.controlsShortcut = shortcut }
+            self.finishEditing(); return nil
+        }
+    }
+    func finishEditing() {
+        if let recorderMonitor { NSEvent.removeMonitor(recorderMonitor); self.recorderMonitor = nil }
+        guard model != nil else { return }
+        model.editingShortcut = nil; registerShortcuts()
     }
     private func setupMenus() {
-        let main = NSMenu()
-        let application = NSMenuItem(); let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About Local Voice", action: #selector(showAbout), keyEquivalent: "")
+        let main = NSMenu(); let application = NSMenuItem(); let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "About Workbench Voice", action: #selector(showAbout), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide Local Voice", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(withTitle: "Quit Local Voice", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Hide Workbench Voice", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Quit Workbench Voice", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         application.submenu = appMenu; main.addItem(application)
         let edit = NSMenuItem(); edit.title = "Edit"; let editMenu = NSMenu(title: "Edit")
-        for (title, action, key) in [("Undo", "undo:", "z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] {
-            editMenu.addItem(withTitle: title, action: Selector(action), keyEquivalent: key)
-        }
+        for (title, action, key) in [("Undo", "undo:", "z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] { editMenu.addItem(withTitle: title, action: Selector(action), keyEquivalent: key) }
         edit.submenu = editMenu; main.addItem(edit)
-        let windows = NSMenuItem(); windows.title = "Window"; let windowMenu = NSMenu(title: "Window")
-        windowMenu.addItem(withTitle: "Show Local Voice", action: #selector(showWindow), keyEquivalent: "0")
-        windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
-        windows.submenu = windowMenu; main.addItem(windows); NSApp.mainMenu = main
-        NSApp.windowsMenu = windowMenu
+        let windows = NSMenuItem(); windows.title = "Window"; let menu = NSMenu(title: "Window")
+        menu.addItem(withTitle: "Open editor", action: #selector(showWindow), keyEquivalent: "0")
+        windows.submenu = menu; main.addItem(windows); NSApp.mainMenu = main; NSApp.windowsMenu = menu
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Local Voice")
-        let menu = NSMenu()
-        menu.addItem(withTitle: "Open Local Voice", action: #selector(showWindow), keyEquivalent: "")
-        menu.addItem(withTitle: "Start / stop dictation   ⌃⌥Space", action: #selector(toggleRecording), keyEquivalent: "")
-        menu.addItem(.separator())
-        menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
-        statusItem.menu = menu
+        statusItem.autosaveName = NSStatusItem.AutosaveName("LocalVoice.MenuBar")
+        statusItem.button?.target = self; statusItem.button?.action = #selector(statusClicked(_:))
+        statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp]); updateRecordingUI()
     }
-    private func registerShortcut() {
-        var event = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        let context = Unmanaged.passUnretained(self).toOpaque()
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, context in
-            guard let context else { return OSStatus(eventNotHandledErr) }
-            let delegate = Unmanaged<AppDelegate>.fromOpaque(context).takeUnretainedValue()
-            Task { @MainActor in delegate.toggleRecording() }
-            return noErr
-        }, 1, &event, context, &handler)
-        let id = EventHotKeyID(signature: 0x4C564F49, id: 1)
-        let result = RegisterEventHotKey(UInt32(kVK_Space), UInt32(controlKey | optionKey), id, GetApplicationEventTarget(), 0, &hotKey)
-        if result != noErr { model.error = "The shortcut ⌃⌥Space is already in use. Recording still works from this window or the menu bar." }
+    @objc func statusClicked(_ sender: Any?) {
+        if NSApp.currentEvent?.type == .rightMouseUp {
+            let menu = NSMenu()
+            menu.addItem(withTitle: "Quick controls", action: #selector(toggleControls), keyEquivalent: "")
+            menu.addItem(withTitle: "Open editor", action: #selector(showWindow), keyEquivalent: "")
+            menu.addItem(.separator()); menu.addItem(withTitle: "Quit Workbench Voice", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            statusItem.menu = menu; statusItem.button?.performClick(nil); statusItem.menu = nil
+        } else { toggleControls() }
+    }
+    @objc func toggleControls() { if popover.isShown { closeControls() } else { showControls() } }
+    func showControls() {
+        guard let button = statusItem.button else { return }
+        menuTarget = TextDelivery.capture()
+        model.refreshPermissions(); window.orderOut(nil); NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.contentViewController?.view.window?.makeKey()
+    }
+    func closeControls() { popover.performClose(nil); finishEditing() }
+    func popoverDidClose(_ notification: Notification) { finishEditing() }
+    func resumeTarget(_ action: @escaping (TextDelivery.Target?) -> Void) {
+        let target = menuTarget
+        closeControls()
+        // Restore only the app from which controls were opened. Delivery checks the
+        // exact focused element again after processing; it never presses Return.
+        target?.app.activate(options: [])
+        Task { try? await Task.sleep(nanoseconds: 160_000_000); action(target) }
+    }
+    func menuRecording() {
+        if model.phase == .recording { closeControls(); model.stopRecording(); return }
+        resumeTarget { [weak self] target in self?.model.toggleRecording(target: target) }
+    }
+    func pasteLast() {
+        guard !model.transcript.isEmpty, model.phase == .idle else { return }
+        resumeTarget { [weak self] target in
+            guard let self else { return }
+            Task { self.model.status = await TextDelivery.deliver(self.model.transcript, target: target, mode: .paste, restoreClipboard: self.model.preferences.restoreClipboard) }
+        }
     }
     func updateRecordingUI() {
-        statusItem.button?.image = NSImage(systemSymbolName: model.phase == .recording ? "mic.fill" : "waveform", accessibilityDescription: model.phase == .recording ? "Local Voice recording" : "Local Voice")
-        if model.phase == .recording || model.phase == .transcribing {
+        statusItem?.button?.image = NSImage(systemSymbolName: model.phase == .recording ? "mic.fill" : "waveform", accessibilityDescription: "Workbench Voice")
+        statusItem?.button?.toolTip = "Workbench Voice · " + model.preferences.controlsShortcut.label
+        if [.recording, .transcribing, .cleaning].contains(model.phase) {
             let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
-            if let frame = screen?.visibleFrame { overlay.setFrameOrigin(NSPoint(x: frame.midX - 170, y: frame.minY + 28)) }
+            if let frame = screen?.visibleFrame { overlay.setFrameOrigin(NSPoint(x: frame.midX - 190, y: frame.minY + 28)) }
             overlay.orderFrontRegardless()
         } else { overlay.orderOut(nil) }
     }
-    @objc func showWindow() { window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
-    @objc func toggleRecording() { model.toggleRecording(fromShortcut: true) }
-    @objc func showAbout() { NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Local Voice", .applicationVersion: "1.0.0", .credits: NSAttributedString(string: "Local dictation and text-to-speech.\nPowered by Parakeet, FluidAudio, and macOS voices.")]) }
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showWindow(); return true }
+    @objc func showWindow() { closeControls(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
+    @objc func showAbout() { NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Workbench Voice", .applicationVersion: "1.1.0", .credits: NSAttributedString(string: "Local dictation and text-to-speech.\nPowered by Parakeet, FluidAudio, and macOS voices.")]) }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showControls(); return true }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
-    func applicationWillTerminate(_ notification: Notification) { model?.shutdown(); if let hotKey { UnregisterEventHotKey(hotKey) }; if let handler { RemoveEventHandler(handler) } }
+    func applicationWillTerminate(_ notification: Notification) { model?.shutdown(); hotkeys.unregister() }
 }
 
 func runCLI(_ args: [String]) async -> Int32 {
@@ -92,7 +147,19 @@ func runCLI(_ args: [String]) async -> Int32 {
         let engine = RecognitionEngine()
         switch args.first {
         case "--check-core":
-            try CoreChecks.run()
+            try CoreChecks.run(); try CleanupChecks.run()
+        case "--check-input":
+            try await MainActor.run { try InputChecks.run() }
+        case "--check-cleanup":
+            try CleanupChecks.run()
+            let result = await CleanupEngine().clean(CleanupChecks.example, style: .natural)
+            guard DictationCleanup.isFaithful(result.text, to: DictationCleanup.light(CleanupChecks.example)), result.text.contains("• Apples") else { throw VoiceError.message("Natural cleanup changed the checked example") }
+            print("NATURAL_CHECK_OK: \(result.method)\n\(result.text)")
+        case "--clean-text":
+            guard args.count >= 2 else { throw VoiceError.message("Usage: --clean-text TEXT_FILE [Original|Light|Natural]") }
+            let text = try String(contentsOfFile: args[1], encoding: .utf8)
+            let result = await CleanupEngine().clean(text, style: args.count > 2 ? (CleanupStyle(rawValue: args[2]) ?? .light) : .light)
+            print(result.text)
         case "--prepare-model":
             try await engine.prepare(); print("MODEL_READY: Parakeet v2")
         case "--transcribe":
@@ -128,7 +195,7 @@ if CommandLine.arguments.count > 1, CommandLine.arguments[1].hasPrefix("--") {
 } else {
     MainActor.assumeIsolated {
         let app = NSApplication.shared
-        app.setActivationPolicy(.regular)
+        app.setActivationPolicy(.accessory)
         let delegate = AppDelegate()
         app.delegate = delegate
         app.run()

@@ -35,3 +35,19 @@ The upstream CoreML runtime prints a nonfatal shape-inference diagnostic during 
 - Replaced XCTest-dependent checks with a self-contained executable check suite; full Xcode is not installed on the target Mac.
 - Normalized M4A export to 44.1 kHz / 96 kbps AAC after the original bitrate was rejected for a 22.05 kHz system voice.
 - Used the actual pinned FluidAudio API, whose decoder-state signature differs from its README example.
+
+## Workbench Voice 1.1.0 — 8 September 2026
+
+Tested on this Apple Silicon Mac running macOS 26.5.1. The installed signed binary matches the executable inside `dist/Workbench Voice.zip`; the build-directory binary differs because app signing changes its signature. The shared Workbench source is byte-identical in Voice and StageMark.
+
+- 14 core checks and 16 cleanup checks pass, including the false start/train-time/grocery-list example, other explicit corrections, retained negation, rejected invented/swapped times, quantities, compound list items, ordinary prose, and old state decoding.
+- Native input checks pass: exclusive Carbon registration, conflict reporting, repeat suppression, key-up after modifiers are released, and registration cleanup. The UI shortcut editor changed the shortcut and restored the default. Toggle/hold settings were exercised. Releasing a hold while permission is pending cancels the attempt instead of leaving capture armed.
+- The real optional Apple language model was exercised. The checked example used the Light fallback because the generated candidate did not meet the fidelity checks. Natural mode is optional; Light is the default.
+- The installed editor transformed the supplied example into the final 7pm sentence and three grocery bullets. Its Original sheet showed the full unedited input. Cleaned draft and original survived app updates/relaunch.
+- Existing transcript history, dictionary, and reading text were compared with a pre-test snapshot and remained unchanged. The example is left in the editor. Storage and bundle identifiers remain stable.
+- Native menu layout, editor, shared Dark appearance, and return to the Mac’s System appearance were visually checked. An initial popover inheritance issue was fixed with an explicit SwiftUI theme modifier.
+- StageMark-to-Voice navigation was exercised. Voice’s clipboard fallback was verified in a new TextEdit document: the complete cleaned result was available for manual paste.
+- Spotlight metadata resolves exactly the two canonical installed apps, named Workbench Voice and Workbench StageMark. Both declare the Utilities category. This proves index discovery; a screenshot of Spotlight results was not obtained.
+- Automatic insertion and clipboard restoration require the user’s macOS Accessibility grant. That grant and its live end-to-end test remain pending. The app currently copies safely and shows the enable action. No successful automatic insertion is claimed here.
+
+The native speech round-trip and M4A re-transcription pass on the installed build. CoreML still prints the upstream E5RT shape diagnostic during loading, without preventing successful inference. No cloud account or server is required.

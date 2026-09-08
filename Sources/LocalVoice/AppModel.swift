@@ -5,7 +5,18 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudioRecorderDelegate {
-    enum Phase: String { case idle, requesting, recording, transcribing }
+    enum Phase: String { case idle, requesting, recording, transcribing, cleaning }
+    @Published var preferences = VoicePreferences.load() {
+        didSet {
+            preferences.save()
+            if oldValue.dictationShortcut != preferences.dictationShortcut || oldValue.controlsShortcut != preferences.controlsShortcut { onShortcutsChanged?() }
+        }
+    }
+    @Published var rawTranscript = ""
+    @Published var cleanupMethod = ""
+    @Published var editingShortcut: UInt32?
+    @Published var shortcutFailures: [UInt32: String] = [:]
+    @Published var quickTab = "Dictate"
     @Published var page = "dictate"
     @Published var phase: Phase = .idle
     @Published var ready = false
@@ -26,12 +37,10 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     @Published var paused = false
     @Published var audioDuration = 0.0
     @Published var playbackTime = 0.0
-    @Published var autoPaste = UserDefaults.standard.bool(forKey: "autoPaste") {
-        didSet { UserDefaults.standard.set(autoPaste, forKey: "autoPaste") }
-    }
     @Published var accessibilityGranted = AXIsProcessTrusted()
     @Published var canRetry = false
     let engine = RecognitionEngine()
+    let cleanupEngine = CleanupEngine()
     let store = StateStore()
     private var loaded = false
     private var recorder: AVAudioRecorder?
@@ -42,9 +51,17 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     private var audioURL: URL?
     private var audioSignature = ""
     private var peakPower: Float = -160
-    private var destination: NSRunningApplication?
+    private var destination: TextDelivery.Target?
+    private var recordingAttempt: UUID?
+    private var permissionRequest: Task<Bool, Never>?
     private var persistWork: DispatchWorkItem?
     var onPhaseChange: (() -> Void)?
+    var onShortcutsChanged: (() -> Void)?
+    var onEditShortcut: ((UInt32) -> Void)?
+    var onShowEditor: ((String) -> Void)?
+    var onMenuRecording: (() -> Void)?
+    var onCloseMenu: (() -> Void)?
+    var onPasteLast: (() -> Void)?
     var voices: [String] = []
 
     override init() {
@@ -52,6 +69,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         do {
             let state = try store.load()
             transcript = state.draft; speechText = state.speechText; history = state.history
+            rawTranscript = state.rawDraft ?? state.draft
             replacements = state.replacements; voice = state.voice; rate = state.rate
         } catch {
             let backup = store.url.deletingLastPathComponent().appendingPathComponent("state-unreadable-\(UUID().uuidString).json")
@@ -83,25 +101,36 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         preparing = false
     }
 
-    func toggleRecording(fromShortcut: Bool = false) {
+    func toggleRecording(fromShortcut: Bool = false, target: TextDelivery.Target? = nil) {
         if phase == .recording { stopRecording(); return }
         guard phase == .idle, ready, !rendering else { return }
         stopPlayback()
-        let front = NSWorkspace.shared.frontmostApplication
-        destination = fromShortcut && front?.processIdentifier != ProcessInfo.processInfo.processIdentifier ? front : nil
-        Task { await startRecording() }
+        let attempt = UUID(); recordingAttempt = attempt
+        destination = target ?? (fromShortcut ? TextDelivery.capture() : nil)
+        phase = .requesting
+        Task { await startRecording(attempt) }
+    }
+    func shortcutChanged(down: Bool) {
+        if preferences.capture == .toggle { if down { toggleRecording(fromShortcut: true) }; return }
+        if down { if phase == .idle { toggleRecording(fromShortcut: true) } }
+        else if phase == .recording { stopRecording() }
+        else if phase == .requesting { cancelRecording() }
     }
 
-    private func startRecording() async {
+    private func startRecording(_ attempt: UUID) async {
         phase = .requesting; error = nil; onPhaseChange?()
         let granted: Bool
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
         case .authorized: granted = true
-        case .notDetermined: granted = await AVCaptureDevice.requestAccess(for: .audio)
+        case .notDetermined:
+            status = "Allow Microphone access in the macOS prompt."
+            if permissionRequest == nil { permissionRequest = Task { await AVCaptureDevice.requestAccess(for: .audio) } }
+            granted = await permissionRequest!.value; permissionRequest = nil
         default: granted = false
         }
+        guard recordingAttempt == attempt else { return }
         guard granted else {
-            fail("Microphone access is off. Open Settings → Privacy & Security → Microphone and allow Local Voice."); return
+            fail("Microphone access is off. Open Settings → Privacy & Security → Microphone and allow Workbench Voice."); return
         }
         do {
             if let old = recordURL { try? FileManager.default.removeItem(at: old) }
@@ -111,7 +140,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
             capture.delegate = self; capture.isMeteringEnabled = true
             guard capture.prepareToRecord(), capture.record() else { throw VoiceError.message("The microphone could not start. Check that an input device is connected.") }
             recorder = capture; recordURL = url; canRetry = false; elapsed = 0; level = 0; peakPower = -160
-            phase = .recording; status = "Listening… press ⌃⌥Space to finish"; onPhaseChange?()
+            phase = .recording; status = preferences.capture == .toggle ? "Listening… press \(preferences.dictationShortcut.label) to finish" : "Listening… release the shortcut to finish"; onPhaseChange?()
             meter = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
                 Task { @MainActor in
                     guard let self, let recorder = self.recorder else { return }
@@ -136,7 +165,11 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     }
 
     func cancelRecording() {
+        if phase == .requesting {
+            recordingAttempt = nil; phase = .idle; status = "Capture cancelled. Use the shortcut again when microphone permission is ready."; onPhaseChange?(); return
+        }
         guard phase == .recording else { return }
+        recordingAttempt = nil
         recorder?.stop(); recorder = nil; meter?.invalidate(); meter = nil
         if let url = recordURL { try? FileManager.default.removeItem(at: url) }; recordURL = nil
         phase = .idle; level = 0; status = "Recording discarded."; onPhaseChange?()
@@ -168,20 +201,17 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         Task {
             do {
                 let raw = try await engine.transcribe(url)
-                let result = TextRules.apply(raw, replacements: replacements)
+                rawTranscript = raw
+                phase = .cleaning; status = "Tidying your words…"; onPhaseChange?()
+                let cleaned = await cleanupEngine.clean(raw, style: preferences.cleanup)
+                let result = TextRules.apply(cleaned.text, replacements: replacements)
                 guard !result.isEmpty else { throw VoiceError.message("No speech was recognised. Try speaking closer to the microphone.") }
                 transcript = result
-                history.insert(Transcript(text: result, seconds: duration), at: 0)
+                cleanupMethod = cleaned.method
+                history.insert(Transcript(text: result, seconds: duration, rawText: raw, cleanupMethod: cleaned.method), at: 0)
                 history = Array(history.prefix(30)); persist()
-                copyTranscript()
                 accessibilityGranted = AXIsProcessTrusted()
-                if autoPaste, accessibilityGranted, let destination,
-                   NSWorkspace.shared.frontmostApplication?.processIdentifier == destination.processIdentifier {
-                    pasteToFrontApp()
-                    status = "Paste requested in \(destination.localizedName ?? "your app"). Transcript also copied."
-                } else {
-                    status = self.destination == nil ? "Transcript ready and copied." : "Copied · press ⌘V where you want your words."
-                }
+                status = await TextDelivery.deliver(result, target: destination, mode: preferences.delivery, restoreClipboard: preferences.restoreClipboard)
                 if temporary { try? FileManager.default.removeItem(at: url); recordURL = nil }
                 phase = .idle; onPhaseChange?()
             } catch {
@@ -192,16 +222,23 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
 
     func copyTranscript() {
         guard !transcript.isEmpty else { return }
-        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(transcript, forType: .string)
+        TextDelivery.copy(transcript)
         status = "Copied to clipboard."
     }
-    private func pasteToFrontApp() {
-        // Only the app selected when the shortcut began may receive a paste. Never sends Return.
-        guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 9, keyDown: true),
-              let up = CGEvent(keyboardEventSource: nil, virtualKey: 9, keyDown: false) else { return }
-        down.flags = .maskCommand; up.flags = .maskCommand
-        down.post(tap: .cghidEventTap); up.post(tap: .cghidEventTap)
+    func cleanCurrentDraft() {
+        guard phase == .idle, !transcript.isEmpty else { return }
+        let original = transcript
+        phase = .cleaning; error = nil
+        Task {
+            let cleaned = await cleanupEngine.clean(original, style: preferences.cleanup)
+            rawTranscript = original; transcript = TextRules.apply(cleaned.text, replacements: replacements)
+            cleanupMethod = cleaned.method; phase = .idle; status = cleaned.method + " · original retained"; persist()
+        }
     }
+    func openTranscript(_ item: Transcript) {
+        transcript = item.text; rawTranscript = item.rawText ?? item.text; cleanupMethod = item.cleanupMethod ?? "Original"; page = "dictate"; persist()
+    }
+    func useOriginal() { transcript = rawTranscript; cleanupMethod = "Original restored"; status = "Original transcript restored."; persist() }
     func requestAccessibility() {
         let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         accessibilityGranted = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
@@ -281,7 +318,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     }
     func saveNow() {
         guard loaded else { return }
-        do { try store.save(SavedState(draft: transcript, speechText: speechText, history: history, replacements: replacements, voice: voice, rate: rate)) }
+        do { try store.save(SavedState(draft: transcript, speechText: speechText, history: history, replacements: replacements, voice: voice, rate: rate, rawDraft: rawTranscript)) }
         catch { self.error = "Could not save this session. \(error.localizedDescription)" }
     }
     func shutdown() { cancelRecording(); stopPlayback(); saveNow(); AudioRenderer.remove(audioURL); if let recordURL { try? FileManager.default.removeItem(at: recordURL) } }

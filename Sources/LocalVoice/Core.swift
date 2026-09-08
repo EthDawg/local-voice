@@ -31,6 +31,8 @@ struct Transcript: Codable, Identifiable {
     var date = Date()
     var text: String
     var seconds: Double
+    var rawText: String? = nil
+    var cleanupMethod: String? = nil
 }
 
 struct SavedState: Codable {
@@ -40,6 +42,7 @@ struct SavedState: Codable {
     var replacements: [Replacement] = []
     var voice = "Karen"
     var rate = 180.0
+    var rawDraft: String? = nil
 }
 
 struct StateStore {
