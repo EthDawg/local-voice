@@ -183,6 +183,7 @@ private struct DemoResourceEditor: View {
             TextField("Starting step, fallback, or context (optional)", text: $item.notes, axis: .vertical).lineLimit(2...4).textFieldStyle(.roundedBorder).accessibilityLabel("Preparation notes")
             Toggle("Favorite", isOn: $item.favorite)
             if let problem = item.validationMessage { Text(problem).font(.caption).foregroundStyle(.secondary) }
+            if let notice = library.draftNotice { Text(notice).font(.caption).foregroundStyle(.secondary) }
             if let error = library.error { Text(error).font(.caption).foregroundStyle(.orange).lineLimit(3) }
             HStack {
                 Button("Cancel") { library.draft = nil }.keyboardShortcut(.cancelAction)

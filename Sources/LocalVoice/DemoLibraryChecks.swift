@@ -102,6 +102,18 @@ enum DemoLibraryChecks {
         guard model.save(spaced) else { throw VoiceError.message("Exact path test could not restore its file resource") }
         let restored = DemoLibraryModel(store: store)
         guard restored.resources.first(where: { $0.id == spaced.id })?.content == spacedURL.path else { throw VoiceError.message("Exact file path was not preserved across restart") }
-        print("DEMO_LIBRARY_MODEL_CHECKS_OK: selection and detail agree after launch/filter changes; exact file paths survive saving and restart")
+        for kind in DemoResourceKind.allCases {
+            let unfinished = DemoResource(kind: kind, title: "Unfinished resource", product: "People", persona: "Manager", content: "Keep this draft", notes: "Unfinished notes")
+            model.draft = unfinished
+            model.newPrompt("New clipboard text")
+            guard model.draft == unfinished && model.draftNotice != nil else { throw VoiceError.message("Clipboard prompt replaced an unfinished \(kind.rawValue.lowercased()) draft") }
+            model.newPrompt()
+            guard model.draft == unfinished else { throw VoiceError.message("New prompt replaced an unfinished resource draft") }
+            model.draft = nil
+            guard model.draftNotice == nil else { throw VoiceError.message("Draft notice remained after finishing the editor") }
+        }
+        model.newPrompt("Next prompt")
+        guard model.draft?.content == "Next prompt" && model.draftNotice == nil else { throw VoiceError.message("Prompt creation did not resume after finishing the editor") }
+        print("DEMO_LIBRARY_MODEL_CHECKS_OK: selection, exact file paths, and unfinished drafts preserved; prompt creation resumes after dismissal")
     }
 }

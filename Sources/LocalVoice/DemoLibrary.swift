@@ -150,7 +150,8 @@ struct DemoLibraryStore {
 final class DemoLibraryModel: ObservableObject {
     @Published private(set) var resources: [DemoResource] = [] { didSet { reconcileSelection() } }
     @Published var selection: UUID?
-    @Published var draft: DemoResource?
+    @Published var draft: DemoResource? { didSet { if draft == nil { draftNotice = nil } } }
+    @Published private(set) var draftNotice: String?
     @Published var query = "" { didSet { reconcileSelection() } }
     @Published var favoritesOnly = false { didSet { reconcileSelection() } }
     @Published var notice: String?
@@ -169,6 +170,7 @@ final class DemoLibraryModel: ObservableObject {
         if !visible.contains(where: { $0.id == selection }) { selection = visible.first?.id }
     }
     func newPrompt(_ text: String = "") {
+        guard draft == nil else { draftNotice = "Save or cancel this resource before starting another prompt."; return }
         draft = DemoResource(title: String(text.split(separator: "\n").first?.prefix(80) ?? ""), content: text)
     }
     func save(_ proposed: DemoResource) -> Bool {
