@@ -22,7 +22,7 @@ There is no automatic updater. Users quit the app and replace the copy in Applic
 
 ## Next release gate: ordinary download and open
 
-The maintainer will obtain or renew Apple Developer Program membership. Keep certificate private keys and notarization credentials out of Git, issues, chat, website files, and release assets. The remaining work is:
+Apple Developer Program membership and a valid Developer ID Application identity were verified on 8 September 2026. Keep certificate private keys and notarization credentials out of Git, issues, chat, website files, and release assets. The repeatable workflow is in [scripts/release](../scripts/release/README.md). Publication still requires every gate below:
 
 - Obtain a **Developer ID Application** identity on the release Mac, or a suitably protected release environment.
 - Extend packaging to sign nested code and the app with a secure timestamp and hardened runtime. Check Voice's audio-input entitlement and actual speech/recording/paste behavior under that runtime. Do not use `--deep` as a substitute for correct nested-code signing.
@@ -30,7 +30,11 @@ The maintainer will obtain or renew Apple Developer Program membership. Keep cer
 - Verify signatures and the ticket. Download through a browser onto a separate Mac or clean account so quarantine and first-run permissions are genuinely exercised. Test Voice model setup, microphone, optional paste, and StageMark drawing/shortcuts; a local rebuild does not prove this experience.
 - Publish a new versioned release and checksum, then update website links and remove the early-signing notice only after that downloaded build passes.
 
-Keep the existing bundle identifiers and storage locations so current testers retain their data. Do not buy a domain, create an App Store listing, add accounts, or introduce an updater to solve this initial tester path. Consider a signed updater only when repeated releases make manual replacement a real burden.
+Keep the existing bundle identifiers and storage locations so current testers retain their data. Consider a signed updater only when repeated releases make manual replacement a real burden.
+
+## Mac App Store channel
+
+The maintainer has also requested Mac App Store publication. This needs a separate sandboxed build, store certificates/profiles, App Store Connect metadata and Apple review; Developer ID notarization alone does not produce a store listing. Voice's automatic Accessibility paste is incompatible with the documented sandbox model and needs a considered store-specific workflow. StageMark is the first sandbox candidate. See the [release guide](../scripts/release/README.md) for requirements and validation limits. Do not advertise either app as available in the store before Apple's publication is verified.
 
 ## Repeatable release checks
 
