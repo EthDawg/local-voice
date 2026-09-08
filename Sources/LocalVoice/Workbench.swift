@@ -31,7 +31,12 @@ enum Workbench {
 final class WorkbenchSettings: ObservableObject {
     enum Appearance: String, CaseIterable { case system = "System", light = "Light", dark = "Dark" }
     static let shared = WorkbenchSettings()
+    #if APP_STORE
+    // Store editions keep preferences within their own sandbox container.
+    private let defaults = UserDefaults.standard
+    #else
     private let defaults = UserDefaults(suiteName: "com.ethdawg.workbench")!
+    #endif
     private let notification = Notification.Name("com.ethdawg.workbench.appearance")
     private var observer: NSObjectProtocol?
     private var systemObserver: NSObjectProtocol?
@@ -49,7 +54,13 @@ final class WorkbenchSettings: ObservableObject {
     }
     private func refresh() {
         defaults.synchronize(); UserDefaults.standard.synchronize()
+        #if APP_STORE
+        // Use AppKit appearance rather than reading a system-owned defaults key.
+        NSApp?.appearance = nil
+        systemIsDark = NSApp?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        #else
         systemIsDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+        #endif
         appearance = Appearance(rawValue: defaults.string(forKey: "appearance") ?? "") ?? .system
         NSApp?.appearance = appearance == .system ? nil : NSAppearance(named: appearance == .dark ? .darkAqua : .aqua)
     }
