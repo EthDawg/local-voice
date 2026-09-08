@@ -12,6 +12,8 @@ Voice and StageMark remain two independent native apps. This release connects pr
 
 Prompts, persona labels and notes are plain local content. The library does not act as a persona, store a password vault or send messages. Files remain in their existing locations; download cloud files before an offline demo. JSON exchange includes metadata, prompts, notes, links and file paths, not the media or access bookmarks. Imported resources cannot execute applications or scripts through the library's Open action.
 
+Unfinished resource edits are preserved if the clipboard shortcut is pressed again. Save or cancel the current resource before starting another prompt.
+
 ## Keep the ecosystem open
 
 Resource links open in the default browser, and documents open in their existing apps. A saved Excalidraw link or exported diagram, a local video, a deck and an import fixture all use the same simple library. Workbench does not embed another whiteboard, video editor or automation platform. The versioned JSON format is a portable starting point for future integrations; there is no plugin runtime or agent protocol in this release.
@@ -22,7 +24,7 @@ Native screenshot capture and autonomous persona conversations are also deferred
 
 ## Verification and next acceptance step
 
-The signed installed Voice Preview passed 21 core, 16 cleanup and 36 library checks plus model checks. StageMark passed 33 native tests and 223 assertions. Seven installer regressions cover preservation, identities, process inventory and rollback. The installed production app bundles remain unchanged. Both Preview apps are Developer ID signed local builds; neither has been notarised or publicly released. The existing App Store submission was not changed.
+The signed installed Voice Preview passed 21 core, 16 cleanup and 36 library checks plus model checks, including unfinished-draft preservation. StageMark passed 34 native tests and 232 assertions. Seven installer regressions cover preservation, identities, process inventory and rollback. The installed production app bundles remain unchanged. Both Preview apps are Developer ID signed local builds; neither has been notarised or publicly released. The existing App Store submission was not changed.
 
 Visual acceptance is still pending because the Mac locked before the installed Preview apps could be exercised. When unlocked, check first-launch settings/history copies; keyboard recall; prompt save/search/copy; local-file open/reconnect; light/dark layout; scene import/drag/export/apply/restore; restart persistence; and suite switching. No live microphone, iPhone, physical Intel Mac, remote audience or new sandbox acceptance is claimed.
 
