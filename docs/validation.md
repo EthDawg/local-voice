@@ -64,7 +64,7 @@ Clipboard restoration was independently checked through TextEdit: copying `WORKB
 
 ## Workbench Voice 1.2.0 — usability follow-up, 8 September 2026
 
-The update is installed in `~/Applications/Workbench Voice.app`. Completion of the final permission and recording checks is still pending.
+The update is installed in `~/Applications/Workbench Voice.app`. Final permission, microphone, and persistence checks passed. The installed executable matches the executable in `dist/Workbench Voice.zip`, and its code signature verifies.
 
 - Release build, signature verification, 21 core checks, and 16 cleanup checks pass. The installer’s real speech/transcription/M4A round-trip passes on the packaged build.
 - Native input checks pass. In the installed UI, both shortcut recorders accepted a new combination and restored the original defaults. An unmodified key and a duplicate Voice shortcut were rejected without changing the working binding. Both recorders are visible in quick Settings and the main Shortcuts page.
@@ -75,4 +75,8 @@ The update is installed in `~/Applications/Workbench Voice.app`. Completion of t
 - The first drag experiment did not persist a position. Replaced the drag implementation with native mouse tracking. Subsequent drag gestures changed the actual window origin and saved it; moving left 200 and down 120 produced that exact position change. Closing and reopening the preview retained the stored position. Bounds recovery for disconnected displays passes the geometry check.
 - Preserved held-shortcut state when closing ordinary quick controls; only ending an actual shortcut-edit session now re-registers hotkeys.
 
-Remaining checks: macOS Touch ID authentication is required to re-add only Workbench Voice’s Accessibility permission after replacing the locally signed executable. The user has already approved this repair; its old entry was reset with the supported app-scoped macOS command. The new entry must be added and Automatic paste ready verified. The final build still needs a brief recording check of the real Finish button and a post-relaunch panel/history check.
+- With the user-approved app-scoped Accessibility repair and macOS authentication completed, System Settings shows the exact installed Voice app enabled and Voice reports **Automatic paste ready**. Other apps' Accessibility entries were preserved. This verifies trust on 1.2; the prior insertion/clipboard-restoration check above was on 1.1, not a new target-app matrix.
+- Two brief live microphone captures completed (23.54 and 16.83 seconds including UI-tool overhead). The first exercised the editor Stop control. With the editor closed, the second exposed the floating panel's **Finish dictation** button; clicking it stopped recording, completed transcription, and saved a distinct capture. Starting from the editor kept delivery in clipboard mode with no destination field.
+- Speaker-to-microphone recognition retained the test phrase **The Blue Notebook is ready**, but transcribed the product name Voice as Boys. This is a functional microphone/Finish-button check, not evidence of perfect recognition.
+- No temporary microphone recording files remained after either successful capture. The generated playback audio was deleted. Only the two positively identified test entries were removed, with a private ignored backup; all original 11 captures, draft, original wording, and dictionary were compared with the pre-test snapshot and restored unchanged.
+- After process relaunch, the preview opened with working controls and the saved panel origin remained `{802, 663}`. Default dictation and quick-controls shortcuts, Toggle activation, Light cleanup, automatic paste, and clipboard restoration remained saved.
