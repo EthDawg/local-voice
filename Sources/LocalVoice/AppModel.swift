@@ -235,7 +235,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         TextDelivery.copy(transcript)
         status = "Copied to clipboard."
     }
-    func showLibrary() { libraryFocusToken = UUID(); page = "library"; onShowEditor?("library") }
+    func showLibrary() { page = "library"; onShowEditor?("library"); libraryFocusToken = UUID() }
     func savePrompt(_ text: String) { guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }; showLibrary(); library.newPrompt(text) }
     func copyCapture(_ item: Transcript) { TextDelivery.copy(item.text); status = "Transcript copied." }
     func showPanelPreview() {

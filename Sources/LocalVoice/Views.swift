@@ -214,7 +214,7 @@ struct ContentView: View {
                 WorkbenchAppearancePicker()
             }.padding(22).background(panelColor, in: RoundedRectangle(cornerRadius: 14))
             Text("Local by design").font(.system(size: 16, weight: .medium))
-            Text("Audio is processed on your Mac. No account, API key, analytics, or subscription. The initial model download uses the internet; dictation and reading then work offline. Drafts, your dictionary, and recent transcripts are stored in Application Support/LocalVoice.")
+            Text("Audio is processed on your Mac. No account, API key, analytics, or subscription. The initial model download uses the internet; dictation and reading then work offline. Drafts, your dictionary, and recent transcripts are stored on this Mac.")
                 .font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(5).textSelection(.enabled)
             Spacer()
         } }

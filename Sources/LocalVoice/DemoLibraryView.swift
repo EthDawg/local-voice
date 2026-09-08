@@ -65,7 +65,7 @@ struct DemoLibraryView: View {
                 }.background(Workbench.surface, in: RoundedRectangle(cornerRadius: 12))
             }
             HStack {
-                Text(library.notice ?? "\(library.resources.count) resources · \(model.preferences.shortcut(3).label) to recall")
+                Text(library.notice ?? "\(library.resources.count) \(library.resources.count == 1 ? "resource" : "resources") · \(model.preferences.shortcut(3).label) to recall")
                     .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 Spacer()
                 Menu {
@@ -74,8 +74,15 @@ struct DemoLibraryView: View {
                 } label: { Label("Library", systemImage: "ellipsis.circle") }.fixedSize().font(.caption)
             }
         }
-        .onAppear { searching = true }
-        .onChange(of: model.libraryFocusToken) { _, _ in searching = true }
+        .onAppear { focusSearchWhenReady() }
+        .onChange(of: model.libraryFocusToken) { _, _ in focusSearchWhenReady() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { notification in
+            if let window = notification.object as? NSWindow, window === NSApp.mainWindow { focusSearchWhenReady() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeMainNotification)) { notification in
+            if let window = notification.object as? NSWindow, window === NSApp.keyWindow { focusSearchWhenReady() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in focusSearchWhenReady() }
         .sheet(item: $library.draft) { item in DemoResourceEditor(library: library, initial: item) }
         .confirmationDialog("Remove this resource from the library?", isPresented: Binding(get: { removal != nil }, set: { if !$0 { removal = nil } }), titleVisibility: .visible) {
             Button("Remove resource", role: .destructive) { if let item = removal { library.remove(item) }; removal = nil }
@@ -86,6 +93,16 @@ struct DemoLibraryView: View {
                 Button("Find resource") { searching = true }.keyboardShortcut("f")
                 Button("New prompt") { library.newPrompt() }.keyboardShortcut("n").disabled(library.savingDisabled)
             }.hidden()
+        }
+    }
+    private func focusSearchWhenReady() {
+        guard model.page == "library", library.draft == nil, let window = NSApp.keyWindow, window === NSApp.mainWindow else { return }
+        // Recall can reveal a hidden editor before SwiftUI has mounted the search
+        // field. Re-arm focus on the next main-loop turn, after the window is key.
+        searching = false
+        DispatchQueue.main.async {
+            guard model.page == "library", library.draft == nil, window.isVisible, window === NSApp.keyWindow else { return }
+            searching = true
         }
     }
     private var emptyLibrary: some View {
