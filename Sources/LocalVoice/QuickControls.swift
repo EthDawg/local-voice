@@ -135,7 +135,12 @@ struct VoiceQuickControls: View {
     private var dictation: some View {
         VStack(alignment: .leading, spacing: 14) {
             Button { model.onMenuRecording?() } label: {
-                HStack { Image(systemName: model.phase == .recording ? "stop.fill" : "mic.fill"); Text(model.phase == .recording ? "Finish dictation" : "Start dictation"); Spacer(); Text(model.phase == .recording ? time(model.elapsed) : model.preferences.dictationShortcut.label).font(.caption) }
+                HStack {
+                    Image(systemName: model.phase == .recording ? "stop.fill" : "mic.fill")
+                    Text(model.phase == .recording ? "Finish dictation" : "Start dictation")
+                    Spacer()
+                    if model.phase == .recording { Text(time(model.elapsed)).font(.caption).monospacedDigit() }
+                }
                     .padding(.vertical, 8).frame(maxWidth: .infinity)
             }.buttonStyle(.borderedProminent).disabled(!model.ready || (model.phase != .idle && model.phase != .recording) || model.rendering)
             if model.phase == .requesting { Button("Cancel microphone request") { model.cancelRecording() } }

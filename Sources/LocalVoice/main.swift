@@ -161,7 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     @objc func showShortcuts() { model.page = "shortcuts"; showWindow() }
     @objc func showHistory() { model.page = "history"; showWindow() }
     @objc func showWindow() { closeControls(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
-    @objc func showAbout() { NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Workbench Voice", .applicationVersion: "1.2.0", .credits: NSAttributedString(string: "Local dictation and text-to-speech.\nPowered by Parakeet, FluidAudio, and macOS voices.")]) }
+    @objc func showAbout() { NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Workbench Voice", .applicationVersion: "1.2.1", .credits: NSAttributedString(string: "Local dictation and text-to-speech.\nPowered by Parakeet, FluidAudio, and macOS voices.")]) }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showControls(); return true }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationWillTerminate(_ notification: Notification) { model?.shutdown(); hotkeys.unregister() }

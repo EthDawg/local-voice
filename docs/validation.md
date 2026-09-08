@@ -80,3 +80,9 @@ The update is installed in `~/Applications/Workbench Voice.app`. Final permissio
 - Speaker-to-microphone recognition retained the test phrase **The Blue Notebook is ready**, but transcribed the product name Voice as Boys. This is a functional microphone/Finish-button check, not evidence of perfect recognition.
 - No temporary microphone recording files remained after either successful capture. The generated playback audio was deleted. Only the two positively identified test entries were removed, with a private ignored backup; all original 11 captures, draft, original wording, and dictionary were compared with the pre-test snapshot and restored unchanged.
 - After process relaunch, the preview opened with working controls and the saved panel origin remained `{802, 663}`. Default dictation and quick-controls shortcuts, Toggle activation, Light cleanup, automatic paste, and clipboard restoration remained saved.
+
+## Workbench Voice 1.2.1 — menu clarification, 8 September 2026
+
+The user clarified that the editable keycap works; the duplicate shortcut shown in the Start dictation button was confusing. Removed that non-editable shortcut display. Start/Finish remains a recording button, the recording timer remains visible during capture, and the separate keycap remains the place to edit the shortcut.
+
+Release compilation, packaging, and signature verification pass. No shortcut handling or recording logic changed. The package is prepared but is not installed or visually verified yet: the user is away, and replacing the local ad-hoc build previously required user-present macOS authentication to restore Accessibility. The current installed 1.2.0 app is left in place. Installation and final visual/permission readback remain for the user's return.
