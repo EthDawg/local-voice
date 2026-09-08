@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Workbench questions and larger ideas
+    url: https://github.com/EthDawg/local-voice/discussions
+    about: Ask for help or discuss ideas across Voice and StageMark.
+  - name: Private security report
+    url: https://github.com/EthDawg/local-voice/security/advisories/new
+    about: Report vulnerabilities without sharing them publicly.

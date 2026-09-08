@@ -1,8 +1,24 @@
 # Workbench Voice
 
+![Workbench — small native Mac tools](docs/assets/workbench.svg)
+
+[![CI](https://github.com/EthDawg/local-voice/actions/workflows/ci.yml/badge.svg)](https://github.com/EthDawg/local-voice/actions/workflows/ci.yml)
+[![MIT license](https://img.shields.io/badge/license-MIT-mintcream.svg)](LICENSE)
+[![Good first issues](https://img.shields.io/github/issues/EthDawg/local-voice/good%20first%20issue)](https://github.com/EthDawg/local-voice/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22)
+
+**[Start contributing](CONTRIBUTING.md)** · **[Pick a starter issue](https://github.com/EthDawg/local-voice/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22)** · **[Ask a question](https://github.com/EthDawg/local-voice/discussions)**
+
 A native Mac app for local dictation and text-to-speech. Speak a thought, clean up fillers and corrections, and return the text to the app you started in. Or paste text, listen to it, and save an M4A reading.
 
 Built for Apple Silicon, with Parakeet v2 through FluidAudio and the voices installed in macOS. No accounts, API keys, subscriptions, Python environment, or background server.
+
+## Help shape Workbench
+
+Workbench is an open-source collection of small native Mac utilities: **[Voice](https://github.com/EthDawg/local-voice)** for dictation and reading, and **[StageMark](https://github.com/EthDawg/StageMark)** for presenting. Each app works independently. Our focus is useful everyday tools, local processing, clear controls, and recoverable user data.
+
+First contribution? Fix a confusing instruction, test a workflow on your Mac, improve keyboard access, or take a small Swift change. You do not need to be a Swift expert. [The contributor guide](CONTRIBUTING.md) takes you from choosing an issue to opening your first pull request. Documentation can be edited directly on GitHub without a Mac.
+
+We are early: expect rough edges, locally signed releases, and a small maintainer team. The [open issues](https://github.com/EthDawg/local-voice/issues) are the live backlog; `good first issue` marks bounded starting points and `help wanted` marks broader work. [Discuss larger ideas](https://github.com/EthDawg/local-voice/discussions) before investing heavily. We welcome documentation, accessibility, design, bug reports, and testing as well as code.
 
 ## Install from source
 
@@ -43,7 +59,7 @@ The model is downloaded from FluidInference on Hugging Face during setup. FluidA
 
 Drafts, originals, the dictionary, voice preferences, and recent transcripts are stored in `~/Library/Application Support/LocalVoice/state.json`, readable by the current user. Successful microphone recordings and temporary readings are deleted. Failed microphone recordings remain temporarily available for Retry until the next recording or app exit. The clipboard retains copied transcripts; automatic paste can restore its previous contents after confirmed insertion. Imported audio is not copied into history.
 
-This is a locally signed personal build, not an Apple-notarized distribution. Building on your Mac avoids a separate downloaded-binary installation flow. Code changes can cause macOS to ask for permissions again.
+This is an early community project with locally signed builds, not an Apple-notarized distribution. Building on your Mac avoids a separate downloaded-binary installation flow. Code changes can cause macOS to ask for permissions again.
 
 If Accessibility is switched on but Voice still shows **Enable automatic paste**, macOS may have retained permission for an earlier build. Quit Voice, open **System Settings → Privacy & Security → Accessibility**, select only **Workbench Voice**, remove that entry with **−**, then use **+** to add `~/Applications/Workbench Voice.app` again. Reopen Voice and check for **Automatic paste ready**. This was required and verified after the local build update. Ad-hoc signatures identify a specific build, as explained in [Apple's code-signing requirements](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements).
 
