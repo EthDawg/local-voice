@@ -14,3 +14,5 @@ shown in the dictation artwork; that image must be revised if the store edition
 uses manual paste. Do not present a promotional composite as a native test result.
 
 Both upload copies are saved in the [App Store Connect draft](https://appstoreconnect.apple.com/apps/6809826175/distribution/macos/version/inflight), version 1.2.2. The supplied icon is preserved in this branch. No Voice store binary has been uploaded: automatic paste requires a decision about the sandbox-compatible workflow before submission.
+
+The maintainer prioritised StageMark for App Store submission on 9 September. Voice retains automatic paste in its signed website edition; the store artwork remains a saved iteration draft.
