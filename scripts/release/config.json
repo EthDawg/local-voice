@@ -1,0 +1,10 @@
+{
+  "regressions": ["bash", "scripts/test.sh"],
+  "build": ["bash", "scripts/build.sh"],
+  "archive": "dist/Workbench Voice.zip",
+  "bundle": "Workbench Voice.app",
+  "identifier": "com.ethdawg.localvoice",
+  "executable": "LocalVoice",
+  "entitlements": "scripts/release/developer-id.plist",
+  "checks": [["--check-core"], ["--check-input"], ["--self-test"]]
+}

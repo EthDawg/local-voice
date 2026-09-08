@@ -1,6 +1,6 @@
 export const apps = Object.freeze({
-  voice: { name: 'Workbench Voice', repo: 'local-voice', version: '1.2.1', guide: 'https://github.com/EthDawg/local-voice/blob/main/CONTRIBUTING.md' },
-  stagemark: { name: 'Workbench StageMark', repo: 'StageMark', version: '1.2.0', guide: 'https://github.com/EthDawg/StageMark/blob/main/CONTRIBUTING.md' }
+  voice: { name: 'Workbench Voice', repo: 'local-voice', version: '1.2.2', guide: 'https://github.com/EthDawg/local-voice/blob/main/CONTRIBUTING.md' },
+  stagemark: { name: 'Workbench StageMark', repo: 'StageMark', version: '1.2.1', guide: 'https://github.com/EthDawg/StageMark/blob/main/CONTRIBUTING.md' }
 });
 const fields = ['app', 'version', 'environment', 'task', 'expected', 'observed', 'impact', 'help'];
 export function normalizeReport(input) {

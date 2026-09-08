@@ -14,23 +14,23 @@ The website is not a browser implementation of microphone capture, accessibility
 
 ## Current channel: early access
 
-As checked on 8 September 2026, Voice 1.2.1 and StageMark 1.2.0 are Apple Silicon builds with a macOS 14 deployment target. The actual QA machine was macOS 26.5.1; older supported OS versions still need independent testing. Voice's first launch downloads/prepares the English speech model. Downloaded binaries do not require developer tools.
+As checked on 8 September 2026, Voice 1.2.2 and StageMark 1.2.1 are Apple Silicon builds with a macOS 14 deployment target. The actual QA machine was macOS 26.5.1; older supported OS versions still need independent testing. Voice's first launch downloads/prepares the English speech model. Downloaded binaries do not require developer tools.
 
-Both are ad-hoc signed, not Developer ID signed or Apple-notarized. There was no valid code-signing identity on the release Mac at the time of this check. This is suitable for an explicitly labelled early-testing path, not a claim of frictionless general distribution. Use Apple's app-specific opening guidance; do not recommend disabling Gatekeeper or stripping quarantine flags.
+Both early-access release candidates are Developer ID signed, Apple-notarised and stapled. Apple returned Accepted with no issues, and the final extracted packages passed Gatekeeper as Notarized Developer ID. Source builds remain ad-hoc signed. Independent fresh-Mac testing is still needed before treating the channel as generally validated; retain that limitation in early-access release notes.
 
 There is no automatic updater. Users quit the app and replace the copy in Applications. Settings/history/boards remain outside the app bundle. Website links pin a version and its checksum so feedback can identify exactly what was tested. A checksum detects changed bytes; it is not a substitute for an identified developer signature or notarization.
 
-## Next release gate: ordinary download and open
+## Remaining gate: independent first-run testing
 
-The maintainer will obtain or renew Apple Developer Program membership. Keep certificate private keys and notarization credentials out of Git, issues, chat, website files, and release assets. The remaining work is:
+Apple Developer Program membership, signing, notarisation, stapling and local package verification are complete. The repeatable workflow is in [scripts/release](../scripts/release/README.md). Signed early-access prereleases are ready for independent testers; general availability still needs a separate Mac or clean account to exercise browser download, Gatekeeper and first-run permissions.
 
-- Obtain a **Developer ID Application** identity on the release Mac, or a suitably protected release environment.
-- Extend packaging to sign nested code and the app with a secure timestamp and hardened runtime. Check Voice's audio-input entitlement and actual speech/recording/paste behavior under that runtime. Do not use `--deep` as a substitute for correct nested-code signing.
-- Submit the archive with Apple's `notarytool` or Xcode, inspect the result/log, staple the accepted ticket to the app, and repackage the stapled app.
-- Verify signatures and the ticket. Download through a browser onto a separate Mac or clean account so quarantine and first-run permissions are genuinely exercised. Test Voice model setup, microphone, optional paste, and StageMark drawing/shortcuts; a local rebuild does not prove this experience.
-- Publish a new versioned release and checksum, then update website links and remove the early-signing notice only after that downloaded build passes.
+Test Voice model setup, live microphone capture, optional paste and StageMark drawing/shortcuts. A local rebuild or automated speech round trip does not prove this experience. Record the OS, app version and observed outcome in the release gate issue. Publish versioned checksums and verify the public download before changing the website links.
 
-Keep the existing bundle identifiers and storage locations so current testers retain their data. Do not buy a domain, create an App Store listing, add accounts, or introduce an updater to solve this initial tester path. Consider a signed updater only when repeated releases make manual replacement a real burden.
+Keep the existing bundle identifiers and storage locations so current testers retain their data. Consider a signed updater only when repeated releases make manual replacement a real burden.
+
+## Mac App Store channel
+
+The maintainer has also requested Mac App Store publication. This needs a separate sandboxed build, store certificates/profiles, App Store Connect metadata and Apple review; Developer ID notarization alone does not produce a store listing. Voice's automatic Accessibility paste is incompatible with the documented sandbox model and needs a considered store-specific workflow. StageMark is the first sandbox candidate. See the [release guide](../scripts/release/README.md) for requirements and validation limits. Do not advertise either app as available in the store before Apple's publication is verified.
 
 ## Repeatable release checks
 

@@ -10,3 +10,7 @@ test-results/
 
 site/public/
 site/.vercel/
+__pycache__/
+*.p12
+*.p8
+*.key
