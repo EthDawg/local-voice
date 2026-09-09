@@ -6,6 +6,12 @@ if [ "${1:-}" = "--preview" ]; then
     shift
     exec python3 scripts/release/preview.py build "$@"
 fi
+if xcrun --find appintentsmetadataprocessor >/dev/null 2>&1; then
+    TOOLCHAIN="$(dirname "$(dirname "$(dirname "$(xcrun --find swiftc)")")")"
+    export VOICE_INTENT_PROTOCOLS="$PROJECT_DIR/scripts/app-intents-protocols.json"
+    export VOICE_INTENT_VALUES="$PROJECT_DIR/.build/Voice.swiftconstvalues"
+    rm -f "$VOICE_INTENT_VALUES"
+fi
 swift build -c release --disable-sandbox
 BIN_DIR="$(swift build -c release --show-bin-path --disable-sandbox)"
 mkdir -p "$PROJECT_DIR/dist"

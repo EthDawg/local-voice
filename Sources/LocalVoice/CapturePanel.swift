@@ -129,13 +129,16 @@ struct RecordingOverlay: View {
                 Button { model.stopRecording() } label: { Label("Finish", systemImage: "stop.fill") }
                     .buttonStyle(.borderedProminent).accessibilityLabel("Finish dictation")
             }
-            Menu {
+            if let id = model.shortcutRequest.id {
+                Button { model.cancelShortcut(id) } label: { Image(systemName: "xmark.circle").font(.system(size: 19)).frame(width: 28, height: 32) }
+                    .buttonStyle(.plain).accessibilityLabel("Cancel dictation").help("Discard this Shortcuts recording")
+            } else { Menu {
                 if model.phase == .recording { Button("Discard recording", role: .destructive) { model.cancelRecording() } }
                 Button("Reset panel position") { model.onResetPanel?() }
                 if model.previewingPanel { Button("Close preview") { model.closePanelPreview() } }
             } label: { Image(systemName: "ellipsis.circle").font(.system(size: 19)).frame(width: 28, height: 32) }
                 .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                .accessibilityLabel("Dictation options").help("Dictation options")
+                .accessibilityLabel("Dictation options").help("Dictation options") }
         }
         .padding(.horizontal, 12).frame(width: CapturePanelPlacement.size.width, height: CapturePanelPlacement.size.height)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))

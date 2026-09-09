@@ -1,31 +1,37 @@
-# Dictation in Apple Shortcuts
+# Shortcuts dictation and optional Speko reading
 
-Matt ([@mattywhitenz](https://github.com/mattywhitenz)) proposed a focused native dictation action in [#10](https://github.com/EthDawg/local-voice/issues/10). This implementation credits his proposal; no contributor code has been submitted or attributed.
+Matt ([@mattywhitenz](https://github.com/mattywhitenz)) proposed these workflows in [#10](https://github.com/EthDawg/local-voice/issues/10) and [#11](https://github.com/EthDawg/local-voice/issues/11). Credit is for the proposals; no unsubmitted contributor code has been attributed.
 
-## Your workflow
+## Dictate into Notes or another app
 
-With a verified package, add **Dictate with Workbench** in Apple Shortcuts, followed by **Create Note**, **Copy to Clipboard**, or another action that accepts text. Run it, speak, and choose **Finish** in Voice’s visible capture panel. The next action receives that recording’s transcript. Downstream apps control what they do with the text and whether they sync online.
+Create a shortcut with three actions:
 
-Set up Voice’s local speech model first. The action uses the existing microphone permission, local recognition, cleanup preferences, dictionary and history. It never automatically copies, pastes or submits. Concurrent work is rejected; cancellation, permission failures and shutdown return an error, never an earlier draft. Keyboard shortcuts and Apple Shortcuts are separate features.
+1. **Record Audio** (Apple’s built-in action).
+2. **Transcribe with Workbench**, taking the recorded audio.
+3. **Create Note**, **Copy to Clipboard**, or another action accepting text.
 
-## Build and validation status
+Run the saved shortcut, speak, and stop the recording in Shortcuts. Voice uses its existing local recognition, cleanup preferences, dictionary and history, returning only that invocation’s transcript. It does not copy, paste or submit. You can also supply an existing audio file up to 30 minutes long. Set up Voice’s speech model first; busy/missing-model/invalid-audio cases report errors.
 
-The implementation compiles with the existing Command Line Tools. Request ownership checks cover concurrent calls, incorrect IDs, duplicate completion, cancellation, late callbacks and errors. The existing regression suite passes.
+Apple owns the microphone and its cancellation controls in this workflow. Workbench’s action never opens a microphone. Subsequent actions control the text’s destination, including any online syncing. Voice’s existing keyboard dictation remains independent.
 
-Apple Shortcuts discovery requires metadata extracted by full Xcode. `REQUIRE_APP_INTENTS=1 bash scripts/build.sh` refuses to package without it. A Command Line Tools build explicitly reports this limitation in Voice’s Shortcuts page. Installed action discovery and a live Shortcuts → dictation → text output workflow must pass before this feature is promoted as a supported download.
+**Why this composition:** native testing on macOS 26.5.1 confirmed the prototype’s direct recording action could return live text, but Shortcuts’ Stop did not reliably cancel an app-owned microphone capture, even with task/progress cancellation handlers. The shipped design reuses Apple’s Record Audio lifecycle. The direct recording action was removed; it is not a hidden microphone fallback. Cancellation during local processing may finish the current recognition work; it cannot keep recording audio.
 
-CI packaging/extraction is being checked in the PR. Adding a downloadable CI artifact also needs a workflow update; the current command-line GitHub authorization lacks the workflow scope. No signing credentials are sent to CI.
+## Optional Speko reading
 
-## Speko is a separate experiment
+Mac voices remain the default, offline and account-free. Choosing **Read aloud → Speko · online** explicitly enables online readings. Create a personal account at [Speko](https://platform.speko.ai), choose **Gateway + Router** during onboarding, create an API key and save it in Voice’s secure field. No gateway worker is needed.
 
-Matt also proposed [optional Speko reading (#11)](https://github.com/EthDawg/local-voice/issues/11). [Speko](https://speko.ai/) is a hosted router for online voice providers, not the installed Mac voices Voice already uses. It requires a personal account/API key, sends selected text to Speko and a provider, and can incur usage charges.
+Only text you explicitly submit for a Speko reading goes to its Router and selected voice provider. Accepted text may be billed, including cancelled requests. Dictation/cleanup gain no cloud fallback. Keys are kept in this edition’s macOS Keychain, separate between Preview and production; never in app JSON, logs or the repository. Removing a key returns reading to Mac voices.
 
-A prototype was implemented and 28 synthetic integration checks passed, including its PCM-to-M4A path. It is preserved on the separate `experiment/speko-reading` branch and excluded from the Shortcuts candidate. It has not been tested with a real key or released. First establish the user benefit (such as a specific higher-quality voice) before asking anyone to open an account or introducing a network provider into the public app.
+The initial scope uses automatic balanced routing and the route’s default voice, with 5,000 characters per request. Provider-specific voices and pace controls are absent for Speko; Mac voices retain pace and a 50,000-character limit. Requests have bounded duration/response size, unique idempotency keys, no automatic retry, no cookies/cache and no redirects. Error bodies are not displayed/logged. Raw mono 24 kHz PCM is wrapped in WAV for playback and M4A export. Listen/Save reuse unchanged generated audio; key replacement/removal invalidates it.
 
-The prototype uses a fixed HTTPS endpoint, explicit opt-in, Keychain, bounded requests, no automatic retries, no redirects, and cancellation. It adds no cloud dictation. Mac voices remain the default. Prototype code is not a product or privacy-policy commitment.
+## Build and validation
 
-## Research — 9 September 2026
+Full Xcode extracts real action metadata. Command Line Tools can compile/test source, but their packages explicitly disclose that native discovery is unavailable. `REQUIRE_APP_INTENTS=1 bash scripts/build.sh` fails without Apple’s processor. The app target alone emits constant values; packaging verifies the generated action identifier, input and output. CI applies the same gate and retains the tested package.
 
-[Apple’s App Intents documentation](https://developer.apple.com/documentation/appintents/creating-your-first-app-intent) supports typed action results. Merely opening Voice from a keyboard shortcut or URL does not return a recording to the next action.
+On 9 September 2026, Xcode 26.6 (17F113) generated native metadata and the Developer ID-signed Preview updated in place without deleting data or resetting permissions. The regression suite includes 28 synthetic invocation/API/audio checks. The user entered their key directly in Preview and authorised one sentence: “Your table is ready.” Speko playback completed, M4A export reused cached audio, and local recognition confirmed that sentence. No private text or key was retrieved. Record Audio composition testing is recorded in the release/PR when complete.
 
-[Speko’s speech API](https://docs.speko.ai/relay/tts/speech) provides automatic routing and raw PCM for one-shot speech. A native HTTPS client is sufficient if this option is later adopted. Its [MIT-licensed Gateway](https://github.com/SpekoAI/gateway) is an early-preview voice-agent runtime; embedding that runtime would be disproportionate for one optional reading feature. No gateway code or telemetry has been copied.
+## Research
+
+[Apple App Intents](https://developer.apple.com/documentation/appintents/creating-your-first-app-intent) supplies typed results to Shortcuts. A keyboard shortcut or URL that merely opens Voice cannot do that. Recording is delegated to Apple’s existing action after native cancellation testing exposed the lifecycle gap described above.
+
+[Speko’s speech API](https://docs.speko.ai/relay/tts/speech) supports one-shot raw PCM with automatic routing. A small HTTPS client fits this reading feature. Its [MIT-licensed Gateway](https://github.com/SpekoAI/gateway) is an early-preview runtime for voice agents; no gateway code, telemetry, additional runtime or generic provider framework is bundled.
