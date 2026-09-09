@@ -8,7 +8,7 @@ struct ShortcutKeycap: View {
     var body: some View {
         Button { model.onEditShortcut?(id) } label: {
             HStack(spacing: 7) {
-                Text(model.editingShortcut == id ? "Press keys…" : (id == 1 ? model.preferences.dictationShortcut : model.preferences.controlsShortcut).label)
+                Text(model.editingShortcut == id ? "Press keys…" : model.preferences.shortcut(id).label)
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
                 Image(systemName: "pencil").font(.system(size: 10))
             }.padding(.horizontal, 10).padding(.vertical, 7)
@@ -25,7 +25,7 @@ struct ShortcutControl: View {
     @ObservedObject var model: AppModel
     var id: UInt32
     var title: String
-    var shortcut: VoiceShortcut { id == 1 ? model.preferences.dictationShortcut : model.preferences.controlsShortcut }
+    var shortcut: VoiceShortcut { model.preferences.shortcut(id) }
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
@@ -49,6 +49,7 @@ struct VoiceShortcutSettings: View {
             Text("Click a shortcut, then press your preferred combination.").font(.caption).foregroundStyle(.secondary)
             ShortcutControl(model: model, id: 1, title: "Dictation")
             ShortcutControl(model: model, id: 2, title: "Quick controls")
+            ShortcutControl(model: model, id: 3, title: "Demo library")
             Text("Escape cancels. Delete turns a shortcut off. Existing shortcuts stay unchanged if a combination is unavailable.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Button("Restore default shortcuts") { model.onResetShortcuts?() }
@@ -94,6 +95,7 @@ struct VoiceQuickControls: View {
                 Menu {
                     Button("Open editor…") { model.onShowEditor?("dictate") }
                     Button("Recent transcripts…") { model.onShowEditor?("history") }
+                    Button("Demo library…") { model.showLibrary() }
                     Button("Your dictionary…") { model.onShowEditor?("dictionary") }
                     Divider()
                     Button("Quit Workbench Voice") { NSApp.terminate(nil) }
@@ -122,6 +124,7 @@ struct VoiceQuickControls: View {
             Text(model.status).font(.system(size: 10)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading).lineLimit(3)
             HStack {
                 Button("Open editor…") { model.onShowEditor?(model.quickTab == "Read" ? "speak" : "dictate") }.buttonStyle(.link)
+                Button { model.showLibrary() } label: { Image(systemName: "square.stack.3d.up") }.buttonStyle(.link).help("Demo library · \(model.preferences.shortcut(3).label)").accessibilityLabel("Open demo library")
                 Spacer()
                 WorkbenchSwitcher { model.onCloseMenu?(); model.stopPlayback() }.disabled(model.phase != .idle)
             }
@@ -176,20 +179,21 @@ struct VoiceQuickControls: View {
     private var reading: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Give your eyes a break.").font(.headline)
-            Button("Read clipboard") {
+            Button(model.readingProvider == .speko ? "Read clipboard with Speko" : "Read clipboard") {
                 if let text = NSPasteboard.general.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     model.speechText = text; model.listen()
                 } else { model.status = "Copy some text first." }
             }.disabled(model.phase != .idle || model.rendering || model.playing || model.paused)
-            Picker("Voice", selection: $model.voice) { ForEach(model.voices, id: \.self) { Text($0).tag($0) } }
-            HStack { Text("Pace"); Slider(value: $model.rate, in: 100...300, step: 5); Text("\(Int(model.rate))").monospacedDigit() }
+            if model.readingProvider == .mac { Picker("Voice", selection: $model.voice) { ForEach(model.voices, id: \.self) { Text($0).tag($0) } }
+            HStack { Text("Pace"); Slider(value: $model.rate, in: 100...300, step: 5); Text("\(Int(model.rate))").monospacedDigit() } }
             Text(model.speechText.isEmpty ? "Paste or type a longer passage in the editor." : model.speechText).lineLimit(9).foregroundStyle(.secondary)
             HStack {
                 Button(model.playing ? "Pause" : model.paused ? "Resume" : "Listen") { model.listen() }.disabled(model.speechText.isEmpty || model.rendering || model.phase != .idle)
+                if model.cloudRequestActive { Button("Cancel request") { model.cancelReading() } }
                 if model.playing || model.paused { Button("Stop") { model.stopPlayback() } }
                 Spacer(); Button("Edit text…") { model.onShowEditor?("speak") }
             }
-            Text("Installed Mac voices. No account or usage meter.").font(.caption).foregroundStyle(.secondary)
+            Text(model.readingProvider == .speko ? "Speko sends the reading online. Usage may be billed. Change provider in the editor." : "Installed Mac voices. No account or usage meter.").font(.caption).foregroundStyle(.secondary)
         }
     }
     private var general: some View {

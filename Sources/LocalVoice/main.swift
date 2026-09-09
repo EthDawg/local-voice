@@ -15,10 +15,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     var menuTarget: TextDelivery.Target?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Workbench.preparePreviewData(component: "LocalVoice", files: ["state.json", "demo-library.json"])
         _ = WorkbenchSettings.shared
         model = AppModel()
         window = NSWindow(contentViewController: NSHostingController(rootView: ContentView(model: model)))
-        window.title = "Workbench Voice"
+        window.title = Workbench.displayName
         window.setContentSize(NSSize(width: 1060, height: 760))
         window.minSize = NSSize(width: 900, height: 700)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
@@ -41,11 +42,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             self.finishEditing()
             self.model.preferences.dictationShortcut = VoicePreferences().dictationShortcut
             self.model.preferences.controlsShortcut = VoicePreferences().controlsShortcut
+            self.model.preferences.libraryShortcut = VoicePreferences().libraryShortcut
         }
         model.onResetPanel = { [weak self] in self?.capturePanel.position(reset: true) }
         hotkeys.onKey = { [weak self] id, down in
             guard let self else { return }
             if id == 1 { self.model.shortcutChanged(down: down) }
+            else if down, id == 3 { self.model.showLibrary() }
             else if down { self.toggleControls() }
         }
         setupMenus(); registerShortcuts(); showControls()
@@ -69,10 +72,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             else if shortcut.modifiers & UInt32(controlKey | optionKey | cmdKey) == 0 {
                 self.model.shortcutRecordingMessage = "Include Control, Option, or Command."; return nil
             }
-            let other = id == 1 ? self.model.preferences.controlsShortcut : self.model.preferences.dictationShortcut
-            if shortcut.enabled && shortcut == other { self.model.shortcutRecordingMessage = "That shortcut is already assigned in Voice."; return nil }
+            if shortcut.enabled && [UInt32(1), 2, 3].contains(where: { $0 != id && self.model.preferences.shortcut($0) == shortcut }) { self.model.shortcutRecordingMessage = "That shortcut is already assigned in Voice."; return nil }
             var candidate = self.model.preferences
-            if id == 1 { candidate.dictationShortcut = shortcut } else { candidate.controlsShortcut = shortcut }
+            candidate.setShortcut(shortcut, for: id)
             self.hotkeys.register(candidate)
             let failure = self.hotkeys.failures[id]
             self.hotkeys.unregister()
@@ -102,6 +104,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         edit.submenu = editMenu; main.addItem(edit)
         let windows = NSMenuItem(); windows.title = "Window"; let menu = NSMenu(title: "Window")
         menu.addItem(withTitle: "Open editor", action: #selector(showWindow), keyEquivalent: "0")
+        menu.addItem(withTitle: "Demo library", action: #selector(showLibrary), keyEquivalent: "l")
+        let savePrompt = menu.addItem(withTitle: "Save clipboard as prompt…", action: #selector(saveClipboardPrompt), keyEquivalent: "s")
+        savePrompt.keyEquivalentModifierMask = [.command, .shift]
         windows.submenu = menu; main.addItem(windows); NSApp.mainMenu = main; NSApp.windowsMenu = menu
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.autosaveName = NSStatusItem.AutosaveName("LocalVoice.MenuBar")
@@ -114,6 +119,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             menu.addItem(withTitle: "Quick controls", action: #selector(toggleControls), keyEquivalent: "")
             menu.addItem(withTitle: "Open editor", action: #selector(showWindow), keyEquivalent: "")
             menu.addItem(withTitle: "Recent transcripts…", action: #selector(showHistory), keyEquivalent: "")
+            menu.addItem(withTitle: "Demo library…", action: #selector(showLibrary), keyEquivalent: "")
             menu.addItem(withTitle: "Keyboard shortcuts…", action: #selector(showShortcuts), keyEquivalent: "")
             menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
             menu.addItem(.separator()); menu.addItem(withTitle: "Quit Workbench Voice", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -160,6 +166,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     @objc func showSettings() { model.page = "settings"; showWindow() }
     @objc func showShortcuts() { model.page = "shortcuts"; showWindow() }
     @objc func showHistory() { model.page = "history"; showWindow() }
+    @objc func showLibrary() { model.showLibrary() }
+    @objc func saveClipboardPrompt() {
+        guard let text = NSPasteboard.general.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { model.showLibrary(); model.library.notice = "Copy some text first."; return }
+        model.savePrompt(text)
+    }
     @objc func showWindow() { closeControls(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
     @objc func showAbout() { NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Workbench Voice", .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development", .credits: NSAttributedString(string: "Local dictation and text-to-speech.\nPowered by Parakeet, FluidAudio, and macOS voices.")]) }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showControls(); return true }
@@ -172,7 +183,8 @@ func runCLI(_ args: [String]) async -> Int32 {
         let engine = RecognitionEngine()
         switch args.first {
         case "--check-core":
-            try CoreChecks.run(); try CleanupChecks.run()
+            try CoreChecks.run(); try CleanupChecks.run(); try DemoLibraryChecks.run()
+            try await MainActor.run { try DemoLibraryChecks.runModelChecks(); try IntegrationChecks.run() }
         case "--check-input":
             try await MainActor.run { try InputChecks.run() }
         case "--check-cleanup":

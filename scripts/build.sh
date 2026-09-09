@@ -2,6 +2,16 @@
 set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
+if [ "${1:-}" = "--preview" ]; then
+    shift
+    exec python3 scripts/release/preview.py build "$@"
+fi
+if xcrun --find appintentsmetadataprocessor >/dev/null 2>&1; then
+    TOOLCHAIN="$(dirname "$(dirname "$(dirname "$(xcrun --find swiftc)")")")"
+    export VOICE_INTENT_PROTOCOLS="$PROJECT_DIR/scripts/app-intents-protocols.json"
+    export VOICE_INTENT_VALUES="$PROJECT_DIR/.build/Voice.swiftconstvalues"
+    rm -f "$VOICE_INTENT_VALUES"
+fi
 swift build -c release --disable-sandbox
 BIN_DIR="$(swift build -c release --show-bin-path --disable-sandbox)"
 mkdir -p "$PROJECT_DIR/dist"
@@ -20,6 +30,7 @@ if [ ! -f "$PROJECT_DIR/scripts/AppIcon.icns" ]; then
     iconutil -c icns "$PACKAGE_DIR/AppIcon.iconset" -o "$PROJECT_DIR/scripts/AppIcon.icns"
 fi
 cp "$PROJECT_DIR/scripts/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
+bash "$PROJECT_DIR/scripts/app-intents.sh" "$APP_DIR"
 codesign --force --deep --sign - "$APP_DIR"
 codesign --verify --deep --strict "$APP_DIR"
 ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$PACKAGE_DIR/Workbench Voice.zip"
