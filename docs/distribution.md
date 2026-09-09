@@ -14,7 +14,9 @@ The website is not a browser implementation of microphone capture, accessibility
 
 ## Current channel: early access
 
-As checked on 8 September 2026, Voice 1.2.2 and StageMark 1.2.1 are Apple Silicon builds with a macOS 14 deployment target. The actual QA machine was macOS 26.5.1; older supported OS versions still need independent testing. Voice's first launch downloads/prepares the English speech model. Downloaded binaries do not require developer tools.
+For the 10 September 2026 early-access update, Voice 1.3.0 and StageMark 1.2.1 are Apple Silicon builds with a macOS 14 deployment target. The actual QA machine was macOS 26.5.1; older supported OS versions still need independent testing. Voice's first launch downloads/prepares the English speech model. Downloaded binaries do not require developer tools.
+
+Voice 1.3 adds optional Speko reading (real playback/export verified) and a typed Shortcuts audio-to-text action. Action discovery/connections are verified; the complete Apple Record Audio composition still needs live confirmation. See [integration validation](voice-integrations.md).
 
 Both early-access release candidates are Developer ID signed, Apple-notarised and stapled. Apple returned Accepted with no issues, and the final extracted packages passed Gatekeeper as Notarized Developer ID. Source builds remain ad-hoc signed. Independent fresh-Mac testing is still needed before treating the channel as generally validated; retain that limitation in early-access release notes.
 
