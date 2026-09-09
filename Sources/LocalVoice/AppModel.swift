@@ -58,23 +58,6 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     @Published var rate = 180.0 { didSet { persist() } }
     @Published var elapsed = 0.0
     @Published var level = 0.0
-    @Published var readingProvider = ReadingProvider(rawValue: UserDefaults.standard.string(forKey: "readingProvider.v1") ?? "") ?? .mac {
-        didSet { UserDefaults.standard.set(readingProvider.rawValue, forKey: "readingProvider.v1"); stopPlayback() }
-    }
-    @Published var keyNotice = ""
-    private var readingTask: Task<Void, Never>?
-    var readingLimit: Int { readingProvider == .speko ? SpekoRenderer.maximumCharacters : 50_000 }
-    func saveSpekoKey(_ key: String) {
-        do { try SpekoKeychain.save(key); invalidateAudio(); keyNotice = "Key saved in Keychain." }
-        catch { self.error = error.localizedDescription }
-    }
-    func removeSpekoKey() {
-        do { try SpekoKeychain.remove(); readingProvider = .mac; invalidateAudio(); keyNotice = "Key removed. Using Mac voices." }
-        catch { self.error = error.localizedDescription }
-    }
-    private func invalidateAudio() { stopPlayback(); AudioRenderer.remove(audioURL); audioURL = nil; audioSignature = "" }
-    func cancelReading() { readingTask?.cancel(); status = "Reading cancelled. Speko may still bill text already accepted." }
-    @Published var cloudRequestActive = false
     @Published var rendering = false
     @Published var playing = false
     @Published var paused = false
@@ -323,42 +306,30 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         catch { fail(error.localizedDescription) }
     }
 
-    private var signature: String { "\(readingProvider.rawValue)|\(voice)|\(Int(rate))|\(speechText)" }
+    private var signature: String { "\(voice)|\(Int(rate))|\(speechText)" }
     func listen() {
         guard !rendering, phase == .idle else { return }
         if playing { player?.pause(); playing = false; paused = true; return }
         if paused, signature == audioSignature { player?.play(); playing = true; paused = false; return }
         stopPlayback()
-        rendering = true
-        readingTask = Task {
-            defer { rendering = false; readingTask = nil }
+        Task {
             do {
                 let url = try await generateAudio()
-                try Task.checkCancellation()
                 player = try AVAudioPlayer(contentsOf: url); player?.delegate = self
                 guard player?.play() == true else { throw VoiceError.message("Audio could not play. Check your Mac's audio output.") }
                 playing = true; audioDuration = player?.duration ?? 0; status = "Reading aloud."
                 playTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
                     Task { @MainActor in self?.playbackTime = self?.player?.currentTime ?? 0 }
                 }
-            } catch { if !(error is CancellationError) { self.error = error.localizedDescription } }
+            } catch { self.error = error.localizedDescription }
         }
     }
     private func generateAudio() async throws -> URL {
         if let audioURL, signature == audioSignature { return audioURL }
         rendering = true; error = nil
         let text = speechText, selectedVoice = voice, selectedRate = Int(rate), originalSignature = signature
-        guard text.count <= readingLimit else { throw VoiceError.message("This reading is too long for the selected provider.") }
-        let url: URL
-        if readingProvider == .speko {
-            let key = try SpekoKeychain.read()
-            cloudRequestActive = true
-            defer { cloudRequestActive = false }
-            url = try await SpekoRenderer.render(text: text, key: key)
-        } else {
-            url = try await Task.detached(priority: .userInitiated) { try AudioRenderer.render(text: text, voice: selectedVoice, rate: selectedRate) }.value
-        }
-        do { try Task.checkCancellation() } catch { AudioRenderer.remove(url); throw error }
+        defer { rendering = false }
+        let url = try await Task.detached(priority: .userInitiated) { try AudioRenderer.render(text: text, voice: selectedVoice, rate: selectedRate) }.value
         AudioRenderer.remove(audioURL); audioURL = url; audioSignature = originalSignature
         return url
     }
@@ -366,15 +337,13 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         guard !rendering, !speechText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let panel = NSSavePanel(); panel.allowedContentTypes = [.mpeg4Audio]; panel.nameFieldStringValue = "Reading.m4a"
         guard panel.runModal() == .OK, let destination = panel.url else { return }
-        rendering = true
-        readingTask = Task {
-            defer { rendering = false; readingTask = nil }
+        Task {
             do {
                 let url = try await generateAudio()
-                try Task.checkCancellation()
+                rendering = true
                 try await Task.detached { try AudioRenderer.export(url, to: destination) }.value
                 rendering = false; status = "Audio saved to \(destination.lastPathComponent)."
-            } catch { if !(error is CancellationError) { self.error = error.localizedDescription } }
+            } catch { rendering = false; self.error = error.localizedDescription }
         }
     }
     func stopPlayback() {
@@ -406,5 +375,5 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         do { try store.save(SavedState(draft: transcript, speechText: speechText, history: history, replacements: replacements, voice: voice, rate: rate, rawDraft: rawTranscript)) }
         catch { self.error = "Could not save this session. \(error.localizedDescription)" }
     }
-    func shutdown() { readingTask?.cancel(); shortcutRequest.cancel(); cancelRecording(); stopPlayback(); saveNow(); AudioRenderer.remove(audioURL); if let recordURL { try? FileManager.default.removeItem(at: recordURL) } }
+    func shutdown() { shortcutRequest.cancel(); cancelRecording(); stopPlayback(); saveNow(); AudioRenderer.remove(audioURL); if let recordURL { try? FileManager.default.removeItem(at: recordURL) } }
 }

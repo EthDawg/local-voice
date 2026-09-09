@@ -1,31 +1,31 @@
-# Apple Shortcuts and optional Speko reading
+# Dictation in Apple Shortcuts
 
-Matt ([@mattywhitenz](https://github.com/mattywhitenz)) proposed these two focused contributions in [#10](https://github.com/EthDawg/local-voice/issues/10) and [#11](https://github.com/EthDawg/local-voice/issues/11). Implementation is maintained here; credit is for the proposals, not unsubmitted code.
+Matt ([@mattywhitenz](https://github.com/mattywhitenz)) proposed a focused native dictation action in [#10](https://github.com/EthDawg/local-voice/issues/10). This implementation credits his proposal; no contributor code has been submitted or attributed.
 
-## Dictate into your own workflow
+## Your workflow
 
-In Apple Shortcuts, add **Dictate with Workbench**, followed by **Create Note**, **Copy to Clipboard**, or another action that accepts text. Run it, speak, and choose **Finish** in Voice’s visible capture panel. The next action receives that recording’s transcript. Downstream apps control what they do with the text and whether they sync it online.
+With a verified package, add **Dictate with Workbench** in Apple Shortcuts, followed by **Create Note**, **Copy to Clipboard**, or another action that accepts text. Run it, speak, and choose **Finish** in Voice’s visible capture panel. The next action receives that recording’s transcript. Downstream apps control what they do with the text and whether they sync online.
 
 Set up Voice’s local speech model first. The action uses the existing microphone permission, local recognition, cleanup preferences, dictionary and history. It never automatically copies, pastes or submits. Concurrent work is rejected; cancellation, permission failures and shutdown return an error, never an earlier draft. Keyboard shortcuts and Apple Shortcuts are separate features.
 
-The App Intent requires Apple-generated package metadata. A full Xcode toolchain is needed to package it; Command Line Tools can compile and test the implementation but cannot make the action discoverable. `REQUIRE_APP_INTENTS=1 bash scripts/build.sh` fails if metadata cannot be created. CI uses this gate and saves the resulting package. Do not call a CLT-only package Shortcuts-ready.
+## Build and validation status
 
-## Choose a reading voice
+The implementation compiles with the existing Command Line Tools. Request ownership checks cover concurrent calls, incorrect IDs, duplicate completion, cancellation, late callbacks and errors. The existing regression suite passes.
 
-Mac voices remain the default, offline and account-free. In **Read aloud**, choosing **Speko · online** shows what leaves the Mac and lets you save/remove your personal API key in this edition’s macOS Keychain. The key is not stored in app JSON, preferences, logs, exports or the repository. Preview and production keys are separate.
+Apple Shortcuts discovery requires metadata extracted by full Xcode. `REQUIRE_APP_INTENTS=1 bash scripts/build.sh` refuses to package without it. A Command Line Tools build explicitly reports this limitation in Voice’s Shortcuts page. Installed action discovery and a live Shortcuts → dictation → text output workflow must pass before this feature is promoted as a supported download.
 
-Only text explicitly submitted for a Speko reading goes to `https://router.speko.dev/v1/tts/speech`, then its selected voice provider. Speko may bill accepted text even if you cancel. Dictation and cleanup do not gain any cloud fallback. Removing the key returns reading to Mac voices. The first scope uses automatic, balanced routing and the route’s default voice, with 5,000 characters per request; provider-specific voice IDs and pace controls are intentionally absent for Speko. Mac voices retain their existing pace and 50,000-character limit.
+CI packaging/extraction is being checked in the PR. Adding a downloadable CI artifact also needs a workflow update; the current command-line GitHub authorization lacks the workflow scope. No signing credentials are sent to CI.
 
-Requests have unique idempotency keys, no automatic retries, bounded duration/response size, no cookies/cache, and no redirects. Error bodies are not shown or logged. Raw mono PCM at 24 kHz is wrapped in WAV for the existing player and M4A export. A repeated Listen/Save of unchanged rendered text reuses the temporary audio; removing/replacing the key invalidates it.
+## Speko is a separate experiment
 
-## Research and scope decision — 9 September 2026
+Matt also proposed [optional Speko reading (#11)](https://github.com/EthDawg/local-voice/issues/11). [Speko](https://speko.ai/) is a hosted router for online voice providers, not the installed Mac voices Voice already uses. It requires a personal account/API key, sends selected text to Speko and a provider, and can incur usage charges.
 
-- [Apple App Intents](https://developer.apple.com/documentation/appintents/creating-your-first-app-intent): native actions provide typed results to Shortcuts. A URL that merely opens Voice cannot provide an invocation-owned transcript.
-- [Speko speech API](https://docs.speko.ai/relay/tts/speech): the one-shot endpoint supports raw PCM, automatic routing and a default voice. A small native HTTPS client fits the existing playback workflow.
-- [Speko Gateway](https://github.com/SpekoAI/gateway): MIT, early preview, customer-side voice-agent runtime with streaming integrations. Embedding its runtime would add unnecessary processes and dependencies for one optional reading provider. No gateway code or telemetry is included.
+A prototype was implemented and 28 synthetic integration checks passed, including its PCM-to-M4A path. It is preserved on the separate `experiment/speko-reading` branch and excluded from the Shortcuts candidate. It has not been tested with a real key or released. First establish the user benefit (such as a specific higher-quality voice) before asking anyone to open an account or introducing a network provider into the public app.
 
-## Validation
+The prototype uses a fixed HTTPS endpoint, explicit opt-in, Keychain, bounded requests, no automatic retries, no redirects, and cancellation. It adds no cloud dictation. Mac voices remain the default. Prototype code is not a product or privacy-policy commitment.
 
-`bash scripts/test.sh` includes synthetic request ownership, duplicate/stale completion, cancellation/error, HTTP contract, invalid input/audio and PCM-to-M4A checks. These use no real key or private text. CI additionally requires extracted Shortcuts metadata.
+## Research — 9 September 2026
 
-Before promoting downloads, record installed action discovery, live Shortcuts → dictation → text output, cancellation and ordinary dictation regression. A real Speko request needs a user-configured key and agreed synthetic text; mocks and successful compilation do not establish provider playback, billing or production reliability. See the accompanying PR/release for current verification status.
+[Apple’s App Intents documentation](https://developer.apple.com/documentation/appintents/creating-your-first-app-intent) supports typed action results. Merely opening Voice from a keyboard shortcut or URL does not return a recording to the next action.
+
+[Speko’s speech API](https://docs.speko.ai/relay/tts/speech) provides automatic routing and raw PCM for one-shot speech. A native HTTPS client is sufficient if this option is later adopted. Its [MIT-licensed Gateway](https://github.com/SpekoAI/gateway) is an early-preview voice-agent runtime; embedding that runtime would be disproportionate for one optional reading feature. No gateway code or telemetry has been copied.

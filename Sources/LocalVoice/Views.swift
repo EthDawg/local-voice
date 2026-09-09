@@ -13,7 +13,7 @@ struct ContentView: View {
             sidebar
             VStack(alignment: .leading, spacing: 24) {
                 HStack {
-                    Label(model.page == "speak" && model.readingProvider == .speko ? "SPEKO · ONLINE READING" : "ON YOUR MAC", systemImage: model.page == "speak" && model.readingProvider == .speko ? "network" : "lock.shield").font(.system(size: 10, weight: .semibold)).tracking(1.6).foregroundStyle(mint)
+                    Label("ON YOUR MAC", systemImage: "lock.shield").font(.system(size: 10, weight: .semibold)).tracking(1.6).foregroundStyle(mint)
                     Spacer()
                     ShortcutControl(model: model, id: 1, title: "Dictation").frame(width: 300)
                 }
@@ -149,8 +149,7 @@ struct ContentView: View {
     private var speak: some View {
         VStack(alignment: .leading, spacing: 24) {
             heading("Give your words a voice.", "Paste something to hear it aloud, or save a reading to take with you.")
-            ReadingProviderView(model: model)
-            if model.readingProvider == .mac { HStack(spacing: 24) {
+            HStack(spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("VOICE").font(.system(size: 10, weight: .semibold)).tracking(1.4).foregroundStyle(.secondary)
                     Picker("Voice", selection: $model.voice) { ForEach(model.voices, id: \.self) { Text($0).tag($0) } }.labelsHidden().frame(width: 220)
@@ -159,22 +158,21 @@ struct ContentView: View {
                     HStack { Text("PACE").tracking(1.4); Spacer(); Text("\(Int(model.rate)) words/min").monospacedDigit() }.font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                     Slider(value: $model.rate, in: 100...300, step: 10).accessibilityLabel("Reading pace")
                 }
-            }.padding(20).background(panelColor, in: RoundedRectangle(cornerRadius: 14)).disabled(model.rendering) }
+            }.padding(20).background(panelColor, in: RoundedRectangle(cornerRadius: 14)).disabled(model.rendering)
             editor(text: $model.speechText, placeholder: "Paste an article, a draft, or a thought.\nLet your Mac do the reading.", label: "Text to read").disabled(model.rendering)
             HStack {
-                Text("\(model.speechText.count.formatted()) / \(model.readingLimit.formatted()) characters").font(.system(size: 10)).foregroundStyle(.tertiary)
+                Text("\(model.speechText.count.formatted()) / 50,000 characters").font(.system(size: 10)).foregroundStyle(.tertiary)
                 Spacer()
                 if model.playing || model.paused { Text("\(time(model.playbackTime)) / \(time(model.audioDuration))").font(.system(size: 11, design: .monospaced)).foregroundStyle(mint) }
             }
             HStack(spacing: 12) {
                 Button { model.listen() } label: { Label(model.rendering ? "Making audio…" : model.playing ? "Pause" : model.paused ? "Resume" : "Listen", systemImage: model.playing ? "pause.fill" : "play.fill") }
-                    .buttonStyle(PrimaryButton()).disabled(model.speechText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.rendering || model.phase != .idle || model.speechText.count > model.readingLimit)
-                if model.cloudRequestActive { Button("Cancel request") { model.cancelReading() } }
+                    .buttonStyle(PrimaryButton()).disabled(model.speechText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.rendering || model.phase != .idle || model.speechText.count > 50_000)
                 if model.playing || model.paused { Button("Stop") { model.stopPlayback() } }
                 Spacer()
-                Button { model.saveAudio() } label: { Label("Save audio…", systemImage: "square.and.arrow.down") }.disabled(model.speechText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.rendering || model.speechText.count > model.readingLimit)
+                Button { model.saveAudio() } label: { Label("Save audio…", systemImage: "square.and.arrow.down") }.disabled(model.speechText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.rendering || model.speechText.count > 50_000)
             }.controlSize(.large)
-            Text("Saved audio is M4A, ready for QuickTime, Music, or sharing.")
+            Text("Uses installed macOS voices. Saved audio is M4A, ready for QuickTime, Music, or sharing.")
                 .font(.system(size: 10)).foregroundStyle(.tertiary)
         }
     }
@@ -192,7 +190,9 @@ struct ContentView: View {
             VoiceShortcutSettings(model: model).padding(22).background(panelColor, in: RoundedRectangle(cornerRadius: 14))
             VStack(alignment: .leading, spacing: 10) {
                 Text("Apple Shortcuts").font(.headline)
-                Text("Add Dictate with Workbench, then Create Note, Copy to Clipboard, or another action that accepts text. Finish the visible recording to pass your words along.").foregroundStyle(.secondary)
+                Text(Bundle.main.url(forResource: "Metadata", withExtension: "appintents") != nil
+                     ? "Add Dictate with Workbench, then Create Note, Copy to Clipboard, or another action that accepts text. Finish the visible recording to pass your words along."
+                     : "This development build has no Apple Shortcuts metadata. Use the full-Xcode package for the Dictate with Workbench action.").foregroundStyle(.secondary)
                 Button("Open Apple Shortcuts") { NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Shortcuts.app")) }
             }
             Spacer()
