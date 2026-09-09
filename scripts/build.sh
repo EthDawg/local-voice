@@ -24,6 +24,7 @@ if [ ! -f "$PROJECT_DIR/scripts/AppIcon.icns" ]; then
     iconutil -c icns "$PACKAGE_DIR/AppIcon.iconset" -o "$PROJECT_DIR/scripts/AppIcon.icns"
 fi
 cp "$PROJECT_DIR/scripts/AppIcon.icns" "$APP_DIR/Contents/Resources/AppIcon.icns"
+bash "$PROJECT_DIR/scripts/app-intents.sh" "$APP_DIR"
 codesign --force --deep --sign - "$APP_DIR"
 codesign --verify --deep --strict "$APP_DIR"
 ditto -c -k --sequesterRsrc --keepParent "$APP_DIR" "$PACKAGE_DIR/Workbench Voice.zip"

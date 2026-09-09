@@ -184,7 +184,7 @@ func runCLI(_ args: [String]) async -> Int32 {
         switch args.first {
         case "--check-core":
             try CoreChecks.run(); try CleanupChecks.run(); try DemoLibraryChecks.run()
-            try await MainActor.run { try DemoLibraryChecks.runModelChecks() }
+            try await MainActor.run { try DemoLibraryChecks.runModelChecks(); try IntegrationChecks.run() }
         case "--check-input":
             try await MainActor.run { try InputChecks.run() }
         case "--check-cleanup":

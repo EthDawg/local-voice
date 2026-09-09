@@ -26,9 +26,11 @@ bash scripts/test.sh
 bash scripts/build.sh
 ```
 
+Full Xcode is required to extract Apple Shortcuts metadata for distribution; Command Line Tools still support source development. CI sets `REQUIRE_APP_INTENTS=1` so an undiscoverable action cannot pass packaging. See [integration notes](docs/voice-integrations.md).
+
 The default checks do not download the speech model or require microphone access. They test core state, history, dictionary and cleanup behavior. `bash scripts/build.sh` produces `dist/Workbench Voice.zip` without installing it.
 
-For microphone, speech-engine, or paste changes, quit any running Voice app and use `bash scripts/install.sh` to test the installed bundle. This **replaces your installed Voice app**, preserves its previous version as a rollback ZIP, downloads/prepares the model, and runs a speech round-trip. Use only synthetic text/audio for shared examples. Accessibility is optional for paste; microphone permission is needed for recording. See [privacy and limits](README.md#privacy-and-limits) and [validation](docs/validation.md).
+For microphone, speech-engine, or paste changes, quit any running Voice app and use `bash scripts/install.sh` to test the installed bundle. This **updates the separate Voice Preview app**, preserves its previous version as a rollback ZIP, downloads/prepares the model, and runs a speech round-trip. Use only synthetic text/audio for shared examples. Accessibility is optional for paste; microphone permission is needed for recording. See [privacy and limits](README.md#privacy-and-limits) and [validation](docs/validation.md).
 
 CI runs the same tests and package build on a fresh Apple Silicon macOS runner. A maintainer may need to approve the first workflow run from a new fork. CI cannot prove live microphone permissions, cross-app paste, screen sharing, or physical hardware behavior; document relevant manual checks in the PR.
 

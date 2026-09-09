@@ -5,6 +5,29 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudioRecorderDelegate {
+    static weak var intentModel: AppModel?
+    let shortcutRequest = DictationRequest()
+    func dictateForShortcut() async throws -> String {
+        guard ready else { throw VoiceError.message("Open Voice and finish preparing the speech model, then run this shortcut again.") }
+        guard phase == .idle, !rendering else { throw VoiceError.message("Voice is busy. Finish the current recording or reading first.") }
+        let id = UUID()
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            return try await withCheckedThrowingContinuation { continuation in
+                do {
+                    try shortcutRequest.begin(id: id) { continuation.resume(with: $0) }
+                    onCloseMenu?()
+                    toggleRecording()
+                } catch { continuation.resume(throwing: error) }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                guard let self, self.shortcutRequest.id == id else { return }
+                self.shortcutRequest.cancel(); self.cancelRecording()
+            }
+        }
+    }
+
     enum Phase: String { case idle, requesting, recording, transcribing, cleaning }
     @Published var preferences = VoicePreferences.load() {
         didSet {
@@ -35,6 +58,23 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     @Published var rate = 180.0 { didSet { persist() } }
     @Published var elapsed = 0.0
     @Published var level = 0.0
+    @Published var readingProvider = ReadingProvider(rawValue: UserDefaults.standard.string(forKey: "readingProvider.v1") ?? "") ?? .mac {
+        didSet { UserDefaults.standard.set(readingProvider.rawValue, forKey: "readingProvider.v1"); stopPlayback() }
+    }
+    @Published var keyNotice = ""
+    private var readingTask: Task<Void, Never>?
+    var readingLimit: Int { readingProvider == .speko ? SpekoRenderer.maximumCharacters : 50_000 }
+    func saveSpekoKey(_ key: String) {
+        do { try SpekoKeychain.save(key); invalidateAudio(); keyNotice = "Key saved in Keychain." }
+        catch { self.error = error.localizedDescription }
+    }
+    func removeSpekoKey() {
+        do { try SpekoKeychain.remove(); readingProvider = .mac; invalidateAudio(); keyNotice = "Key removed. Using Mac voices." }
+        catch { self.error = error.localizedDescription }
+    }
+    private func invalidateAudio() { stopPlayback(); AudioRenderer.remove(audioURL); audioURL = nil; audioSignature = "" }
+    func cancelReading() { readingTask?.cancel(); status = "Reading cancelled. Speko may still bill text already accepted." }
+    @Published var cloudRequestActive = false
     @Published var rendering = false
     @Published var playing = false
     @Published var paused = false
@@ -74,6 +114,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
 
     override init() {
         super.init()
+        Self.intentModel = self
         do {
             let state = try store.load()
             transcript = state.draft; speechText = state.speechText; history = state.history
@@ -149,7 +190,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
             capture.delegate = self; capture.isMeteringEnabled = true
             guard capture.prepareToRecord(), capture.record() else { throw VoiceError.message("The microphone could not start. Check that an input device is connected.") }
             recorder = capture; recordURL = url; canRetry = false; elapsed = 0; level = 0; peakPower = -160
-            phase = .recording; status = preferences.capture == .toggle ? "Listening… press \(preferences.dictationShortcut.label) to finish" : "Listening… release the shortcut to finish"; onPhaseChange?()
+            phase = .recording; status = shortcutRequest.id != nil ? "Listening for Shortcuts… choose Finish to return text" : preferences.capture == .toggle ? "Listening… press \(preferences.dictationShortcut.label) to finish" : "Listening… release the shortcut to finish"; onPhaseChange?()
             meter = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
                 Task { @MainActor in
                     guard let self, let recorder = self.recorder else { return }
@@ -175,9 +216,10 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
 
     func cancelRecording() {
         if phase == .requesting {
-            recordingAttempt = nil; phase = .idle; status = "Capture cancelled. Use the shortcut again when microphone permission is ready."; onPhaseChange?(); return
+            shortcutRequest.cancel(); recordingAttempt = nil; phase = .idle; status = "Capture cancelled. Use the shortcut again when microphone permission is ready."; onPhaseChange?(); return
         }
         guard phase == .recording else { return }
+        shortcutRequest.cancel()
         recordingAttempt = nil
         recorder?.stop(); recorder = nil; meter?.invalidate(); meter = nil
         if let url = recordURL { try? FileManager.default.removeItem(at: url) }; recordURL = nil
@@ -206,26 +248,37 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     }
 
     private func transcribe(_ url: URL, duration: Double, temporary: Bool) {
+        let shortcutID = shortcutRequest.id
         phase = .transcribing; status = "Turning speech into text…"; error = nil; canRetry = false; onPhaseChange?()
         Task {
             do {
                 let raw = try await engine.transcribe(url)
-                rawTranscript = raw
+                if let shortcutID, shortcutRequest.id != shortcutID { throw CancellationError() }
                 phase = .cleaning; status = "Tidying your words…"; onPhaseChange?()
                 let cleaned = await cleanupEngine.clean(raw, style: preferences.cleanup)
+                if let shortcutID, shortcutRequest.id != shortcutID { throw CancellationError() }
                 let result = TextRules.apply(cleaned.text, replacements: replacements)
                 guard !result.isEmpty else { throw VoiceError.message("No speech was recognised. Try speaking closer to the microphone.") }
-                transcript = result
+                rawTranscript = raw; transcript = result
                 cleanupMethod = cleaned.method
                 history = TranscriptHistory.adding(Transcript(text: result, seconds: duration, rawText: raw, cleanupMethod: cleaned.method), to: history)
                 // Commit the capture before focus restoration or clipboard delivery can suspend this task.
                 saveNow()
                 accessibilityGranted = AXIsProcessTrusted()
-                status = await TextDelivery.deliver(result, target: destination, mode: preferences.delivery, restoreClipboard: preferences.restoreClipboard)
+                if let shortcutID {
+                    status = "Transcript returned to Shortcuts."
+                    shortcutRequest.finish(id: shortcutID, result: .success(result))
+                } else {
+                    status = await TextDelivery.deliver(result, target: destination, mode: preferences.delivery, restoreClipboard: preferences.restoreClipboard)
+                }
                 if temporary { try? FileManager.default.removeItem(at: url); recordURL = nil }
                 phase = .idle; onPhaseChange?()
             } catch {
-                canRetry = temporary; fail("Transcription failed. \(error.localizedDescription)")
+                if error is CancellationError {
+                    if temporary { try? FileManager.default.removeItem(at: url); recordURL = nil }
+                    phase = .idle; status = "Shortcuts capture cancelled."; onPhaseChange?(); return
+                }
+                canRetry = temporary && shortcutID == nil; fail("Transcription failed. \(error.localizedDescription)")
             }
         }
     }
@@ -270,30 +323,42 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         catch { fail(error.localizedDescription) }
     }
 
-    private var signature: String { "\(voice)|\(Int(rate))|\(speechText)" }
+    private var signature: String { "\(readingProvider.rawValue)|\(voice)|\(Int(rate))|\(speechText)" }
     func listen() {
         guard !rendering, phase == .idle else { return }
         if playing { player?.pause(); playing = false; paused = true; return }
         if paused, signature == audioSignature { player?.play(); playing = true; paused = false; return }
         stopPlayback()
-        Task {
+        rendering = true
+        readingTask = Task {
+            defer { rendering = false; readingTask = nil }
             do {
                 let url = try await generateAudio()
+                try Task.checkCancellation()
                 player = try AVAudioPlayer(contentsOf: url); player?.delegate = self
                 guard player?.play() == true else { throw VoiceError.message("Audio could not play. Check your Mac's audio output.") }
                 playing = true; audioDuration = player?.duration ?? 0; status = "Reading aloud."
                 playTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
                     Task { @MainActor in self?.playbackTime = self?.player?.currentTime ?? 0 }
                 }
-            } catch { self.error = error.localizedDescription }
+            } catch { if !(error is CancellationError) { self.error = error.localizedDescription } }
         }
     }
     private func generateAudio() async throws -> URL {
         if let audioURL, signature == audioSignature { return audioURL }
         rendering = true; error = nil
         let text = speechText, selectedVoice = voice, selectedRate = Int(rate), originalSignature = signature
-        defer { rendering = false }
-        let url = try await Task.detached(priority: .userInitiated) { try AudioRenderer.render(text: text, voice: selectedVoice, rate: selectedRate) }.value
+        guard text.count <= readingLimit else { throw VoiceError.message("This reading is too long for the selected provider.") }
+        let url: URL
+        if readingProvider == .speko {
+            let key = try SpekoKeychain.read()
+            cloudRequestActive = true
+            defer { cloudRequestActive = false }
+            url = try await SpekoRenderer.render(text: text, key: key)
+        } else {
+            url = try await Task.detached(priority: .userInitiated) { try AudioRenderer.render(text: text, voice: selectedVoice, rate: selectedRate) }.value
+        }
+        do { try Task.checkCancellation() } catch { AudioRenderer.remove(url); throw error }
         AudioRenderer.remove(audioURL); audioURL = url; audioSignature = originalSignature
         return url
     }
@@ -301,13 +366,15 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         guard !rendering, !speechText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let panel = NSSavePanel(); panel.allowedContentTypes = [.mpeg4Audio]; panel.nameFieldStringValue = "Reading.m4a"
         guard panel.runModal() == .OK, let destination = panel.url else { return }
-        Task {
+        rendering = true
+        readingTask = Task {
+            defer { rendering = false; readingTask = nil }
             do {
                 let url = try await generateAudio()
-                rendering = true
+                try Task.checkCancellation()
                 try await Task.detached { try AudioRenderer.export(url, to: destination) }.value
                 rendering = false; status = "Audio saved to \(destination.lastPathComponent)."
-            } catch { rendering = false; self.error = error.localizedDescription }
+            } catch { if !(error is CancellationError) { self.error = error.localizedDescription } }
         }
     }
     func stopPlayback() {
@@ -327,7 +394,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     }
     func removeReplacement(_ item: Replacement) { replacements.removeAll { $0.id == item.id }; persist() }
     func removeTranscript(_ item: Transcript) { history.removeAll { $0.id == item.id }; persist() }
-    func fail(_ text: String) { error = text; phase = .idle; status = "Needs attention"; onPhaseChange?() }
+    func fail(_ text: String) { if let id = shortcutRequest.id { shortcutRequest.finish(id: id, result: .failure(VoiceError.message(text))) }; error = text; phase = .idle; status = "Needs attention"; onPhaseChange?() }
     func persist() {
         guard loaded else { return }
         persistWork?.cancel()
@@ -339,5 +406,5 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         do { try store.save(SavedState(draft: transcript, speechText: speechText, history: history, replacements: replacements, voice: voice, rate: rate, rawDraft: rawTranscript)) }
         catch { self.error = "Could not save this session. \(error.localizedDescription)" }
     }
-    func shutdown() { cancelRecording(); stopPlayback(); saveNow(); AudioRenderer.remove(audioURL); if let recordURL { try? FileManager.default.removeItem(at: recordURL) } }
+    func shutdown() { readingTask?.cancel(); shortcutRequest.cancel(); cancelRecording(); stopPlayback(); saveNow(); AudioRenderer.remove(audioURL); if let recordURL { try? FileManager.default.removeItem(at: recordURL) } }
 }

@@ -12,7 +12,7 @@
 
 A native Mac app for local dictation and text-to-speech. Speak a thought, clean up fillers and corrections, and return the text to the app you started in. Or paste text, listen to it, and save an M4A reading.
 
-Built for Apple Silicon, with Parakeet v2 through FluidAudio and the voices installed in macOS. No accounts, API keys, subscriptions, Python environment, or background server.
+Built for Apple Silicon, with Parakeet v2 through FluidAudio and the voices installed in macOS. Local dictation and Mac voices need no account, API key, subscription, Python environment or background server. Optional Speko reading uses your own account and key.
 
 ## Help shape Workbench
 
@@ -51,7 +51,8 @@ For updates, quit Preview, pull the repository, and run the installer again with
 - **Save a prompt:** choose **Save prompt** on a transcript, or press **Command + Shift + S** while Voice is active to review and save clipboard text. **Command + N** adds a prompt in the library and **Command + F** focuses search. Copying a saved prompt never submits it to another app.
 - **Move a library:** use the library’s bottom **Library** menu to export/import JSON. Exchange files include prompts, links, notes, and local file paths; media is not copied. Imports preserve existing resources and skip matching IDs. Files from another Mac may need reconnecting.
 - **Workbench:** both Voice and [StageMark](https://github.com/EthDawg/StageMark) share a suite switcher, appearance settings, and Spotlight prefix. Search **Workbench** to find them.
-- **Read aloud:** choose an installed voice and pace, enter text, and click Listen. Pause, resume, stop, or save an M4A file.
+- **Read aloud:** choose a Mac voice and pace, or explicitly opt in to Speko online reading with your own Keychain-stored API key. Listen, pause, resume, stop, or save M4A. Speko is experimental until a real-key playback/export check is recorded.
+- **Apple Shortcuts:** the new Dictate with Workbench action returns its own capture to Create Note, Copy to Clipboard, or any text action. Requires a package built with full Xcode metadata; see [integration setup and validation](docs/voice-integrations.md).
 - **Import audio:** transcribe an audio file up to 30 minutes. Original imported files are never modified.
 - **Dictionary:** replace recognised words or phrases with your preferred spelling. Matches whole words, ignoring case. Dictionary replacements run after cleanup.
 - **Recent transcripts:** the last 100 completed captures stay on this Mac, including separate recordings with identical words. Search checks both cleaned and original text. The full history offers original wording and read-aloud actions. Captures are saved before clipboard or paste delivery; existing history survives updates.
@@ -60,9 +61,9 @@ Closing the window keeps the app in the menu bar. Use **Quit Workbench Voice** o
 
 ## Privacy and limits
 
-Audio is processed locally. Recordings are made only after a button or shortcut starts capture. Recordings are limited to five minutes; text-to-speech is limited to 50,000 characters per reading. Dictation is English. Recognition and cleanup quality vary. Light rules recognise explicit patterns rather than every possible spoken correction; complex or ambiguous wording can remain unchanged. Natural editing checks factual token order, numbers, and negation, but these checks do not prove semantic equivalence. The original remains available. There is no cloud fallback.
+Audio is processed locally. Recordings are made only after a button or shortcut starts capture. Recordings are limited to five minutes; Mac reading is limited to 50,000 characters (Speko: 5,000) per reading. Dictation is English. Recognition and cleanup quality vary. Light rules recognise explicit patterns rather than every possible spoken correction; complex or ambiguous wording can remain unchanged. Natural editing checks factual token order, numbers, and negation, but these checks do not prove semantic equivalence. The original remains available. There is no cloud fallback.
 
-The model is downloaded from FluidInference on Hugging Face during setup. FluidAudio caches it in the user's Application Support directory. No audio, transcript, clipboard content, or telemetry is uploaded by this app.
+The model is downloaded from FluidInference on Hugging Face during setup. FluidAudio caches it in the user's Application Support directory. Dictation audio and transcripts are never uploaded for recognition or cleanup. If you explicitly choose Speko, the text you submit to Listen/Save audio (including Read clipboard) is sent to Speko and its selected voice provider and may be billed. No telemetry is added. Apple Shortcuts controls downstream destinations, which may sync online. See [the integration privacy details](docs/voice-integrations.md).
 
 Drafts, originals, the dictionary, reading settings, and recent transcripts are stored in `~/Library/Application Support/LocalVoice/state.json` for production and `~/Library/Application Support/LocalVoice Preview/state.json` for Preview, readable by the current user. Preview copies missing production settings and saved data once on first launch, then keeps its own state. Successful microphone recordings and temporary readings are deleted. Failed microphone recordings remain temporarily available for Retry until the next recording or app exit. The clipboard retains copied transcripts; automatic paste can restore its previous contents after confirmed insertion. Imported audio is not copied into history.
 
@@ -95,3 +96,5 @@ The shared platform contract is [Workbench](docs/workbench.md). See [the impleme
 - Workflow inspiration: [Pat Simmons's local Wispr Flow replacement](https://www.youtube.com/watch?v=IMQw3aHjf2Q&t=437s).
 
 The app code is MIT licensed. Third-party components retain their own licenses.
+
+Matt ([@mattywhitenz](https://github.com/mattywhitenz)) proposed Apple Shortcuts dictation and optional Speko reading in #10 and #11.

@@ -179,20 +179,21 @@ struct VoiceQuickControls: View {
     private var reading: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Give your eyes a break.").font(.headline)
-            Button("Read clipboard") {
+            Button(model.readingProvider == .speko ? "Read clipboard with Speko" : "Read clipboard") {
                 if let text = NSPasteboard.general.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     model.speechText = text; model.listen()
                 } else { model.status = "Copy some text first." }
             }.disabled(model.phase != .idle || model.rendering || model.playing || model.paused)
-            Picker("Voice", selection: $model.voice) { ForEach(model.voices, id: \.self) { Text($0).tag($0) } }
-            HStack { Text("Pace"); Slider(value: $model.rate, in: 100...300, step: 5); Text("\(Int(model.rate))").monospacedDigit() }
+            if model.readingProvider == .mac { Picker("Voice", selection: $model.voice) { ForEach(model.voices, id: \.self) { Text($0).tag($0) } }
+            HStack { Text("Pace"); Slider(value: $model.rate, in: 100...300, step: 5); Text("\(Int(model.rate))").monospacedDigit() } }
             Text(model.speechText.isEmpty ? "Paste or type a longer passage in the editor." : model.speechText).lineLimit(9).foregroundStyle(.secondary)
             HStack {
                 Button(model.playing ? "Pause" : model.paused ? "Resume" : "Listen") { model.listen() }.disabled(model.speechText.isEmpty || model.rendering || model.phase != .idle)
+                if model.cloudRequestActive { Button("Cancel request") { model.cancelReading() } }
                 if model.playing || model.paused { Button("Stop") { model.stopPlayback() } }
                 Spacer(); Button("Edit text…") { model.onShowEditor?("speak") }
             }
-            Text("Installed Mac voices. No account or usage meter.").font(.caption).foregroundStyle(.secondary)
+            Text(model.readingProvider == .speko ? "Speko sends the reading online. Usage may be billed. Change provider in the editor." : "Installed Mac voices. No account or usage meter.").font(.caption).foregroundStyle(.secondary)
         }
     }
     private var general: some View {
