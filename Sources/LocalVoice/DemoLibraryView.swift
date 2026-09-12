@@ -1,6 +1,16 @@
 import AppKit
 import SwiftUI
 
+/// Return belongs to text composition/editing until the search field submits it.
+/// Caps Lock and keypad flags do not change the action; modified/repeated keys do.
+enum DemoLibraryReturnPolicy {
+    static func allows(fromSearch: Bool, editableText: Bool, hasMarkedText: Bool,
+                       modifiers: NSEvent.ModifierFlags, isRepeat: Bool) -> Bool {
+        !hasMarkedText && !isRepeat && (fromSearch || !editableText)
+            && modifiers.intersection([.command, .control, .option, .shift]).isEmpty
+    }
+}
+
 struct DemoLibraryView: View {
     @ObservedObject var library: DemoLibraryModel
     @ObservedObject var model: AppModel
@@ -29,6 +39,8 @@ struct DemoLibraryView: View {
             HStack(spacing: 10) {
                 TextField("Search resources, products, personas…", text: $library.query)
                     .textFieldStyle(.roundedBorder).focused($searching).accessibilityLabel("Search demo library")
+                    // Native submission lets Return confirm an IME candidate first.
+                    .onSubmit { _ = performReturnAction(fromSearch: true) }
                 Toggle(isOn: $library.favoritesOnly) { Image(systemName: library.favoritesOnly ? "star.fill" : "star") }
                     .toggleStyle(.button).help("Show favorites only").accessibilityLabel("Favorites only")
             }
@@ -61,6 +73,7 @@ struct DemoLibraryView: View {
                             }.padding(.vertical, 6).tag(item.id)
                         }
                     }.listStyle(.sidebar).frame(minWidth: 190, idealWidth: 220, maxWidth: 300)
+                        .onKeyPress(.return, phases: .down) { _ in performReturnAction(fromSearch: false) }
                     if let item = library.selected { detail(item).frame(minWidth: 230, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading) }
                 }.background(Workbench.surface, in: RoundedRectangle(cornerRadius: 12))
             }
@@ -94,6 +107,16 @@ struct DemoLibraryView: View {
                 Button("New prompt") { library.newPrompt() }.keyboardShortcut("n").disabled(library.savingDisabled)
             }.hidden()
         }
+    }
+    private func performReturnAction(fromSearch: Bool) -> KeyPress.Result {
+        guard model.page == "library", library.draft == nil, removal == nil,
+              let window = NSApp.keyWindow, window === NSApp.mainWindow, window.attachedSheet == nil else { return .ignored }
+        let editor = window.firstResponder as? NSTextView
+        let event = NSApp.currentEvent
+        guard DemoLibraryReturnPolicy.allows(fromSearch: fromSearch, editableText: editor?.isEditable == true,
+            hasMarkedText: editor?.hasMarkedText() == true, modifiers: event?.modifierFlags ?? [],
+            isRepeat: event?.type == .keyDown && event?.isARepeat == true) else { return .ignored }
+        return library.performPrimaryAction() ? .handled : .ignored
     }
     private func focusSearchWhenReady() {
         guard model.page == "library", library.draft == nil, let window = NSApp.keyWindow, window === NSApp.mainWindow else { return }
@@ -139,7 +162,7 @@ struct DemoLibraryView: View {
                 Text(item.fileAvailable ? "Opens in its usual app. Keep cloud files downloaded for an offline demo." : "Connect its drive or locate the file again.")
                     .font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Button("Open file") { library.open(item) }.buttonStyle(.borderedProminent).disabled(!item.fileAvailable || !item.canOpenFile)
+                    primaryActionButton(item)
                     Button("Show in Finder") { library.open(item, reveal: true) }.disabled(!item.fileAvailable)
                 }
                 if item.fileAvailable && !item.canOpenFile { Text("Applications and executable files are available in Finder only.").font(.caption).foregroundStyle(.secondary) }
@@ -148,7 +171,7 @@ struct DemoLibraryView: View {
                 ScrollView { Text(item.content).font(.system(size: 13)).lineSpacing(4).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
                     .frame(maxHeight: .infinity)
                 HStack {
-                    Button(item.kind == .prompt ? "Copy prompt" : "Open link") { if item.kind == .prompt { library.copy(item) } else { library.open(item) } }.buttonStyle(.borderedProminent)
+                    primaryActionButton(item)
                     if item.kind == .link { Button("Copy link") { library.copy(item) } }
                     else { Button("Read aloud") { model.speechText = item.content; model.page = "speak" } }
                 }
@@ -165,6 +188,18 @@ struct DemoLibraryView: View {
                 Button { removal = item } label: { Image(systemName: "trash") }.accessibilityLabel("Remove resource").disabled(library.savingDisabled)
             }.font(.caption).buttonStyle(.borderless)
         }.padding(18)
+    }
+    private func primaryActionButton(_ item: DemoResource) -> some View {
+        Button { library.performPrimaryAction() } label: {
+            HStack(spacing: 8) {
+                Text(item.primaryActionTitle)
+                Image(systemName: "return").font(.caption).accessibilityHidden(true)
+            }
+        }
+        .buttonStyle(.borderedProminent).disabled(!item.primaryActionAvailable || library.draft != nil)
+        .accessibilityLabel(item.primaryActionTitle)
+        .accessibilityHint("Press Return from search or the results list.")
+        .help("\(item.primaryActionTitle) · Return from search or the results list")
     }
     private func saveClipboard() {
         guard let text = NSPasteboard.general.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { library.notice = "Copy some text first."; return }

@@ -146,7 +146,8 @@ struct DemoScenesView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         #if !APP_STORE
-                        Button("Start demo") { commitName(); model.startDemo() }.buttonStyle(.borderedProminent).controlSize(.large).disabled(model.desktopBusy)
+                        Button("Present full screen") { commitName(); model.startDemo() }.buttonStyle(.borderedProminent).controlSize(.large).disabled(model.desktopBusy)
+                        Button("Present in window") { commitName(); model.startDemo(mode: .windowed) }.controlSize(.large).disabled(model.desktopBusy)
                         #else
                         Button("Export image…") { commitName(); model.exportPNG() }.buttonStyle(.borderedProminent).controlSize(.large)
                         #endif

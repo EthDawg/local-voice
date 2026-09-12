@@ -196,7 +196,23 @@ struct ContentView: View {
             HStack {
                 Text("\(model.speechText.count.formatted()) / \(model.readingLimit.formatted()) characters").font(.system(size: 10)).foregroundStyle(.tertiary)
                 Spacer()
-                if model.playing || model.paused { Text("\(time(model.playbackTime)) / \(time(model.audioDuration))").font(.system(size: 11, design: .monospaced)).foregroundStyle(mint) }
+            }
+            if model.playing || model.paused {
+                HStack(spacing: 12) {
+                    Button { model.skipReading(by: -15) } label: { Image(systemName: "gobackward.15") }
+                        .help("Back 15 seconds").accessibilityLabel("Back 15 seconds")
+                    Text(time(model.playbackTime)).monospacedDigit().frame(minWidth: 34, alignment: .trailing)
+                        .accessibilityLabel("Elapsed time").accessibilityValue(time(model.playbackTime))
+                    Slider(value: Binding(get: { model.playbackTime }, set: { model.seekReading(to: $0) }),
+                           in: 0...max(model.audioDuration, 0.001))
+                        .accessibilityLabel("Reading position")
+                        .accessibilityValue("\(time(model.playbackTime)) of \(time(model.audioDuration))")
+                    Text(time(model.audioDuration)).monospacedDigit().frame(minWidth: 34, alignment: .leading)
+                        .accessibilityLabel("Reading duration").accessibilityValue(time(model.audioDuration))
+                    Button { model.skipReading(by: 15) } label: { Image(systemName: "goforward.15") }
+                        .help("Forward 15 seconds").accessibilityLabel("Forward 15 seconds")
+                }
+                .font(.system(size: 11)).disabled(!model.canSeekReading)
             }
             HStack(spacing: 12) {
                 Button { model.listen() } label: { Label(model.rendering ? "Making audio…" : model.playing ? "Pause" : model.paused ? "Resume" : "Listen", systemImage: model.playing ? "pause.fill" : "play.fill") }

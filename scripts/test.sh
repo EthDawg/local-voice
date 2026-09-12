@@ -6,6 +6,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/release/test_release.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/release/test_preview.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-clean-draft.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-remember-correction.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-reading-playback.py
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/test-library-recall.py
 swift build -c release --disable-sandbox
 BIN_DIR="$(swift build -c release --disable-sandbox --show-bin-path)"
 "$BIN_DIR/LocalVoice" --check-core

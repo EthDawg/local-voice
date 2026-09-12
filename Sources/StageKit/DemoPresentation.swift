@@ -13,21 +13,26 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
     private let hand: NSImage?
     private let persona: NSImage?
     private let screen: NSScreen?
-    private var ending = false
-    private var entering = false
+    private let mode: PresentationMode
+    private var lifecycle = PresentationLifecycle()
     private var keepAwake: NSObjectProtocol?
-    init(scene: DemoScene, image: NSImage, logo: NSImage?, hand: NSImage?, persona: NSImage? = nil, screen: NSScreen?, root: URL) {
+    init(scene: DemoScene, image: NSImage, logo: NSImage?, hand: NSImage?, persona: NSImage? = nil, screen: NSScreen?, root: URL, mode: PresentationMode = .fullScreen) {
         self.scene = scene; backdrop = image; self.logo = logo; self.hand = hand; self.persona = persona; self.screen = screen
+        self.mode = mode
         capture = DemoCapture(root: root)
         controls = PresentationControlsModel(root: root)
         super.init()
     }
     func start() {
         keepAwake = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleDisplaySleepDisabled], reason: "Presenting a Workbench demo")
-        let frame = screen?.visibleFrame ?? CGRect(x: 80, y: 80, width: 1100, height: 720)
-        let window = DemoStageWindow(contentRect: frame, styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+        let visible = screen?.visibleFrame ?? CGRect(x: 80, y: 80, width: 1100, height: 720)
+        let frame = mode == .fullScreen ? visible : FloatingControlGeometry.frame(anchor: .top,
+            size: CGSize(width: min(1100, visible.width - 64), height: min(720, visible.height - 64)),
+            visibleFrame: visible, inset: 32)
+        let window = DemoStageWindow(contentRect: frame, styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = scene.name + " · Demo"
-        window.titleVisibility = .hidden; window.titlebarAppearsTransparent = true
+        window.titleVisibility = mode == .fullScreen ? .hidden : .visible; window.titlebarAppearsTransparent = false
+        window.minSize = NSSize(width: 480, height: 320)
         window.collectionBehavior = [.fullScreenPrimary]
         window.tabbingMode = .disallowed
         window.isReleasedWhenClosed = false; window.delegate = self
@@ -40,17 +45,27 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
         window.contentView = NSHostingView(rootView: DemoStageContent(scene: scene, backdrop: backdrop, logo: logo, hand: hand, persona: persona, capture: capture, controls: controls) { [weak self] in self?.end() })
         self.window = window
         NSApp.activate(ignoringOtherApps: true); window.makeKeyAndOrderFront(nil)
-        entering = true; window.toggleFullScreen(nil)
+        if mode == .fullScreen { lifecycle.willEnter(); window.toggleFullScreen(nil) }
         if scene.showsPhone { capture.start() }
     }
     func bringForward() { NSApp.activate(ignoringOtherApps: true); window?.makeKeyAndOrderFront(nil) }
     func end() {
-        guard !ending else { return }; ending = true; capture.stop(); releaseKeepAwake()
-        if entering { return }
-        if window?.styleMask.contains(.fullScreen) == true { window?.toggleFullScreen(nil) }
-        else { finish() }
+        guard !lifecycle.ending, !lifecycle.finished else { return }
+        capture.stop(); releaseKeepAwake()
+        apply(lifecycle.requestEnd())
+    }
+    private func apply(_ effect: PresentationLifecycle.Effect) {
+        switch effect {
+        case .none: break
+        case .exitFullScreen:
+            guard let window else { finish(); return }
+            lifecycle.willExit(); window.toggleFullScreen(nil)
+        case .finish: finish()
+        }
     }
     private func finish() {
+        guard !lifecycle.finished else { return }
+        lifecycle.complete()
         controls.stop()
         capture.stop(); releaseKeepAwake()
         window?.delegate = nil; window?.orderOut(nil); window?.contentView = nil; window?.close(); window = nil
@@ -60,13 +75,20 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
         if let keepAwake { ProcessInfo.processInfo.endActivity(keepAwake); self.keepAwake = nil }
     }
     deinit { if let keepAwake { ProcessInfo.processInfo.endActivity(keepAwake) } }
-    func windowDidEnterFullScreen(_ notification: Notification) {
-        entering = false
-        if ending { window?.toggleFullScreen(nil) }
+    func windowWillEnterFullScreen(_ notification: Notification) {
+        lifecycle.willEnter(); window?.titleVisibility = .hidden
     }
-    func windowDidExitFullScreen(_ notification: Notification) { entering = false; ending = true; finish() }
-    func windowDidFailToEnterFullScreen(_ window: NSWindow) { entering = false; if ending { finish() } }
-    func windowDidFailToExitFullScreen(_ window: NSWindow) { finish() }
+    func windowWillExitFullScreen(_ notification: Notification) { lifecycle.willExit() }
+    func windowDidEnterFullScreen(_ notification: Notification) { apply(lifecycle.didEnter()) }
+    func windowDidExitFullScreen(_ notification: Notification) {
+        window?.titleVisibility = .visible
+        apply(lifecycle.didExit())
+    }
+    func windowDidFailToEnterFullScreen(_ window: NSWindow) {
+        window.titleVisibility = .visible
+        apply(lifecycle.failedToEnter())
+    }
+    func windowDidFailToExitFullScreen(_ window: NSWindow) { apply(lifecycle.failedToExit()) }
     func windowShouldClose(_ sender: NSWindow) -> Bool { end(); return false }
 }
 
@@ -79,6 +101,9 @@ private final class DemoStageWindow: NSWindow {
     }
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard attachedSheet == nil else { return super.performKeyEquivalent(with: event) }
+        if PresentationControlsPolicy.isFullScreenCommand(characters: event.charactersIgnoringModifiers, modifiers: event.modifierFlags) {
+            toggleFullScreen(nil); return true
+        }
         if PresentationControlsPolicy.isRevealCommand(characters: event.charactersIgnoringModifiers,
             command: event.modifierFlags.contains(.command), option: event.modifierFlags.contains(.option),
             control: event.modifierFlags.contains(.control)) {

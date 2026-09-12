@@ -20,6 +20,14 @@ struct DemoResource: Codable, Identifiable, Equatable {
     var bookmark: Data?
 
     var group: String { [product, persona].filter { !$0.isEmpty }.joined(separator: " · ") }
+    var primaryActionTitle: String { switch kind { case .prompt: "Copy prompt"; case .link: "Open link"; case .file: "Open file" } }
+    var primaryActionAvailable: Bool {
+        switch kind {
+        case .prompt: return !content.isEmpty
+        case .link: return webURL != nil
+        case .file: return fileAvailable && canOpenFile
+        }
+    }
     var webURL: URL? {
         guard let url = URL(string: content), let scheme = url.scheme?.lowercased(),
               ["https", "http"].contains(scheme), let host = url.host, !host.isEmpty,
@@ -158,8 +166,14 @@ final class DemoLibraryModel: ObservableObject {
     @Published var error: String?
     @Published private(set) var savingDisabled = false
     let store: DemoLibraryStore
-    init(store: DemoLibraryStore = DemoLibraryStore()) {
+    private let copyText: (String) -> Int?
+    private let openURL: (URL) -> Bool
+    init(store: DemoLibraryStore = DemoLibraryStore(),
+         copyText: ((String) -> Int?)? = nil,
+         openURL: ((URL) -> Bool)? = nil) {
         self.store = store
+        self.copyText = copyText ?? { TextDelivery.copy($0) }
+        self.openURL = openURL ?? { NSWorkspace.shared.open($0) }
         do { resources = try store.load(); reconcileSelection() }
         catch { self.error = "The library could not be read. Saving is paused to preserve it. \(error.localizedDescription)"; savingDisabled = true }
     }
@@ -197,7 +211,22 @@ final class DemoLibraryModel: ObservableObject {
     func remove(_ item: DemoResource) {
         if commit(resources.filter { $0.id != item.id }) { notice = "Removed from the library. The original file is unchanged." }
     }
-    func copy(_ item: DemoResource) { TextDelivery.copy(item.kind == .file ? (item.fileURL?.path ?? item.content) : item.content); notice = item.kind == .file ? "File path copied." : "\(item.kind.rawValue) copied. Paste when you are ready." }
+    /// Both the visible button and keyboard recall act on the current filtered selection.
+    /// Returning true means an action was attempted; copy/open report their own failures.
+    @discardableResult func performPrimaryAction() -> Bool {
+        guard draft == nil, let item = selected, item.primaryActionAvailable else { return false }
+        if item.kind == .prompt { copy(item) } else { open(item) }
+        return true
+    }
+    func copy(_ item: DemoResource) {
+        let text = item.kind == .file ? (item.fileURL?.path ?? item.content) : item.content
+        guard copyText(text) != nil else {
+            notice = nil; error = "The clipboard could not be updated. Try copying again."
+            return
+        }
+        if !savingDisabled { error = nil }
+        notice = item.kind == .file ? "File path copied." : "\(item.kind.rawValue) copied. Paste when you are ready."
+    }
     func chooseFile(for existing: DemoResource? = nil) {
         let panel = NSOpenPanel(); panel.canChooseDirectories = false; panel.allowsMultipleSelection = false
         panel.message = "Choose a video, deck, image, or demo file. Workbench keeps a reference to the original."
@@ -216,7 +245,7 @@ final class DemoLibraryModel: ObservableObject {
     func open(_ item: DemoResource, reveal: Bool = false) {
         if item.kind == .link {
             guard let url = item.webURL else { error = "This web link is not valid."; return }
-            if !NSWorkspace.shared.open(url) { error = "No application could open this link." }
+            if !openURL(url) { error = "No application could open this link." }
             return
         }
         guard let resolved = item.resolvedFile else { error = "Locate this file again to reconnect it."; return }
@@ -238,7 +267,7 @@ final class DemoLibraryModel: ObservableObject {
             } catch { self.error = "Saved file access could not be refreshed. Use Locate file before the next demo." }
         }
         if reveal { NSWorkspace.shared.activateFileViewerSelecting([url]) }
-        else if !NSWorkspace.shared.open(url) { error = "No application could open this file. Use Show in Finder to choose one." }
+        else if !openURL(url) { error = "No application could open this file. Use Show in Finder to choose one." }
     }
     func exportLibrary() {
         let panel = NSSavePanel(); panel.allowedContentTypes = [.json]; panel.nameFieldStringValue = "Workbench Demo Library.json"

@@ -120,3 +120,11 @@ is claimed; the implementation pull request remains a draft.
 This increment adds **Remember correction…** to transcript review, with explicit heard/preferred spelling, exact draft preview, reuse of the local dictionary and Undo that preserves newer edits. Earlier captures and recognizer originals stay unchanged; saving does not paste again. See the [comparison, decision and checks](dictation-comparison.md).
 
 The complete local regression suite passed again, including 43 correction-rule and 43 transaction checks. Native interface checks used production UI and methods with synthetic, in-memory state. Signed packaging and native Shortcuts metadata validation passed. Apple submission and notarization remain on hold. The release asset manifest records the final source and archive identity; earlier Preview evidence above remains dated historical evidence.
+
+## Everyday utilities increment: 2.0.0-preview.3
+
+Read aloud now seeks/skips in existing audio; boards copy/save PNG images; presentations can start in a normal resizable window and switch fullscreen without ending; saved resources use Return for the selected primary action and report copy failures truthfully. See [the comparison and acceptance contracts](utility-comparison.md) and [commodity architecture](commodity-strategy.md).
+
+Focused checks added 32 production playback-method checks, 8 real AVAudioPlayer checks and 29 saved-resource/model/view checks. Stage coverage is now 66 tests and 1,613 assertions. Native fixtures exercised playback reuse, keyboard resource recall/failure/editing, Save cancellation/export and window/fullscreen transitions. Fixtures use synthetic content and isolated stores/effects. No live draft or library was replaced. The release manifest identifies the exact signed source and archive.
+
+The first full build exposed an actor-isolation error in the new test seam; fixed in production and mirrored in its fixture. A sandboxed run could not use the native audio encoder; normal approved execution passed that integration. Stage shortcut checks initially conflicted with the running Preview and passed after it released the keys. These are retained as validation history. Physical-device, meeting-receiver, VoiceOver and fresh-Mac checks remain separate; Apple submission and notarization remain on hold.

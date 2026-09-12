@@ -123,7 +123,7 @@ final class AnnotationView: NSView {
         guard let app = coordinator else { return }
         let settings = app.settings.value
         if let board {
-            (board == .white ? NSColor(srgbRed: 0.975, green: 0.98, blue: 0.99, alpha: 1) : NSColor(srgbRed: 0.055, green: 0.07, blue: 0.105, alpha: 1)).setFill()
+            BoardImageExport.background(board).setFill()
             dirtyRect.fill()
         }
         let time = Date.timeIntervalSinceReferenceDate

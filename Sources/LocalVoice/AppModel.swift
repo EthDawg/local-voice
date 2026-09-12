@@ -111,6 +111,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     private var meter: Timer?
     private var player: AVAudioPlayer?
     private var playTimer: Timer?
+    private var playbackID: UUID?
     private var audioURL: URL?
     private var audioSignature = ""
     private var peakPower: Float = -160
@@ -435,10 +436,31 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     }
 
     private var signature: String { "\(readingProvider.rawValue)|\(voice)|\(Int(rate))|\(speechText)" }
+    var canSeekReading: Bool { !rendering && (playing || paused) && player != nil && audioDuration.isFinite && audioDuration > 0 }
+    func seekReading(to seconds: TimeInterval) {
+        guard canSeekReading, seconds.isFinite, let player else { return }
+        // Stay on the final audio frame: seeking to/past EOF can make a player
+        // wrap to the beginning. A paused reading stays paused at this position.
+        let lastFrame = max(0, player.duration - 1 / max(1, player.format.sampleRate))
+        player.currentTime = min(max(0, seconds), lastFrame)
+        playbackTime = player.currentTime
+    }
+    func skipReading(by seconds: TimeInterval) {
+        guard seconds.isFinite, let player else { return }
+        seekReading(to: player.currentTime + seconds)
+    }
     func listen() {
         guard !rendering, phase == .idle else { return }
-        if playing { player?.pause(); playing = false; paused = true; return }
-        if paused, signature == audioSignature { player?.play(); playing = true; paused = false; return }
+        if playing {
+            player?.pause(); playbackTime = player?.currentTime ?? 0
+            playing = false; paused = true; status = "Reading paused."; return
+        }
+        if paused, signature == audioSignature {
+            guard player?.play() == true else {
+                stopPlayback(); error = "Audio could not resume. Check your Mac's audio output."; return
+            }
+            playing = true; paused = false; status = "Reading aloud."; return
+        }
         stopPlayback()
         rendering = true
         readingTask = Task {
@@ -446,11 +468,16 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
             do {
                 let url = try await generateAudio()
                 try Task.checkCancellation()
-                player = try AVAudioPlayer(contentsOf: url); player?.delegate = self
-                guard player?.play() == true else { throw VoiceError.message("Audio could not play. Check your Mac's audio output.") }
-                playing = true; audioDuration = player?.duration ?? 0; status = "Reading aloud."
+                let activePlayer = try AVAudioPlayer(contentsOf: url); activePlayer.delegate = self
+                guard activePlayer.play() else { throw VoiceError.message("Audio could not play. Check your Mac's audio output.") }
+                player = activePlayer
+                let invocation = UUID(); playbackID = invocation
+                playing = true; audioDuration = activePlayer.duration; status = "Reading aloud."
                 playTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
-                    Task { @MainActor in self?.playbackTime = self?.player?.currentTime ?? 0 }
+                    Task { @MainActor in
+                        guard let self, self.playbackID == invocation, let activePlayer = self.player else { return }
+                        self.playbackTime = activePlayer.currentTime
+                    }
                 }
             } catch { if !(error is CancellationError) { self.error = error.localizedDescription } }
         }
@@ -489,11 +516,16 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         }
     }
     func stopPlayback() {
-        player?.stop(); player = nil; playing = false; paused = false; playbackTime = 0
-        playTimer?.invalidate(); playTimer = nil
+        let wasActive = playing || paused
+        player?.stop(); player = nil; playing = false; paused = false; playbackTime = 0; audioDuration = 0
+        playTimer?.invalidate(); playTimer = nil; playbackID = nil
+        if wasActive { status = "Reading stopped." }
     }
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        Task { @MainActor in self.stopPlayback(); self.status = flag ? "Finished reading." : "Playback interrupted." }
+        Task { @MainActor in
+            guard self.player === player else { return }
+            self.stopPlayback(); self.status = flag ? "Finished reading." : "Playback interrupted."
+        }
     }
     nonisolated func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
         Task { @MainActor in

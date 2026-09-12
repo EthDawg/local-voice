@@ -299,7 +299,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
             myDevice = profile; notice = "My device saved. Use it in any scene."
         } catch { notice = error.localizedDescription }
     }
-    func startDemo() {
+    func startDemo(mode: PresentationMode = .fullScreen) {
         guard mayBeginInteraction?() != false else { notice = "Finish your current recording or keyboard practice before presenting."; return }
         guard let scene = selected, let image = image(for: scene) else { return }
         if scene.logo != nil && logoImage(for: scene) == nil { notice = SceneError.missingLogo.localizedDescription; return }
@@ -308,7 +308,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
         if presentation != nil { presentation?.bringForward(); return }
         personas.hideOverlay()
         onBeginPresentation?()
-        let presenter = DemoPresentation(scene: scene, image: image, logo: logoImage(for: scene), hand: handImage(for: scene), persona: personaImage(for: scene), screen: targetScreen, root: root)
+        let presenter = DemoPresentation(scene: scene, image: image, logo: logoImage(for: scene), hand: handImage(for: scene), persona: personaImage(for: scene), screen: targetScreen, root: root, mode: mode)
         presenter.onEnd = { [weak self] in self?.presentation = nil; self?.objectWillChange.send(); self?.show() }
         presentation = presenter
         objectWillChange.send()

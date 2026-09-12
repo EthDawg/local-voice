@@ -161,6 +161,7 @@ struct QuickControlsView: View {
                 quickAction(.whiteboard, title: "Whiteboard", symbol: "rectangle")
                 quickAction(.blackboard, title: "Blackboard", symbol: "rectangle.fill")
             }
+            BoardExportButtons(app: app)
         }
     }
 

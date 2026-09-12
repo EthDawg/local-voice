@@ -15,6 +15,10 @@ struct PresentationControlsPolicy: Equatable {
     static func isRevealCommand(characters: String?, command: Bool, option: Bool, control: Bool) -> Bool {
         characters == "/" && command && !option && !control
     }
+    static func isFullScreenCommand(characters: String?, modifiers: NSEvent.ModifierFlags) -> Bool {
+        characters?.lowercased() == "f" &&
+            modifiers.intersection([.command, .control, .option, .shift]) == [.command, .control]
+    }
 }
 
 /// Job-specific placement only. Expanded state is never restored at launch.

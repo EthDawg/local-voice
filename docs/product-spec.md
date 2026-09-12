@@ -79,3 +79,7 @@ The seven linked-task studies and three follow-up boards are illustrations, not 
 ## Deliberate dictionary corrections
 
 The app-window review flow follows the [dictation comparison and correction contract](dictation-comparison.md). Remember correction connects the existing dictionary to the current draft, with explicit before/after fields, preview, transactional saving and scoped Undo. It does not add a live recording or presentation control.
+
+## Everyday utility increment
+
+[Utility comparison and contracts](utility-comparison.md) specifies playback seeking, board image export, windowed presentation and contextual resource recall. [Commodity strategy](commodity-strategy.md) records the architecture and model-upgrade acceptance process. These extend existing surfaces; they do not add a universal floating mode menu.

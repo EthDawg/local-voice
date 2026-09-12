@@ -53,6 +53,9 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate, NSPopo
     private var previousApplication: NSRunningApplication?
     private var palette: NSPanel?
     private var timerWindow: NSPanel?
+    private var boardSavePanel: NSSavePanel?
+    @Published private(set) var boardExportInProgress = false
+    private var shuttingDown = false
     private var recorderMonitor: Any?
     private var saveWork: DispatchWorkItem?
     private var registeredShortcuts: [String: Shortcut] = [:]
@@ -80,6 +83,7 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate, NSPopo
         super.init()
     }
     func start() {
+        shuttingDown = false
         do {
             let archive = try BoardStorage.load(from: archiveURL)
             boardHistory = archive.displays.mapValues(CanvasHistory.init)
@@ -104,6 +108,8 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate, NSPopo
         if !embedded && !settings.value.onboardingComplete { showQuickControls() }
     }
     func shutdown() {
+        shuttingDown = true
+        boardSavePanel?.cancel(nil); boardSavePanel = nil
         demoScenes.shutdown()
         hideQuickControls()
         stopDrawing(); saveWork?.cancel(); saveBoards()
@@ -148,6 +154,7 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate, NSPopo
     }
     private var activeHistory: CanvasHistory? { history(for: activeDisplayID ?? currentID) }
     func startDrawing(_ selected: DrawingTool, latched: Bool) {
+        guard !boardExportInProgress else { return }
         guard mayBeginInteraction?() != false else { notice = "Finish your current recording or keyboard practice before drawing."; return }
         onBeginActivity?()
         for canvas in canvases.values { canvas.finishStroke(); canvas.commitText() }
@@ -170,13 +177,14 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate, NSPopo
         refreshWindows(); refreshPalette(); refreshEffects(); updateStatus()
     }
     func escape() {
+        if boardExportInProgress { boardSavePanel?.cancel(nil); return }
         if recordingAction != nil { finishRecording(); return }
         if quickControlsVisible { hideQuickControls(); return }
         stopDrawing(); boards.removeAll(); palette?.orderOut(nil)
         refreshWindows(); refreshEffects(); updateStatus()
     }
     func handleHotkey(_ action: Action, down: Bool) {
-        guard recordingAction == nil else { return }
+        guard recordingAction == nil, !boardExportInProgress else { return }
         if down && action != .clear && action != .controls && mayBeginInteraction?() == false { return }
         if let selected = action.tool {
             if down {
@@ -187,6 +195,7 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate, NSPopo
         } else if down { perform(action) }
     }
     func perform(_ action: Action) {
+        guard !boardExportInProgress else { return }
         if action != .clear && action != .controls && mayBeginInteraction?() == false { return }
         if let selected = action.tool { startDrawing(selected, latched: true); return }
         switch action {
@@ -215,7 +224,7 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate, NSPopo
         activeHistory?.clear(); canvasChanged()
     }
     func toggleBoard(_ style: BoardStyle) {
-        guard mayBeginInteraction?() != false else { return }
+        guard !boardExportInProgress, mayBeginInteraction?() != false else { return }
         hideQuickControls()
         let id = currentID
         for canvas in canvases.values { canvas.finishStroke(); canvas.commitText() }
@@ -244,6 +253,52 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate, NSPopo
         do { try BoardStorage.save(BoardArchive(displays: boardHistory.mapValues(\.annotations)), to: archiveURL) }
         catch { notice = "Board saving failed: \(error.localizedDescription)" }
     }
+    private var exportableBoardID: String? {
+        if let activeDisplayID, boards[activeDisplayID] != nil { return activeDisplayID }
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }),
+           boards[Self.displayID(screen)] != nil { return Self.displayID(screen) }
+        return boards.count == 1 ? boards.keys.first : nil
+    }
+    var canExportBoard: Bool { exportableBoardID != nil && !boardExportInProgress }
+    func boardImageExport() throws -> BoardImageExport {
+        guard let id = exportableBoardID, let style = boards[id], let canvas = canvases[id],
+              let history = history(for: id) else { throw BoardExportError.noBoard }
+        // Capture the committed text/stroke and the selected display before a
+        // save panel can change focus, pointer location or canvas state.
+        canvas.finishStroke(); canvas.commitText()
+        return BoardImageExport(style: style, size: canvas.bounds.size, annotations: history.annotations,
+                                scale: panels[id]?.screen?.backingScaleFactor ?? 1)
+    }
+    func copyBoard() {
+        guard !boardExportInProgress else { return }
+        do { try boardImageExport().copy(); notice = "Board copied as an image." }
+        catch { notice = error.localizedDescription }
+    }
+    func saveBoardPNG() {
+        guard !boardExportInProgress else { return }
+        let data: Data
+        do { data = try boardImageExport().png() }
+        catch { notice = error.localizedDescription; return }
+        hideQuickControls()
+        boardExportInProgress = true
+        refreshWindows(); refreshPalette()
+        let panel = NSSavePanel()
+        panel.title = "Save board image"; panel.allowedContentTypes = [.png]
+        panel.nameFieldStringValue = "Workbench board.png"
+        panel.message = "Saves the board background and drawings. Other apps and drawing controls are excluded."
+        boardSavePanel = panel
+        NSApp.activate(ignoringOtherApps: true)
+        panel.begin { [weak self] result in
+            guard let self else { return }
+            boardSavePanel = nil; boardExportInProgress = false
+            guard !shuttingDown else { return }
+            if result == .OK, let url = panel.url {
+                do { try data.write(to: url, options: .atomic); notice = "Saved \(url.lastPathComponent)." }
+                catch { notice = "Board image could not be saved: \(error.localizedDescription)" }
+            }
+            refreshWindows(); refreshPalette(); refreshEffects()
+        }
+    }
     func settingsChanged() {
         if !shortcutsSuspended && recordingAction == nil && registeredShortcuts != settings.value.shortcuts {
             registerShortcuts()
@@ -254,6 +309,11 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate, NSPopo
         if !timerSessionStarted { countdown.reset(seconds: settings.value.timerMinutes * 60); updateCountdown() }
     }
     private func refreshWindows() {
+        if boardExportInProgress {
+            panels.values.forEach { $0.orderOut(nil) }
+            hotkeys.setEscapeEnabled(false)
+            return
+        }
         for (id, panel) in panels {
             let intercept = isDrawing || boards[id] != nil
             panel.ignoresMouseEvents = !intercept
@@ -422,10 +482,10 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate, NSPopo
         if let window = notification.object as? NSWindow, window === mainWindow { finishRecording() }
     }
     private func refreshPalette() {
-        let shouldShow = isDrawing && (!boards.isEmpty ? settings.value.boardPalette != .hide : settings.value.showDrawingPalette)
+        let shouldShow = !boardExportInProgress && isDrawing && (!boards.isEmpty ? settings.value.boardPalette != .hide : settings.value.showDrawingPalette)
         guard shouldShow else { palette?.orderOut(nil); return }
         if palette == nil {
-            let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 630, height: 66), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+            let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 670, height: 66), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 2)
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
             panel.backgroundColor = .clear; panel.isOpaque = false; panel.hasShadow = true; panel.hidesOnDeactivate = false
@@ -433,7 +493,7 @@ final class AppCoordinator: NSObject, ObservableObject, NSWindowDelegate, NSPopo
             panel.isMovableByWindowBackground = true; palette = panel
         }
         let frame = currentScreen.visibleFrame
-        palette?.setFrameOrigin(NSPoint(x: frame.midX - 315, y: frame.minY + 28))
+        palette?.setFrameOrigin(NSPoint(x: frame.midX - 335, y: frame.minY + 28))
         palette?.alphaValue = 1; palette?.ignoresMouseEvents = false; palette?.orderFrontRegardless()
     }
     func toggleTimer() {

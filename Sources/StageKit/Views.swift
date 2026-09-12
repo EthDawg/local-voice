@@ -229,6 +229,9 @@ struct ControlCenter: View {
                 boardCard(.white, title: "Whiteboard", action: .whiteboard)
                 boardCard(.black, title: "Blackboard", action: .blackboard)
             }
+            BoardExportButtons(app: app)
+            Text("Copy or save an open board as an image. Its background and drawings are included; other apps are excluded.")
+                .font(.system(size: 12)).foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 18) {
                 Toggle("Keep board drawings separate from the screen", isOn: $settings.value.separateBoards).disabled(!app.boards.isEmpty)
                 Text(settings.value.separateBoards ? "Your board is saved automatically on this Mac. White and black backgrounds use the same saved canvas for each display." : "The board uses your current screen annotations. Shared screen ink is temporary and is not saved when you quit.")
@@ -403,11 +406,29 @@ struct DrawingPalette: View {
             Divider().frame(height: 24).padding(.horizontal, 3)
             Button { app.perform(.undo) } label: { Image(systemName: "arrow.uturn.backward").frame(width: 25, height: 32) }.help("Undo").accessibilityLabel("Undo")
             Button { app.clearCanvas() } label: { Image(systemName: "trash").frame(width: 25, height: 32) }.help("Clear canvas").accessibilityLabel("Clear canvas")
+            Menu {
+                Button("Copy board") { app.copyBoard() }
+                Button("Save board PNG…") { app.saveBoardPNG() }
+            } label: {
+                Image(systemName: "square.and.arrow.up").frame(width: 28, height: 32)
+            }.menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .disabled(!app.canExportBoard).help("Copy or save the open board")
+                .accessibilityLabel("Board image")
             Button { app.escape() } label: { Text("Done").font(.system(size: 11, weight: .semibold)).foregroundStyle(inkAccent).padding(.horizontal, 8) }.help("Return to demo · Escape")
         }.buttonStyle(.plain).padding(.horizontal, 13).padding(.vertical, 12)
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 15))
             .overlay(RoundedRectangle(cornerRadius: 15).stroke(.white.opacity(0.12)))
             .padding(4)
+    }
+}
+
+struct BoardExportButtons: View {
+    @ObservedObject var app: AppCoordinator
+    var body: some View {
+        HStack {
+            Button { app.copyBoard() } label: { Label("Copy board", systemImage: "doc.on.doc") }
+            Button { app.saveBoardPNG() } label: { Label("Save board PNG…", systemImage: "square.and.arrow.down") }
+        }.disabled(!app.canExportBoard)
     }
 }
 

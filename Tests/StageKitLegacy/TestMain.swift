@@ -4,15 +4,21 @@ import AppKit
 struct TestRunner {
     static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
-        guard args.isEmpty || args == ["--ci"] || args == ["--scenes-only"] else {
-            print("Usage: StageMarkTests [--ci | --scenes-only]")
+        if args == ["--board-presentation-fixture"] {
+            _ = NSApplication.shared
+            BoardPresentationFixture().run()
+            return
+        }
+        let boardPresentationOnly = args == ["--board-presentation-only"]
+        guard args.isEmpty || args == ["--ci"] || args == ["--scenes-only"] || boardPresentationOnly else {
+            print("Usage: StageMarkTests [--ci | --scenes-only | --board-presentation-only | --board-presentation-fixture]")
             exit(2)
         }
         let scenesOnly = args == ["--scenes-only"]
         let hostedCI = args == ["--ci"]
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.accessory)
-        if !scenesOnly { NSApp.finishLaunching() }
+        if !scenesOnly && !boardPresentationOnly { NSApp.finishLaunching() }
         let suite = CoreTests()
         let integration = IntegrationTests()
         let scenes = SceneTests()
@@ -23,7 +29,14 @@ struct TestRunner {
         let personas = PersonaTests()
         let floating = FloatingControlGeometryTests()
         let workbench = WorkbenchModuleTests()
+        let boardExport = BoardExportTests()
+        let presentationLifecycle = PresentationLifecycleTests()
         var tests: [(String, () throws -> Void)] = [
+            ("board export pixels orientation text and Retina", boardExport.testBoardPixelsOrientationTextAndRetinaScale),
+            ("board snapshot file bounds and invalid input", boardExport.testSnapshotPersistenceBoundsAndInvalidInput),
+            ("board private clipboard image and failure preservation", boardExport.testPrivateClipboardPNGAndFailurePreservation),
+            ("presentation window and fullscreen lifecycle", presentationLifecycle.testModeChangesKeepPresentationAndEndClosesOnce),
+            ("presentation transition interruption and failure recovery", presentationLifecycle.testEndDuringNativeTransitionsAndFailureRecovery),
             ("floating controls anchors bounds and resize", floating.testAnchorsBoundsAndResize),
             ("floating controls snap and display recovery", floating.testSnapThresholdsAndDisplayRecovery),
             ("full-height frame persistence and edges", viewportFit.testFullHeightSurvivesSavingAndReachesBothEdges),
@@ -85,14 +98,16 @@ struct TestRunner {
             ("native drawing lifecycle and board isolation", integration.testDrawingLifecycleAndBoardIsolation),
             ("global shortcut registration and release", integration.testShortcutRegistrationAndRelease)
         ]
-        if scenesOnly {
+        if boardPresentationOnly {
+            tests = Array(tests.prefix(5))
+        } else if scenesOnly {
             tests = Array(tests.prefix { $0.0 != "line hit testing" })
         } else if hostedCI {
             print("SKIP live menu-bar popover regression in --ci mode; run scripts/test.zsh on an interactive Mac for full coverage")
         } else {
             tests.append(("menu bar and non-destructive quick adjustments", integration.testMenuBarAccessAndQuickAdjustmentsPreserveBoard))
         }
-        if !scenesOnly { tests.append(("embedded navigation and recording suspension", workbench.testEmbeddedCallbacksAndSuspendedShortcutSettings)) }
+        if !scenesOnly && !boardPresentationOnly { tests.append(("embedded navigation and recording suspension", workbench.testEmbeddedCallbacksAndSuspendedShortcutSettings)) }
         for (name, test) in tests {
             let before = assertionFailures
             do { try test() } catch { assertionFailures += 1; print("FAIL \(name): \(error)") }
