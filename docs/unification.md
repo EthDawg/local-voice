@@ -23,7 +23,7 @@ This is a working acceptance record, not a claim that any unchecked item is deli
 
 Current evidence and remaining installed workflows: [Workbench 2 Preview](preview-2.0.md).
 
-- [x] Unified native app builds and core, provider, keyboard and StageKit regressions pass. Parent release build passed core 21, cleanup 16, library 36, provider 37 plus real loopback transport, integration 42, keyboard checks, and StageKit 53 tests/919 assertions on 12 September 2026.
+- [x] Unified native app builds and core, provider, keyboard and StageKit regressions pass. The final HUD regression run passed core 21, cleanup 16, library 36, provider 37 plus real loopback transport, integration 42, keyboard checks, clipboard 25, and StageKit 54 tests/959 assertions on 12 September 2026.
 - [x] One installed Preview process/status item; home, menus, Dock, reopen, close and Quit verified.
 - [x] Original Voice and StageMark data preserved; imported data and settings verified.
 - [ ] Dictation, cancellation, history, read-aloud/export and App Intents verified in installed package.
@@ -35,7 +35,7 @@ Current evidence and remaining installed workflows: [Workbench 2 Preview](previe
 - [ ] Unified landing page explains one app and its download. No website signup is needed.
 - [x] Optional introduction during app use opens an editable draft to Ethan and Matt in the user's email app. The user explicitly chose this flow on 12 September; Workbench does not send email or claim delivery. No website signup, transcript, device or usage data is included.
 - [x] Useful synthetic examples/media for landing page prepared; no heavy image generation. Nine-second silent illustrated annotation workflow, explicitly labelled as an illustration.
-- [ ] README, contributor/architecture source maps, model docs and migration/release notes match actual app.
+- [x] README, contributor/architecture source maps, model docs and migration/release notes match the local unified app. Historical Voice evidence is explicitly scoped; candidate site links target the matching Preview release. Public publication remains a separate unchecked item.
 - [x] No App Store submission changed.
 
 ## Source preservation

@@ -1,53 +1,39 @@
 # Workbench distribution
 
-Workbench is free and MIT licensed. Public downloads and open-source contributions are compatible with Apple Developer ID signing; neither signing nor notarization requires charging for the app or distributing through the Mac App Store.
+Workbench is a free, MIT-licensed native Mac app. Developer ID signing and Apple's notarization service support distribution outside the Mac App Store. A notarization ticket verifies Apple's automated checks; it does not establish that every feature or supported device has been tested. [Apple's distribution guidance](https://developer.apple.com/developer-id/).
 
-## The path for users
+## Unified Preview and earlier releases
 
-1. The [shared Vercel website](https://workbench-mac.vercel.app) (`site/` in this repository) explains the apps and links versioned downloads.
-2. GitHub Releases own the app ZIPs, release notes and SHA-256 checksums. No binary copies are hosted on the website.
-3. A tester installs one app on an Apple Silicon Mac and follows a short real workflow.
-4. The website prepares an observation (“task / expected / observed / environment / impact”) for the relevant repository or the tester's coding agent. GitHub issues remain the only work queue.
-5. Contributors fork an app repository, validate a scoped improvement, and open a PR. The maintainer reviews and releases it.
+The Workbench 2 consolidation is a locally installed, Developer ID-signed Preview. Its notarized public download is still pending. The authoritative workflow evidence and remaining tests are in [Preview 2.0](preview-2.0.md).
 
-The website is not a browser implementation of microphone capture, accessibility paste, global shortcuts or screen overlays. Those need native-app testing. It does not save feedback or post issues automatically.
+As checked on 12 September 2026, the public `local-voice` releases still contain the earlier Voice app, most recently [Voice 1.3.0](https://github.com/EthDawg/local-voice/releases/tag/v1.3.0). Earlier Voice and StageMark notarization records describe those specific packages. They are not signing, notarization or hardware evidence for the new single-app package.
 
-## Current channel: early access
+The unified identities are `com.ethdawg.workbench` and `com.ethdawg.workbench.preview`. The Preview installer uses `~/Applications/Workbench Preview.app`; manual installs and later replacements should use that same location. Quit the existing copy before replacing it. Do not leave another Preview in Downloads or the system Applications folder and alternate between them.
 
-For the 10 September 2026 early-access update, Voice 1.3.0 and StageMark 1.2.1 are Apple Silicon builds with a macOS 14 deployment target. The actual QA machine was macOS 26.5.1; older supported OS versions still need independent testing. Voice's first launch downloads/prepares the English speech model. Downloaded binaries do not require developer tools.
+Saved data lives outside the app bundle. The first unified launch copies supported earlier Voice/StageMark files into missing unified component locations and preserves the originals. Subsequent launches keep the unified working copy. See the [product contract](workbench.md#identity-migration-and-release) for the identity and migration boundaries. There is no automatic updater yet.
 
-Voice 1.3 adds optional Speko reading (real playback/export verified) and a typed Shortcuts audio-to-text action. Action discovery/connections are verified; the complete Apple Record Audio composition still needs live confirmation. See [integration validation](voice-integrations.md).
+## The path for testers and contributors
 
-Both early-access release candidates are Developer ID signed, Apple-notarised and stapled. Apple returned Accepted with no issues, and the final extracted packages passed Gatekeeper as Notarized Developer ID. Source builds remain ad-hoc signed. Independent fresh-Mac testing is still needed before treating the channel as generally validated; retain that limitation in early-access release notes.
+1. The [Workbench website](https://workbench-mac.vercel.app) explains the public download. Candidate website source in this branch must not deploy until its matching release assets exist and have been downloaded and verified.
+2. GitHub Releases own versioned app ZIPs, release notes and SHA-256 checksums. The website does not host additional binary copies. A checksum detects changed bytes; it does not replace an identified developer signature or notarization.
+3. A tester installs one app and tries a small real workflow. Downloaded binaries require no Xcode or developer account; the combined Preview targets Apple Silicon and macOS 14 or later. The actual QA Mac ran macOS 26.5.1; other OS/device combinations need their own evidence.
+4. Website feedback prepares an observation for the unified repository or the tester's coding agent. It does not submit issues automatically. Versioned contributor and product-contract links must match the downloaded candidate, including before consolidation merges to `main`.
+5. Contributors use the [contribution guide](../CONTRIBUTING.md). GitHub issues are the shared work queue, PRs hold review, and releases hold downloadable versions.
 
-There is no automatic updater. Users quit the app and replace the copy in Applications. Settings/history/boards remain outside the app bundle. Website links pin a version and its checksum so feedback can identify exactly what was tested. A checksum detects changed bytes; it is not a substitute for an identified developer signature or notarization.
+The website cannot establish native microphone, Accessibility paste, shortcuts or overlay behavior. Workbench's optional founder introduction opens an editable email draft inside the app; it does not send email or require website signup.
 
-## Remaining gate: independent first-run testing
+## Build, verify and promote
 
-Apple Developer Program membership, signing, notarisation, stapling and local package verification are complete. The repeatable workflow is in [scripts/release](../scripts/release/README.md). Signed early-access prereleases are ready for independent testers; general availability still needs a separate Mac or clean account to exercise browser download, Gatekeeper and first-run permissions.
+Quit Workbench, Workbench Preview and legacy Voice/StageMark apps before running `bash scripts/test.sh`. The suite includes exclusive global-shortcut registration, so a running copy can cause an expected conflict even in StageKit's CI test mode.
 
-Test Voice model setup, live microphone capture, optional paste and StageMark drawing/shortcuts. A local rebuild or automated speech round trip does not prove this experience. Record the OS, app version and observed outcome in the release gate issue. Publish versioned checksums and verify the public download before changing the website links.
+Follow [the release guide](../scripts/release/README.md) for the exact signed Preview build/install and notarization commands. The ordinary `bash scripts/build.sh` produces the ad-hoc `dist/Workbench.zip`. `python3 scripts/release/preview.py build` produces a Developer ID-signed `dist/Workbench Preview.zip`; this local build step does not notarize or publish it.
 
-Keep the existing bundle identifiers and storage locations so current testers retain their data. Consider a signed updater only when repeated releases make manual replacement a real burden.
+The notarization workflow must verify one clean source commit, channel identity, signature, Apple's Accepted response, stapling and Gatekeeper. Re-extract and verify the final archive. Publish its exact ZIP plus `SHA256SUMS.txt`; never replace a version's binary with a different build. Download the public asset again and compare the digest before changing the matching website link.
 
-## Mac App Store channel
+A signed, notarized Preview may be a GitHub **prerelease** for independent testing after packaging and local regressions pass, with remaining fresh-Mac and live-workflow checks stated in its notes. Production promotion requires those acceptance checks to be completed. [Native acceptance and publication](../scripts/release/README.md#native-acceptance-and-publication) is the single policy for both channels. A successful build or synthetic speech round-trip alone does not prove first-run usability, automatic paste, device video or an audience's screen share.
 
-The maintainer has also requested Mac App Store publication. This needs a separate sandboxed build, store certificates/profiles, App Store Connect metadata and Apple review; Developer ID notarization alone does not produce a store listing. Voice's automatic Accessibility paste is incompatible with the documented sandbox model and needs a considered store-specific workflow. StageMark is the first sandbox candidate. See the [release guide](../scripts/release/README.md) for requirements and validation limits. Do not advertise either app as available in the store before Apple's publication is verified.
+For website changes, run `node --test site/tests/*.test.mjs` and `node site/build.mjs`. Check installation wording, version/ref agreement and local assets. Browser interaction and mobile layout need separate evidence when exercised. Preserve the existing Vercel project and `site` root; deploy the unified site only after the matching public download is verified. Never submit synthetic QA feedback as real issues.
 
-## Repeatable release checks
+## App Store scope
 
-Voice: run `bash scripts/test.sh` and `bash scripts/build.sh` from a clean known source commit. Extract `dist/Workbench Voice.zip` to a temporary directory, verify the app signature and Info.plist version, inspect `arm64`, and run the packaged executable's `--self-test` with synthetic speech. Record the source commit and test coverage. This checks speech/file round trips, not a new Mac's live microphone permission.
-
-StageMark: run the full `zsh scripts/test.zsh` on an interactive Mac with the installed app quit, then `zsh scripts/build.zsh`. Hosted CI's explicit `--ci` mode skips the menu-bar popover test and must not be represented as full UI verification. Confirm the archive version, `arm64` and signature.
-
-Publish the final ZIP and a `SHA256SUMS.txt` containing that ZIP's exact name and hash. Download the public assets back and compare the bytes or digest before changing website links. Do not overwrite a version's binary with a different build. A new app build needs a new version and release.
-
-Website: run `node --test site/tests/*.test.mjs` and `node site/build.mjs`. Check desktop/mobile layout, native installation guidance, versioned links, keyboard trial controls, per-app feedback routing, agent copying, and stale-preview invalidation. Never submit synthetic QA reports as real issues. GitHub integration should preview PRs and deploy `main` from the `site` root. Hosting credentials stay in Vercel.
-
-## Sources checked 8 September 2026
-
-- [Apple: Developer ID distribution](https://developer.apple.com/developer-id/)
-- [Apple: notarizing macOS software](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
-- [Apple: custom notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
-- [Apple: opening apps safely](https://support.apple.com/en-au/102445)
-- [Vercel: build and root directory settings](https://vercel.com/docs/builds/configure-a-build)
+This consolidation uses the Developer ID direct-download workflow. It does not change an App Store submission, listing or review. A future store edition has separate sandbox, entitlement, distribution and acceptance requirements; the direct-download Preview does not establish that compatibility.

@@ -56,6 +56,8 @@ Model settings apply to the next request; the active request keeps its original 
 
 Source development requires an Apple Silicon Mac, macOS 14+, Swift 6.2+ and the macOS 26 SDK. Run `bash scripts/doctor.sh` to check prerequisites. Full Xcode is required for distributable Apple Shortcuts metadata. The macOS 14 deployment target is not evidence of testing on every older OS or device.
 
+Quit Workbench, Workbench Preview and legacy Voice/StageMark apps before running the test suite. Its exclusive shortcut-registration checks will conflict with a running copy, including in CI test mode.
+
 From the unified source checkout:
 
 ```sh

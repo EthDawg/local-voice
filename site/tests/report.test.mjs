@@ -19,6 +19,9 @@ test('rejects invalid destinations and incomplete observations',()=>{
 test('agent handoff carries evidence and avoids inventing native verification',()=>{
   const report=createReport(input);const handoff=agentHandoff(report);
   assert.ok(handoff.includes(report.body));assert.match(handoff,/Do not claim observations or test results you did not verify/);
+  assert.ok(handoff.includes(`https://github.com/EthDawg/local-voice/tree/v${apps.voice.version}`));
+  assert.ok(handoff.includes(`https://github.com/EthDawg/local-voice/blob/v${apps.voice.version}/docs/workbench.md`));
+  assert.ok(handoff.includes(apps.voice.guide));
   assert.match(agentHandoff(),/small unassigned good first issue/);
 });
 test('bounds long reports without silently truncating observations',()=>{
@@ -31,6 +34,7 @@ test('download versions and in-page destinations remain consistent',async()=>{
   for(const app of Object.values(apps)){
     assert.ok(html.includes(`https://github.com/EthDawg/${app.repo}/releases/tag/v${app.version}`));
     assert.ok(html.includes(`https://github.com/EthDawg/${app.repo}/releases/download/v${app.version}/SHA256SUMS.txt`));
+    assert.ok(html.includes(app.guide));
   }
   for(const match of html.matchAll(/href="#([^" ]+)"/g)) assert.ok(html.includes(`id="${match[1]}"`),`Missing anchor ${match[1]}`);
 });

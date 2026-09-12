@@ -99,6 +99,8 @@ Use `wait` only while that submission remains in progress. Check the saved submi
 
 A signed, notarized Preview may be published as a GitHub **prerelease** for independent testing after packaging and local regressions pass. Its notes must state the remaining fresh-Mac and live workflow checks. Keep stable production download links unchanged until production has its own accepted release.
 
+Production promotion requires the applicable native checks below to pass on the delivered package. The release helper records signing and notarization evidence; it does not perform these interactive checks or authorize publication.
+
 - Download the final channel ZIP through a browser on another Mac or clean account. Verify its SHA-256, expected app identity, normal Gatekeeper opening and first-run permissions. Shell extraction alone is not this test.
 - Verify one app and one menu-bar icon; home-window reopen/close behavior; onboarding; shortcut recording, conflicts and practice; and safe switching between speech, drawing and presenting.
 - Voice: first model download, microphone start/stop/cancel, transcription, clipboard-only delivery, optional Accessibility paste into a harmless TextEdit document, focus protection, reading/export, and restart/history.

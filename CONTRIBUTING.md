@@ -18,6 +18,8 @@ Use an Apple Silicon Mac, macOS 14+, Swift 6.2+ and the macOS 26 SDK. The deploy
 
 Fork this repository, then substitute your username. Check out the branch or PR you intend to work on; default-branch and historical release contents may differ from this consolidation.
 
+Before running the tests, quit Workbench, Workbench Preview and earlier Voice/StageMark copies. The suite probes exclusive global shortcuts even in its CI mode; another running copy will cause a real registration conflict.
+
 ```sh
 git clone https://github.com/YOUR-USERNAME/local-voice.git
 cd local-voice
@@ -42,11 +44,13 @@ CI runs automated checks and packaging on a macOS runner. A maintainer may need 
 | --- | --- |
 | App lifecycle, menu bar and shared navigation | `Sources/LocalVoice/main.swift`, `WorkbenchHome.swift` |
 | Dictation, recent captures and delivery | `Sources/LocalVoice/AppModel.swift`, `CaptureHistoryView.swift`, `TextDelivery.swift` |
+| Recording HUD and clipboard receipts | `Sources/LocalVoice/CapturePanel.swift`, `ClipboardReceipt.swift`, `ClipboardReceiptChecks.swift` |
 | Recognition selection and transport | `Sources/LocalVoice/RecognitionProviders.swift`, `ModelSettingsView.swift`, `ProviderChecks.swift` |
 | Cleanup and regression cases | `Sources/LocalVoice/Cleanup.swift`, `CleanupChecks.swift` |
 | Unified keyboard assignment and practice | `Sources/LocalVoice/KeyboardCoach.swift`, `KeyboardCoachChecks.swift` |
 | StageKit's public boundary | `Sources/StageKit/StageKitController.swift` |
 | Drawing, boards, timer and presentation | `Sources/StageKit/AppCoordinator.swift`, `DemoScenes.swift`, `DemoPresentation.swift` |
+| Presentation control visibility and keyboard reveal | `Sources/StageKit/PresentationControls.swift`, `Tests/StageKitLegacy/DemoModeTests.swift` |
 | Device capture and Apple alternatives | `Sources/StageKit/DemoCapture.swift`, `NativePresentationApps.swift` |
 | Identity, appearance and legacy-data import | `Sources/LocalVoice/Workbench.swift`, `Sources/StageKit/Workbench.swift` |
 | Packaging and Preview install | `scripts/build.sh`, `scripts/release/preview.py`, `scripts/release/config.json` |

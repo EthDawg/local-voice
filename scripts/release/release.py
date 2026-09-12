@@ -245,10 +245,12 @@ def main():
             **candidate, "archive": final.name,
             "build": build, "architectures": architectures, "team": args.team_id,
             "notarization": submission_id, "sha256": digest,
-            "fresh_mac_interactive_test": "required before publication"
+            "fresh_mac_interactive_test": "not recorded by this helper",
+            "acceptance_policy": "scripts/release/README.md"
         }, indent=2) + "\n")
         print(f"Signed, notarized and stapled: {final}")
-        print("Complete the native first-run checklist before publishing. No assets were uploaded to GitHub.")
+        print("Native first-run and live workflow results are separate. Apply the Preview or production acceptance policy in scripts/release/README.md before publication.")
+        print("No assets were uploaded to GitHub.")
 
 
 if __name__ == "__main__":
