@@ -6,18 +6,20 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
     var onEnd: (() -> Void)?
     private var window: DemoStageWindow?
     private let capture: DemoCapture
-    private let controls = PresentationControlsModel()
+    private let controls: PresentationControlsModel
     private let scene: DemoScene
     private let backdrop: NSImage
     private let logo: NSImage?
     private let hand: NSImage?
+    private let persona: NSImage?
     private let screen: NSScreen?
     private var ending = false
     private var entering = false
     private var keepAwake: NSObjectProtocol?
-    init(scene: DemoScene, image: NSImage, logo: NSImage?, hand: NSImage?, screen: NSScreen?, root: URL) {
-        self.scene = scene; backdrop = image; self.logo = logo; self.hand = hand; self.screen = screen
+    init(scene: DemoScene, image: NSImage, logo: NSImage?, hand: NSImage?, persona: NSImage? = nil, screen: NSScreen?, root: URL) {
+        self.scene = scene; backdrop = image; self.logo = logo; self.hand = hand; self.persona = persona; self.screen = screen
         capture = DemoCapture(root: root)
+        controls = PresentationControlsModel(root: root)
         super.init()
     }
     func start() {
@@ -29,10 +31,13 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
         window.collectionBehavior = [.fullScreenPrimary]
         window.tabbingMode = .disallowed
         window.isReleasedWhenClosed = false; window.delegate = self
-        window.onEscape = { [weak self] in self?.end() }
+        window.onEscape = { [weak self] in
+            guard let self else { return }
+            if !self.controls.handleEscape() { self.end() }
+        }
         window.onReconnect = { [weak self] in self?.capture.reconnect() }
         window.onRevealControls = { [weak self] in self?.controls.revealForKeyboard() }
-        window.contentView = NSHostingView(rootView: DemoStageContent(scene: scene, backdrop: backdrop, logo: logo, hand: hand, capture: capture, controls: controls) { [weak self] in self?.end() })
+        window.contentView = NSHostingView(rootView: DemoStageContent(scene: scene, backdrop: backdrop, logo: logo, hand: hand, persona: persona, capture: capture, controls: controls) { [weak self] in self?.end() })
         self.window = window
         NSApp.activate(ignoringOtherApps: true); window.makeKeyAndOrderFront(nil)
         entering = true; window.toggleFullScreen(nil)
@@ -69,8 +74,11 @@ private final class DemoStageWindow: NSWindow {
     var onEscape: (() -> Void)?
     var onReconnect: (() -> Void)?
     var onRevealControls: (() -> Void)?
-    override func cancelOperation(_ sender: Any?) { onEscape?() }
+    override func cancelOperation(_ sender: Any?) {
+        if let attachedSheet { attachedSheet.cancelOperation(sender) } else { onEscape?() }
+    }
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard attachedSheet == nil else { return super.performKeyEquivalent(with: event) }
         if PresentationControlsPolicy.isRevealCommand(characters: event.charactersIgnoringModifiers,
             command: event.modifierFlags.contains(.command), option: event.modifierFlags.contains(.option),
             control: event.modifierFlags.contains(.control)) {
@@ -87,55 +95,86 @@ private final class DemoStageWindow: NSWindow {
     }
 }
 
-/// AppKit owns the reveal command so it remains available while the toolbar
-/// is absent from the SwiftUI hierarchy. All state updates are on the main queue.
+/// AppKit owns Command-/ and Escape; the model owns only this presentation's
+/// controls and placement. Capture and scene state never depend on expansion.
 private final class PresentationControlsModel: ObservableObject {
     @Published private(set) var policy = PresentationControlsPolicy()
     @Published private(set) var focusRequest = 0
-    private var hideWork: DispatchWorkItem?
-    private var voiceOverObservation: NSKeyValueObservation?
-    private var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
+    @Published private(set) var placement = PresentationControlPlacement()
+    @Published private(set) var dragFrame: CGRect?
+    @Published private(set) var snapAnchor: FloatingControlAnchor?
+    @Published private(set) var placementNotice: String?
+    private let url: URL
+    private var archiveData: Data?
+    private var storageBlocked = false
+    private var dragStart: CGRect?
+    private var suppressClickUntil: TimeInterval = 0
+    var controlSize: CGSize { policy.isExpanded ? CGSize(width: 304, height: 192) : CGSize(width: 76, height: 40) }
 
-    func start() {
-        setHold(.voiceOver, active: NSWorkspace.shared.isVoiceOverEnabled)
-        voiceOverObservation = NSWorkspace.shared.observe(\.isVoiceOverEnabled, options: [.new]) { [weak self] workspace, _ in
-            let enabled = workspace.isVoiceOverEnabled
-            DispatchQueue.main.async { self?.setHold(.voiceOver, active: enabled) }
+    init(root: URL) {
+        url = root.appendingPathComponent("presentation-controls.json")
+        do {
+            archiveData = try PersonaStorage.read(url)
+            if let archiveData { placement = try JSONDecoder().decode(PresentationControlPlacement.self, from: archiveData).validated() }
+        } catch {
+            storageBlocked = true
+            placementNotice = "The previous control position could not be read. Its file is unchanged; new positions apply to this presentation only."
         }
-        reveal()
     }
-    func stop() { hideWork?.cancel(); hideWork = nil; voiceOverObservation = nil }
-    func reveal() { policy.reveal(at: now); scheduleHide() }
-    func revealForKeyboard() { reveal(); focusRequest += 1 }
-    func setHold(_ hold: PresentationControlsPolicy.Hold, active: Bool) {
-        guard policy.holds.contains(hold) != active else { return }
-        policy.setHold(hold, active: active, at: now); scheduleHide()
+    func start() { policy.close() }
+    func stop() { dragStart = nil; dragFrame = nil; snapAnchor = nil }
+    func close() { stop(); policy.close(); focusRequest += 1 }
+    func toggleFromTile() {
+        guard ProcessInfo.processInfo.systemUptime >= suppressClickUntil, dragFrame == nil else { return }
+        policy.toggle()
     }
-    func pointerMoved(y: CGFloat?) {
-        var next = policy
-        next.pointerMoved(y: y.map(Double.init), at: now)
-        guard next != policy else { return }
-        policy = next; scheduleHide()
+    func revealForKeyboard() { stop(); policy.open(); focusRequest += 1 }
+    func handleEscape() -> Bool {
+        if policy.handleEscape() { stop(); focusRequest += 1; return true }
+        return false
     }
-    private func scheduleHide() {
-        hideWork?.cancel(); hideWork = nil
-        guard let deadline = policy.hideDeadline else { return }
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.policy.hideIfDue(at: self.now)
+    func frame(in size: CGSize) -> CGRect {
+        let visible = CGRect(origin: .zero, size: size)
+        return dragFrame.map { FloatingControlGeometry.clamp($0, to: visible) }
+            ?? placement.frame(size: controlSize, in: visible)
+    }
+    func setAnchor(_ anchor: FloatingControlAnchor) {
+        stop(); placement.anchor = anchor; save()
+    }
+    func drag(translation: CGSize, in size: CGSize) {
+        let visible = CGRect(origin: .zero, size: size)
+        if dragStart == nil { dragStart = frame(in: size) }
+        guard let start = dragStart else { return }
+        let proposed = start.offsetBy(dx: translation.width, dy: -translation.height)
+        let bounded = FloatingControlGeometry.clamp(proposed, to: visible)
+        dragFrame = bounded
+        snapAnchor = FloatingControlGeometry.nearestAnchor(to: bounded, in: visible)
+    }
+    func finishDrag(in size: CGSize) {
+        guard let dragFrame else { return }
+        let visible = CGRect(origin: .zero, size: size)
+        let frame = snapAnchor.map { FloatingControlGeometry.frame(anchor: $0, size: controlSize, visibleFrame: visible) } ?? dragFrame
+        placement.move(to: frame, in: visible, anchor: snapAnchor)
+        suppressClickUntil = ProcessInfo.processInfo.systemUptime + 0.25
+        stop(); save()
+    }
+    private func save() {
+        guard !storageBlocked else { return }
+        do { archiveData = try PersonaStorage.write(try placement.validated(), to: url, expected: archiveData) }
+        catch {
+            storageBlocked = true
+            placementNotice = "The control position could not be saved. Its previous file is unchanged."
         }
-        hideWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, deadline - now), execute: work)
     }
-    deinit { hideWork?.cancel() }
 }
 
 private struct DemoStageContent: View {
-    private enum Control: Hashable { case source, reconnect, pin, end, deviceSource, deviceReconnect }
+    private enum Control: Hashable { case tile, source, reconnect, position, close, end, deviceSource, deviceReconnect }
     let scene: DemoScene
     let backdrop: NSImage
     let logo: NSImage?
     let hand: NSImage?
+    let persona: NSImage?
     @ObservedObject var capture: DemoCapture
     @ObservedObject var controls: PresentationControlsModel
     let end: () -> Void
@@ -158,21 +197,21 @@ private struct DemoStageContent: View {
         return capture.sources.first(where: { $0.id == capture.selectedID })?.name
             ?? (capture.selectedID == nil ? "Choose a source" : "Selected device")
     }
-    private var sourceStatus: String {
-        guard scene.showsPhone else { return "Scene only" }
-        if capture.live { return "Live" }
-        if capture.selectedID == nil { return "No device" }
-        if !capture.sources.contains(where: { $0.id == capture.selectedID }) { return "Waiting for device" }
-        // Permission, negotiation and reconnect states have more precise detail
-        // in capture.message. Do not label an unverified feed as live.
-        return "Not live"
+    private var inwardChevron: String {
+        switch controls.placement.anchor {
+        case .top, .topLeft, .topRight: return "chevron.down"
+        case .bottom, .bottomLeft, .bottomRight: return "chevron.up"
+        case .left: return "chevron.right"
+        case .right: return "chevron.left"
+        case nil: return controls.placement.x > 0.5 ? "chevron.left" : "chevron.right"
+        }
     }
     var body: some View {
         GeometryReader { geometry in
-            ZStack(alignment: .topTrailing) {
-                DemoStageSurface(scene: liveScene, image: backdrop, logo: logo, hand: hand, previewLayer: capture.previewLayer, live: capture.live)
+            ZStack {
+                DemoStageSurface(scene: liveScene, image: backdrop, logo: logo, hand: hand, persona: persona, previewLayer: capture.previewLayer, live: capture.live)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onTapGesture { focusedControl = nil }
+                    .onTapGesture { if controls.policy.isExpanded { controls.close() } }
                 if scene.showsPhone && !capture.live {
                     let viewport = ViewportGeometry(scene: liveScene, size: geometry.size).screen
                     VStack(spacing: 14) {
@@ -184,70 +223,106 @@ private struct DemoStageContent: View {
                         .foregroundStyle(.white)
                         .position(x: viewport.midX, y: geometry.size.height - viewport.midY)
                 }
-                if controls.policy.isVisible {
-                    toolbar.frame(maxWidth: 620).padding(18).transition(.opacity)
+                if controls.dragFrame != nil, let anchor = controls.snapAnchor {
+                    let destination = FloatingControlGeometry.frame(anchor: anchor, size: controls.controlSize,
+                                                                     visibleFrame: CGRect(origin: .zero, size: geometry.size))
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.accentColor.opacity(0.16))
+                        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [5, 4])))
+                        .frame(width: destination.width, height: destination.height)
+                        .position(x: destination.midX, y: geometry.size.height - destination.midY)
+                        .allowsHitTesting(false).accessibilityHidden(true)
                 }
-            }.background(.black)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: controls.policy.isVisible)
-                .onContinuousHover { phase in
-                    switch phase {
-                    case .active(let location): controls.pointerMoved(y: location.y)
-                    case .ended: controls.pointerMoved(y: nil)
+                let frame = controls.frame(in: geometry.size)
+                Group {
+                    if controls.policy.isExpanded { expandedControls(in: geometry.size) }
+                    else { tile(in: geometry.size) }
+                }
+                .frame(width: frame.width, height: frame.height)
+                .background {
+                    if reduceTransparency {
+                        RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .windowBackgroundColor))
+                    } else {
+                        RoundedRectangle(cornerRadius: 12).fill(.thickMaterial)
                     }
                 }
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.16)))
+                .position(x: frame.midX, y: geometry.size.height - frame.midY)
+                .animation(reduceMotion || controls.dragFrame != nil ? nil : .easeOut(duration: 0.16), value: controls.policy.isExpanded)
+            }.background(.black).coordinateSpace(name: "presentation-controls")
                 .onAppear { controls.start() }
                 .onDisappear { controls.stop() }
-                .onChange(of: focusedControl) { _, value in controls.setHold(.keyboardFocus, active: value != nil) }
-                .onChange(of: controls.focusRequest) { _, _ in focusedControl = scene.showsPhone ? .source : .pin }
-                .onChange(of: choosingSource) { _, value in controls.setHold(.sheet, active: value) }
+                .onChange(of: controls.focusRequest) { _, _ in
+                    focusedControl = controls.policy.isExpanded ? (scene.showsPhone ? .source : .close) : .tile
+                }
                 .sheet(isPresented: $choosingSource) { sourceSheet }
         }.ignoresSafeArea()
     }
-    private var toolbar: some View {
+    private func dragGesture(in size: CGSize) -> some Gesture {
+        DragGesture(minimumDistance: 5, coordinateSpace: .named("presentation-controls"))
+            .onChanged { controls.drag(translation: $0.translation, in: size) }
+            .onEnded { _ in controls.finishDrag(in: size) }
+    }
+    private func tile(in size: CGSize) -> some View {
+        Button { controls.toggleFromTile() } label: {
+            HStack(spacing: 0) {
+                Image(systemName: "iphone").font(.system(size: 17, weight: .medium))
+                    .frame(width: 42, height: 40)
+                Divider().frame(height: 18)
+                Image(systemName: inwardChevron).font(.system(size: 11, weight: .semibold))
+                    .frame(width: 33, height: 40)
+            }.contentShape(Rectangle())
+        }.buttonStyle(.plain).focused($focusedControl, equals: .tile)
+            .simultaneousGesture(dragGesture(in: size))
+            .accessibilityLabel("Open presentation controls")
+            .accessibilityHint("Command Slash also opens controls. Use the Position menu to move them.")
+            .help("Click or ⌘/ for controls. Drag to move. Visible when sharing this screen.")
+    }
+    private func expandedControls(in size: CGSize) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 14) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Label(sourceStatus, systemImage: capture.live && scene.showsPhone ? "circle.fill" : "circle")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(capture.live && scene.showsPhone ? Color.green : Color.secondary)
-                    Text(sourceName).font(.callout.weight(.medium)).lineLimit(1).frame(maxWidth: 190, alignment: .leading)
-                }.help(scene.showsPhone ? capture.message : "Showing your saved scene without a device feed")
-                    .accessibilityElement(children: .combine)
+            HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "iphone")
+                    Text(sourceName).font(.callout.weight(.semibold)).lineLimit(1)
+                    Spacer(minLength: 0)
+                }.contentShape(Rectangle()).gesture(dragGesture(in: size))
+                    .help("Drag to move, or choose Position")
+                Button { controls.close() } label: { Image(systemName: "xmark") }
+                    .buttonStyle(.plain).frame(width: 24, height: 24).focused($focusedControl, equals: .close)
+                    .accessibilityLabel("Close presentation controls").help("Close controls · Esc")
+            }
+            Text(scene.showsPhone ? (capture.live ? "Use your phone for taps, typing and Dictation." : capture.message) : "Showing your saved scene.")
+                .font(.caption).foregroundStyle(.secondary).lineLimit(2).frame(height: 30, alignment: .topLeading)
+            HStack {
                 if scene.showsPhone {
                     Button("Source…", action: openSource).focused($focusedControl, equals: .source)
-                    Button("Reconnect") { capture.reconnect(); controls.reveal() }
+                    Button("Reconnect") { capture.reconnect() }
                         .focused($focusedControl, equals: .reconnect).help("Reconnect device · ⌘R")
                 }
-                Button("End demo · Esc", action: end).keyboardShortcut(.cancelAction)
-                    .focused($focusedControl, equals: .end)
-                    .accessibilityLabel("End demo").accessibilityHint("Escape also ends the demo")
-            }
-            HStack(spacing: 16) {
-                Toggle("Keep controls visible", isOn: Binding(
-                    get: { controls.policy.holds.contains(.pinned) },
-                    set: { controls.setHold(.pinned, active: $0) }))
-                    .toggleStyle(.checkbox).focused($focusedControl, equals: .pin)
-                    .help("Keep these controls visible for this demo")
-                Spacer(minLength: 0)
-                Text("Top edge or ⌘/ to show").foregroundStyle(.secondary)
-                    .accessibilityLabel("Move to the top edge or press Command Slash to show controls")
-            }.font(.caption)
-        }.padding(12)
-            .background {
-                if reduceTransparency {
-                    RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .windowBackgroundColor))
-                } else {
-                    RoundedRectangle(cornerRadius: 12).fill(.thickMaterial)
+                Spacer()
+            }.frame(height: 28)
+            Divider()
+            HStack {
+                Menu("Position") {
+                    ForEach(FloatingControlAnchor.allCases) { anchor in
+                        Button { controls.setAnchor(anchor) } label: {
+                            if controls.placement.anchor == anchor { Label(anchor.title, systemImage: "checkmark") }
+                            else { Text(anchor.title) }
+                        }
+                    }
+                }.fixedSize().focused($focusedControl, equals: .position)
+                if let notice = controls.placementNotice {
+                    Image(systemName: "exclamationmark.circle").foregroundStyle(.secondary).help(notice).accessibilityLabel(notice)
                 }
-            }
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.12)))
-            .onHover { controls.setHold(.toolbarHover, active: $0) }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Presentation controls")
-            .help("These controls can appear in your screen share")
+                Spacer()
+                Button("End", action: end).focused($focusedControl, equals: .end)
+                    .accessibilityLabel("End presentation").help("End presentation. Escape ends it when controls are closed.")
+            }.frame(height: 28)
+        }.padding(12)
+            .accessibilityElement(children: .contain).accessibilityLabel("Presentation controls")
     }
     private func openSource() {
-        controls.setHold(.sheet, active: true)
+        controls.close()
         choosingSource = true
     }
     private var sourceSheet: some View {
@@ -255,13 +330,13 @@ private struct DemoStageContent: View {
             HStack {
                 Text("Device screen").font(.title2.bold())
                 Spacer()
-                Button("Done") { choosingSource = false; controls.reveal() }.keyboardShortcut(.defaultAction)
+                Button("Done") { choosingSource = false }.keyboardShortcut(.defaultAction)
             }
             Text("Connect an unlocked iPhone or iPad by USB and trust this Mac. External video sources also work; Android needs a compatible video feed.").foregroundStyle(.secondary)
             if capture.sources.isEmpty { Text("No external sources found.") }
             ForEach(capture.sources) { source in
                 Button {
-                    capture.select(source.id); choosingSource = false; controls.reveal()
+                    capture.select(source.id); choosingSource = false
                 } label: {
                     HStack { Image(systemName: source.isScreen ? "iphone" : "video"); Text(source.name); Spacer(); if capture.selectedID == source.id { Image(systemName: "checkmark") } }
                 }.buttonStyle(.bordered)
@@ -275,7 +350,7 @@ private struct DemoStageContent: View {
             Button("Refresh devices") { capture.refresh() }
             Divider()
             NativePresentationApps { capture.reportNotice($0) }
-        }.padding(24).frame(width: 460)
+        }.padding(24).frame(width: 460).onExitCommand { choosingSource = false }
     }
 }
 
@@ -284,12 +359,13 @@ private struct DemoStageSurface: NSViewRepresentable {
     let image: NSImage
     let logo: NSImage?
     let hand: NSImage?
+    let persona: NSImage?
     let previewLayer: AVCaptureVideoPreviewLayer
     let live: Bool
     func makeNSView(context: Context) -> DemoStageSurfaceView { DemoStageSurfaceView(previewLayer: previewLayer) }
     func updateNSView(_ view: DemoStageSurfaceView, context: Context) {
-        let changed = view.scene != scene || view.backdrop !== image || view.logo !== logo || view.hand !== hand
-        view.scene = scene; view.backdrop = image; view.logo = logo; view.hand = hand; view.isLive = live
+        let changed = view.scene != scene || view.backdrop !== image || view.logo !== logo || view.hand !== hand || view.persona !== persona
+        view.scene = scene; view.backdrop = image; view.logo = logo; view.hand = hand; view.persona = persona; view.isLive = live
         if changed { view.needsDisplay = true; view.needsLayout = true; view.refreshLogo() }
     }
 }
@@ -300,6 +376,7 @@ final class DemoStageSurfaceView: NSView {
     var backdrop: NSImage?
     var logo: NSImage?
     var hand: NSImage?
+    var persona: NSImage?
     private let videoLayer: AVCaptureVideoPreviewLayer
     private let branding = DemoStageLogoView()
     var isLive = false { didSet { videoLayer.isHidden = !isLive || scene?.showsPhone != true } }
@@ -327,16 +404,18 @@ final class DemoStageSurfaceView: NSView {
         guard let scene, let backdrop else { return }
         SceneRenderer.draw(scene, image: backdrop, size: bounds.size, handImage: hand)
     }
-    func refreshLogo() { branding.scene = scene; branding.image = logo; branding.needsDisplay = true }
+    func refreshLogo() { branding.scene = scene; branding.image = logo; branding.persona = persona; branding.needsDisplay = true }
 }
 
 private final class DemoStageLogoView: NSView {
     var scene: DemoScene?
     var image: NSImage?
+    var persona: NSImage?
     override var isOpaque: Bool { false }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override func draw(_ dirtyRect: NSRect) {
         guard let scene else { return }
         SceneRenderer.drawLogo(scene, size: bounds.size, image: image)
+        SceneRenderer.drawPersona(scene, size: bounds.size, image: persona)
     }
 }

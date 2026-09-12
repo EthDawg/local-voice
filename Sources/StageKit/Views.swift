@@ -8,6 +8,7 @@ private let inkAccent = Workbench.accent
 struct ControlCenter: View {
     @ObservedObject var app: AppCoordinator
     @ObservedObject var settings: SettingsStore
+    @State private var choosingPersonas = false
     private let tabs: [(String, String)] = [("Present", "play.rectangle"), ("Drawing", "pencil.tip"), ("Pointer", "cursorarrow.rays"), ("Boards", "rectangle.on.rectangle"), ("Break timer", "timer"), ("Shortcuts", "command")]
     var body: some View {
         HStack(spacing: 0) {
@@ -60,6 +61,7 @@ struct ControlCenter: View {
                 HStack {
                     Text(app.embedded && app.selectedTab == "Present" ? "Drawing & presentation" : app.selectedTab).font(.system(size: 14, weight: .semibold))
                     Spacer()
+                    Button { choosingPersonas = true } label: { Label("Persona…", systemImage: "person.crop.rectangle") }
                     HStack(spacing: 6) {
                         Circle().fill(inkAccent).frame(width: 6, height: 6)
                         Text("Ready on \(app.displayCount) \(app.displayCount == 1 ? "display" : "displays")")
@@ -96,6 +98,7 @@ struct ControlCenter: View {
                 }.id(app.selectedTab)
             }
         }.background(inkBackground).tint(inkAccent).workbenchTheme()
+            .sheet(isPresented: $choosingPersonas) { PersonaLibraryView(library: app.demoScenes.personas) }
     }
     private var present: some View {
         VStack(alignment: .leading, spacing: 17) {

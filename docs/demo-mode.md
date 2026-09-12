@@ -49,12 +49,14 @@ evidence; the remaining hardware and wallpaper edge cases are listed below.
    be selected automatically; ambiguous sources require a choice. The selected
    device is remembered. Source switching, disconnect/replug, runtime errors,
    wake and explicit Reconnect all preserve that identity.
-5. End demo or Escape stops capture, releases the idle-sleep assertion, closes
-   the stage and returns to the editor. The stage never changes wallpaper.
+5. End stops capture, releases the idle-sleep assertion, closes the stage and
+   returns to the editor. Escape closes open controls first; when controls are
+   closed it ends the presentation. The stage never changes wallpaper.
 
-The pointer reveals a small Source / Reconnect / Match device proportions / End toolbar.
-Controls fade after three seconds away from the toolbar; hovering keeps them
-visible. Command-R reconnects even while controls are hidden. Only video is connected; there is no recording
+The phone/chevron tile starts collapsed at the right edge centre. Click or
+Command-Slash opens Source / Reconnect / Position / End controls. Hover does not
+reveal them. Drag toward an edge centre or corner to snap, or use Position.
+Command-R reconnects even while controls are collapsed. Only video is connected; there is no recording
 output, audio connection, upload or remote control. A stalled feed is hidden
 after five seconds without new frames, with recovery controls shown. A locked
 device may still emit valid black frames, so there is no claim to detect every

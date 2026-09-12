@@ -40,8 +40,12 @@ struct WorkbenchHome: View {
                 case "annotate": stage.controlsView
                 case "present": stage.scenesView
                 case "shortcuts": KeyboardCoachView(model: keyboard)
-                case "models": ScrollView { ModelSettingsView(engine: model.engine, isBusy: model.phase != .idle || model.preparing || model.rendering) { ready, message in
-                    model.ready = ready; model.modelMessage = message
+                case "models": ScrollView { VStack(alignment: .leading, spacing: 28) {
+                    ModelSettingsView(engine: model.engine, isBusy: model.phase != .idle || model.preparing || model.rendering) { ready, message in
+                        model.ready = ready; model.modelMessage = message
+                    }
+                    Divider()
+                    CleanupModelSettingsView(isBusy: model.phase != .idle || model.preparing || model.rendering)
                 }.padding(32) }
                 case "settings": settings
                 default: ContentView(model: model, embedded: true)
@@ -135,6 +139,7 @@ struct WorkbenchQuickPanel: View {
     var open: (String) -> Void
     var draw: () -> Void
     var timer: () -> Void
+    var personas: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             WorkbenchHeader(title: "Workbench", subtitle: "A little less friction.", symbol: "square.stack.3d.up.fill")
@@ -148,6 +153,7 @@ struct WorkbenchQuickPanel: View {
             quick("Read aloud", "speaker.wave.2") { open("speak") }
             quick("Draw on screen", "pencil.tip") { draw() }
             quick("Present a device", "iphone") { open("present") }
+            quick("Persona overlay…", "person.crop.rectangle") { personas() }
             quick("Break timer", "timer") { timer() }
             Divider()
             HStack { Button("Open Workbench") { open("home") }; Spacer(); Button { open("shortcuts") } label: { Image(systemName: "keyboard") }.accessibilityLabel("Keyboard shortcuts") }

@@ -38,6 +38,8 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     @Published var captureProcessingLabel = "Preparing speech…"
     @Published var isMicrophoneQuiet = false
     @Published var captureUsesHoldShortcut = false
+    @Published private(set) var captureOutputModeLabel = "Light cleanup"
+    @Published private(set) var captureShortcutInstruction = "Use Stop to finish"
     @Published var captureFailure: String?
     var captureDestinationName: String? { destination?.app.localizedName }
     var canCancelCurrentCapture: Bool {
@@ -113,6 +115,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     private var peakPower: Float = -160
     private var destination: TextDelivery.Target?
     private var recordingAttempt: UUID?
+    private var recordingSettings: CaptureSettings?
     private var permissionRequest: Task<Bool, Never>?
     private var transcriptionTask: Task<Void, Never>?
     private var transcriptionID: UUID?
@@ -128,6 +131,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     var onCancelShortcut: (() -> Void)?
     var onResetShortcuts: (() -> Void)?
     var onResetPanel: (() -> Void)?
+    var microphoneStartFailure: ((TextDelivery.Target?) -> String?)?
     var voices: [String] = []
 
     override init() {
@@ -172,19 +176,25 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         if phase == .requesting { cancelRecording(); return }
         if phase == .recording { stopRecording(); return }
         guard phase == .idle, ready, !rendering else { return }
+        let intendedTarget = target ?? (fromShortcut ? TextDelivery.capture() : nil)
+        if let reason = microphoneStartFailure?(intendedTarget) {
+            captureFailure = reason; status = reason; return
+        }
         clipboardReceipt.clear()
         captureFailure = nil
         previewingPanel = false
         stopPlayback()
         captureUsesHoldShortcut = fromShortcut && preferences.capture == .hold
+        recordingSettings = captureSettings()
         isMicrophoneQuiet = false
         let attempt = UUID(); recordingAttempt = attempt
-        destination = target ?? (fromShortcut ? TextDelivery.capture() : nil)
+        destination = intendedTarget
         phase = .requesting
         Task { await startRecording(attempt) }
     }
     func shortcutChanged(down: Bool) {
-        if preferences.capture == .toggle { if down { toggleRecording(fromShortcut: true) }; return }
+        let usesHold = phase == .idle ? preferences.capture == .hold : captureUsesHoldShortcut
+        if !usesHold { if down { toggleRecording(fromShortcut: true) }; return }
         if down { if phase == .idle { toggleRecording(fromShortcut: true) } }
         else if phase == .recording { stopRecording() }
         else if phase == .requesting { cancelRecording() }
@@ -238,7 +248,8 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
             try? FileManager.default.removeItem(at: url); recordURL = nil
             fail("No clear speech was captured. Check your microphone and try again."); return
         }
-        transcribe(url, duration: duration, temporary: true)
+        transcribe(url, duration: duration, temporary: true, settings: recordingSettings)
+        recordingSettings = nil
     }
 
     func cancelRecording() {
@@ -284,7 +295,17 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         transcribe(url, duration: elapsed, temporary: true)
     }
 
-    private func transcribe(_ url: URL, duration: Double, temporary: Bool) {
+    private func captureSettings() -> CaptureSettings {
+        let settings = CaptureSettings(preferences: preferences, cleanup: CleanupConfigurationStore().snapshot(), replacements: replacements)
+        captureOutputModeLabel = settings.outputLabel
+        captureShortcutInstruction = captureUsesHoldShortcut
+            ? "Release \(settings.preferences.dictationShortcut.label) to finish"
+            : (settings.preferences.dictationShortcut.enabled ? "Stop or \(settings.preferences.dictationShortcut.label) to finish" : "Use Stop to finish")
+        return settings
+    }
+
+    private func transcribe(_ url: URL, duration: Double, temporary: Bool, settings: CaptureSettings? = nil) {
+        let settings = settings ?? captureSettings()
         let shortcutID = shortcutRequest.id
         let invocation = UUID(); transcriptionID = invocation
         clipboardReceipt.clear()
@@ -307,11 +328,11 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
                 guard transcriptionID == invocation else { throw CancellationError() }
                 if let shortcutID, shortcutRequest.id != shortcutID { throw CancellationError() }
                 phase = .cleaning; status = "Tidying your words…"; onPhaseChange?()
-                let cleaned = await cleanupEngine.clean(raw, style: preferences.cleanup)
+                let cleaned = await cleanupEngine.clean(raw, style: settings.preferences.cleanup, configuration: settings.cleanup)
                 try Task.checkCancellation()
                 guard transcriptionID == invocation else { throw CancellationError() }
                 if let shortcutID, shortcutRequest.id != shortcutID { throw CancellationError() }
-                let result = TextRules.apply(cleaned.text, replacements: replacements)
+                let result = TextRules.apply(cleaned.text, replacements: settings.replacements)
                 guard !result.isEmpty else { throw VoiceError.message("No speech was recognised. Try speaking closer to the microphone.") }
                 rawTranscript = raw; transcript = result
                 cleanupMethod = cleaned.method
@@ -324,7 +345,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
                     shortcutRequest.finish(id: shortcutID, result: .success(result))
                 } else {
                     phase = .delivering; status = "Delivering text…"; onPhaseChange?()
-                    let outcome = await TextDelivery.deliver(result, target: destination, mode: preferences.delivery, restoreClipboard: preferences.restoreClipboard)
+                    let outcome = await TextDelivery.deliver(result, target: destination, mode: settings.preferences.delivery, restoreClipboard: settings.preferences.restoreClipboard)
                     status = outcome.message
                     clipboardReceipt.record(outcome: outcome, wordCount: TextRules.wordCount(result))
                 }
@@ -358,6 +379,8 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     func copyCapture(_ item: Transcript) { copyTextWithReceipt(item.text) }
     func showPanelPreview() {
         guard phase == .idle else { return }
+        captureUsesHoldShortcut = false
+        _ = captureSettings()
         previewingPanel = true; onPhaseChange?()
     }
     func closePanelPreview() { previewingPanel = false; onPhaseChange?() }
@@ -365,17 +388,31 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         guard phase == .idle, !transcript.isEmpty else { return }
         let original = transcript
         let revision = draftRevision
+        let settings = captureSettings()
+        let invocation = UUID(); transcriptionID = invocation
         clipboardReceipt.dismissHUD(); captureFailure = nil
+        previewingPanel = false; destination = nil
         captureProcessingLabel = "Text cleanup · on this Mac"
-        phase = .cleaning; error = nil
-        Task {
-            let cleaned = await cleanupEngine.clean(original, style: preferences.cleanup)
-            guard revision == draftRevision else {
-                phase = .idle; status = "Your draft changed during cleanup. Your latest text was kept."; return
+        phase = .cleaning; status = "Tidying your words…"; error = nil
+        transcriptionTask = Task {
+            defer {
+                if transcriptionID == invocation {
+                    transcriptionTask = nil; transcriptionID = nil
+                    phase = .idle; onPhaseChange?()
+                }
             }
-            rawTranscript = original; transcript = TextRules.apply(cleaned.text, replacements: replacements)
-            cleanupMethod = cleaned.method; phase = .idle; status = cleaned.method + " · original retained"; persist()
+            let cleaned = await cleanupEngine.clean(original, style: settings.preferences.cleanup, configuration: settings.cleanup)
+            guard transcriptionID == invocation else { return }
+            guard !Task.isCancelled else {
+                status = "Cleanup cancelled. Your draft was kept."; return
+            }
+            guard revision == draftRevision else {
+                status = "Your draft changed during cleanup. Your latest text was kept."; return
+            }
+            rawTranscript = original; transcript = TextRules.apply(cleaned.text, replacements: settings.replacements)
+            cleanupMethod = cleaned.method; status = cleaned.method + " · original retained"; persist()
         }
+        onPhaseChange?()
     }
     func openTranscript(_ item: Transcript) {
         transcript = item.text; rawTranscript = item.rawText ?? item.text; cleanupMethod = item.cleanupMethod ?? "Original"; page = "dictate"; persist()

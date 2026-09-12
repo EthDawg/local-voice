@@ -20,14 +20,23 @@ struct TestRunner {
         let demo = DemoModeTests()
         let viewportFit = ViewportFitTests()
         let logoImport = LogoImportTests()
+        let personas = PersonaTests()
+        let floating = FloatingControlGeometryTests()
         let workbench = WorkbenchModuleTests()
         var tests: [(String, () throws -> Void)] = [
+            ("floating controls anchors bounds and resize", floating.testAnchorsBoundsAndResize),
+            ("floating controls snap and display recovery", floating.testSnapThresholdsAndDisplayRecovery),
             ("full-height frame persistence and edges", viewportFit.testFullHeightSurvivesSavingAndReachesBothEdges),
             ("maximum frame size across displays", viewportFit.testMaximumSizeFitsDisplayAndPreservesScreenShape),
             ("full-height export and live geometry", viewportFit.testExportAndLiveScreenUseFullHeightBorder),
             ("logo native WebP decoding and alpha", logoImport.testWebPAndTransparentPadding),
             ("logo image orientation and rejection", logoImport.testOrientationAndInvalidImages),
             ("logo paste image and file persistence", logoImport.testPasteImageAndFilePersistence),
+            ("persona geometry and strict validation", personas.testGeometryBoundsAndValidation),
+            ("persona durable image and separate desktop placement", personas.testDurableImportSeparatePlacementAndRemoval),
+            ("persona corrupt future and concurrent archive preservation", personas.testCorruptFutureAndConcurrentArchivesStayUntouched),
+            ("persona scene attachment transparency and missing-file recovery", personas.testSceneAttachmentTransparencyAndMissingFile),
+            ("persona native window focus lock drag and visibility", personas.testNativeOverlayWindowAndDragLifecycle),
             ("desktop verification waits for macOS and times out safely", scenes.testDesktopVerificationWaitsForMacOSAndStopsAtTimeout),
             ("scene search keeps customer selection consistent", scenes.testSceneSearchSelectsOnlyMatchingCustomers),
             ("desktop recovery across interrupted scene switch", scenes.testDesktopRecoverySurvivesInterruptedSwitch),

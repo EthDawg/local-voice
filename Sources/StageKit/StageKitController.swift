@@ -40,7 +40,11 @@ public final class StageKitController: ObservableObject {
     }
     /// Hide the shell before drawing, starting a timer or presenting a scene.
     public var onBeginActivity: (() -> Void)? {
-        didSet { coordinator.onBeginActivity = onBeginActivity; coordinator.demoScenes.onBeginPresentation = onBeginActivity }
+        didSet {
+            coordinator.onBeginActivity = onBeginActivity
+            coordinator.demoScenes.onBeginPresentation = onBeginActivity
+            coordinator.demoScenes.personas.onShow = onBeginActivity
+        }
     }
     /// Supply the other modules' shortcuts so every entry point checks conflicts.
     /// Return a concise reason when the combination belongs to another module.
@@ -94,7 +98,8 @@ public final class StageKitController: ObservableObject {
     public func showBoard() { coordinator.toggleBoard(.white) }
     public func showTimer() { coordinator.toggleTimer() }
     public func showScenes() { coordinator.showDemoScenes() }
-    public func endPresentation() { coordinator.demoScenes.endPresentation(); coordinator.hideTimer(); coordinator.escape() }
+    public func showPersonas() { coordinator.demoScenes.showPersonas() }
+    public func endPresentation() { coordinator.demoScenes.endPresentation(); coordinator.demoScenes.personas.hideOverlay(); coordinator.hideTimer(); coordinator.escape() }
     public func escape() { coordinator.escape() }
     public func performShortcut(id: String) {
         guard let action = Action(rawValue: id) else { return }

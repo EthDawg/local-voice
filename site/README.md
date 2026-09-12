@@ -2,7 +2,9 @@
 
 Public site: https://workbench-mac.vercel.app
 
-A small static website for downloading the native apps, trying a real workflow, and preparing a user-experience report or coding-agent handoff. This is the shared website for both apps; GitHub Releases own binaries and issues own feedback. No browser reimplementation, backend, analytics, or stored feedback.
+A small static website for downloading Workbench, learning its jobs and controls, trying a real workflow, and preparing a user-experience report or coding-agent handoff. Voice and StageMark are modules in one native app. GitHub Releases own binaries and issues own feedback. No browser reimplementation, backend, analytics, or stored feedback.
+
+The durable product guide is `guide/index.html`. Its interaction contract lives in `../docs/product-spec.md`; update both in a behavior-changing pull request. `assets/guide/` contains labelled design studies, not app screenshots. The build uses an explicit file allowlist and publishes no source tests or local deployment state.
 
 ## Local development
 

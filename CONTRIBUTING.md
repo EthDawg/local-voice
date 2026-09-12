@@ -57,6 +57,8 @@ CI runs automated checks and packaging on a macOS runner. A maintainer may need 
 
 [The product contract](docs/workbench.md) owns app-wide behaviour; [the implementation map](docs/design.md) describes boundaries. Voice currently lives in the `LocalVoice` executable target; `StageKit` is a separate Swift library within the same process. Neither module should grow its own app lifecycle or another menu-bar icon. The original checkouts are provenance, not a requirement to maintain matching implementation PRs in two repos.
 
+The [jobs and interaction specification](docs/product-spec.md) defines input ownership, surfaces, placement and closure. The [public guide](https://workbench-mac.vercel.app/guide/) explains them to users. Update that specification and `site/guide/index.html` alongside behavior changes.
+
 ## Send your change
 
 Keep one clear purpose per PR. Follow surrounding Swift style and avoid unrelated formatting or generated build products.

@@ -12,7 +12,10 @@ struct DemoScenesView: View {
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
-                WorkbenchHeader(title: "Demo scenes", subtitle: "Your saved mobile demos.", symbol: "iphone.and.landscape")
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("Scenes", systemImage: "iphone.and.landscape").font(.title2.weight(.semibold))
+                    Text("Your saved mobile presentations.").font(.callout).foregroundStyle(.secondary)
+                }
                 TextField("Find a customer or scene", text: $model.query).textFieldStyle(.roundedBorder)
                     .accessibilityLabel("Find a scene")
                 List(selection: $model.selectedID) {
@@ -27,6 +30,8 @@ struct DemoScenesView: View {
                     .disabled(model.storageBlocked)
                 Button { model.importImage() } label: { Label("Add backdrop…", systemImage: "plus") }
                     .buttonStyle(.borderedProminent).disabled(model.storageBlocked)
+                Button { model.showPersonas() } label: { Label("Personas…", systemImage: "person.crop.rectangle") }
+                    .help("Show a persona over your browser without a backdrop")
                 Text("Images and layouts stay on this Mac.")
                     .font(.caption).foregroundStyle(.secondary)
             }.padding(18).frame(width: 245)
@@ -51,11 +56,11 @@ struct DemoScenesView: View {
                             .accessibilityLabel("Scene options")
                     }
                     if let image = model.image(for: scene) {
-                        SceneCanvas(scene: scene, image: image, logoImage: model.logoImage(for: scene), handImage: model.handImage(for: scene)) { value in model.update(value) }
+                        SceneCanvas(scene: scene, image: image, logoImage: model.logoImage(for: scene), handImage: model.handImage(for: scene), personaImage: model.personaImage(for: scene)) { value in model.update(value) }
                             .frame(width: previewSize(in: editor.size).width, height: previewSize(in: editor.size).height)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.primary.opacity(0.12)))
-                            .accessibilityLabel("Scene preview. Drag the phone to position it; drag the background to crop it.")
+                            .accessibilityLabel("Scene preview. Drag the phone or persona to position it; drag the background to crop it.")
                             .frame(maxWidth: .infinity)
                         HStack {
                             Text("Drag to position")
@@ -74,6 +79,7 @@ struct DemoScenesView: View {
                             }.disabled(!scene.showsPhone).help("Fill the available height while keeping the whole frame visible")
                         }
                         logoControls(scene)
+                        personaControls(scene)
                         DisclosureGroup("Adjust layout") {
                         VStack(alignment: .leading, spacing: 16) {
                             HStack {
@@ -153,7 +159,7 @@ struct DemoScenesView: View {
                         }.fixedSize().accessibilityLabel("More demo actions")
                     }
                     #if !APP_STORE
-                    Text("Full-screen demo. Press Esc to finish.")
+                    Text("Click the phone tile for controls. Esc closes controls, then ends.")
                         .font(.caption).foregroundStyle(.secondary)
                     #else
                     Text("Export your scene, then position a QuickTime movie preview over its device frame.")
@@ -173,6 +179,16 @@ struct DemoScenesView: View {
             }
         }
         .sheet(isPresented: $choosingLogo) { SavedLogoGallery(model: model) }
+        .sheet(isPresented: $model.choosingPersonas) {
+            if let id = model.personaSceneID {
+                PersonaLibraryView(library: model.personas, onChoose: { persona in
+                    model.usePersona(persona, in: id)
+                    model.choosingPersonas = false
+                })
+            } else {
+                PersonaLibraryView(library: model.personas)
+            }
+        }
         .alert("Create a text logo", isPresented: $creatingTextLogo) {
             TextField("Company name", text: $textLogoName)
             Button("Create") { model.makeTextLogo(String(textLogoName.prefix(80))) }
@@ -190,6 +206,33 @@ struct DemoScenesView: View {
         let logoControlsHeight: CGFloat = model.selected?.logo == nil ? 0 : 64
         let height = max(200, editor.height - 365 - logoControlsHeight)
         return CGSize(width: min(width, height * model.screenAspect), height: min(width / model.screenAspect, height))
+    }
+    private func personaControls(_ scene: DemoScene) -> some View {
+        HStack(spacing: 12) {
+            Button { model.showPersonas(for: scene.id) } label: {
+                Label(scene.persona == nil ? "Add persona…" : "Change persona…", systemImage: "person.crop.rectangle")
+            }.disabled(model.storageBlocked)
+            if let persona = scene.persona {
+                Text("Size").font(.caption).foregroundStyle(.secondary)
+                Slider(value: Binding(get: { model.selected?.persona?.width ?? persona.width }, set: { width in
+                    guard var value = model.selected, value.id == scene.id else { return }
+                    value.persona?.width = width; model.update(value)
+                }), in: 0.06...0.40).accessibilityLabel("Persona size")
+                Menu("Position") {
+                    Button("Bottom left") { movePersona(scene, x: 0.02, y: 0.02) }
+                    Button("Bottom right") { movePersona(scene, x: 0.98, y: 0.02) }
+                    Button("Top left") { movePersona(scene, x: 0.02, y: 0.98) }
+                    Button("Top right") { movePersona(scene, x: 0.98, y: 0.98) }
+                }.fixedSize()
+                Button { var value = scene; value.persona = nil; model.update(value) } label: {
+                    Image(systemName: "xmark.circle")
+                }.buttonStyle(.plain).accessibilityLabel("Remove persona from scene")
+            }
+            Spacer(minLength: 0)
+        }.font(.caption)
+    }
+    private func movePersona(_ scene: DemoScene, x: Double, y: Double) {
+        var value = scene; value.persona?.x = x; value.persona?.y = y; model.update(value)
     }
     @ViewBuilder private func viewportControls(_ scene: DemoScene) -> some View {
         if scene.showsPhone {
@@ -337,10 +380,11 @@ private struct SceneCanvas: NSViewRepresentable {
     let image: NSImage
     let logoImage: NSImage?
     let handImage: NSImage?
+    let personaImage: NSImage?
     let update: (DemoScene) -> Void
     func makeNSView(context: Context) -> SceneCanvasView { SceneCanvasView() }
     func updateNSView(_ view: SceneCanvasView, context: Context) {
-        view.scene = scene; view.image = image; view.logoImage = logoImage; view.handImage = handImage; view.update = update; view.needsDisplay = true
+        view.scene = scene; view.image = image; view.logoImage = logoImage; view.handImage = handImage; view.personaImage = personaImage; view.update = update; view.needsDisplay = true
     }
 }
 
@@ -349,16 +393,18 @@ private final class SceneCanvasView: NSView {
     var image: NSImage?
     var logoImage: NSImage?
     var handImage: NSImage?
+    var personaImage: NSImage?
     var update: ((DemoScene) -> Void)?
     private var origin = CGPoint.zero
     private var initial: DemoScene?
     private var movingPhone = false
+    private var movingPersona = false
     private var resizingWidth = false
     private var resizingSize = false
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func draw(_ dirtyRect: NSRect) {
         guard let scene, let image else { return }
-        SceneRenderer.draw(scene, image: image, size: bounds.size, logoImage: logoImage, handImage: handImage)
+        SceneRenderer.draw(scene, image: image, size: bounds.size, logoImage: logoImage, handImage: handImage, personaImage: personaImage)
         if scene.showsPhone {
             let rect = SceneRenderer.phoneRect(scene, in: bounds.size)
             NSColor.controlAccentColor.setFill()
@@ -369,7 +415,11 @@ private final class SceneCanvasView: NSView {
     }
     override func mouseDown(with event: NSEvent) {
         origin = convert(event.locationInWindow, from: nil); initial = scene
+        movingPersona = false
         if let scene {
+            if let persona = scene.persona, let personaImage {
+                movingPersona = PersonaGeometry.rect(persona, imageSize: personaImage.size, in: bounds.size).contains(origin)
+            }
             let rect = SceneRenderer.phoneRect(scene, in: bounds.size)
             resizingWidth = scene.showsPhone && abs(origin.x - rect.maxX) < 12 && abs(origin.y - rect.midY) < 12
             resizingSize = scene.showsPhone && abs(origin.x - rect.maxX) < 12 && abs(origin.y - rect.minY) < 12
@@ -380,7 +430,12 @@ private final class SceneCanvasView: NSView {
         guard var draft = initial, let image else { return }
         let point = convert(event.locationInWindow, from: nil)
         let delta = CGPoint(x: point.x - origin.x, y: point.y - origin.y)
-        if resizingWidth {
+        if movingPersona, var persona = draft.persona, let personaImage {
+            let rect = PersonaGeometry.rect(persona, imageSize: personaImage.size, in: bounds.size)
+            persona.x += delta.x / max(1, bounds.width - rect.width)
+            persona.y += delta.y / max(1, bounds.height - rect.height)
+            draft.persona = persona
+        } else if resizingWidth {
             let geometry = ViewportGeometry(scene: draft, size: bounds.size)
             var viewport = draft.viewport ?? .legacy
             viewport.aspect = max(1, geometry.screen.width + delta.x) / max(1, geometry.screen.height)

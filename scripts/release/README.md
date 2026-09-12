@@ -39,6 +39,17 @@ python3 scripts/release/preview.py install \
 
 Local signed candidates are not automatically notarized public downloads. Use the official process below for a downloadable Preview. Installation and GitHub publication remain separate actions.
 
+## 2.0 evaluation exception
+
+For `2.0.0-preview.1`, the maintainer explicitly requested implementation and
+public Preview delivery while holding all Apple submissions, including
+notarization. This evaluation uses a Developer ID signed archive produced by
+`preview.py`, with the full local regressions, source revision and SHA-256
+recorded in its prerelease notes. It is **not notarized**, is not the normal
+release pipeline below, and may be blocked by Gatekeeper on a fresh download.
+The site and release must state that distinction. This exception does not change
+the signing/notarization gates in `release.py` or authorise a production release.
+
 ## Official signed and notarized releases
 
 Run on an interactive release Mac after quitting the installed app so it releases global shortcuts. Ordinary contributors can build and test without a paid Apple account.

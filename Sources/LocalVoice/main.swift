@@ -49,6 +49,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             return nil
         }
         stage.start()
+        model.microphoneStartFailure = { [weak self] target in
+            guard let self else { return "Workbench is unavailable." }
+            return CaptureInputPolicy.canStart(isPresenting: self.stage.isPresenting, hasExternalMacTarget: target != nil)
+                ? nil : "To enter text on your phone, use its keyboard or Dictation button. Mac dictation works in a Mac text field."
+        }
         keyboard = KeyboardCoachModel(entries: shortcutEntries(), update: { [weak self] id, shortcut in guard let self else { return "Workbench is unavailable." }; return self.saveShortcut(id, shortcut) }, suspend: { [weak self] suspended in
             guard let self else { return }
             self.shortcutsSuspended = suspended
@@ -66,8 +71,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover = NSPopover(); popover.behavior = .transient; popover.animates = false; popover.delegate = self
         popover.contentViewController = NSHostingController(rootView: WorkbenchQuickPanel(model: model, open: { [weak self] page in self?.navigate(page) }, draw: { [weak self] in
             self?.resumeTarget { _ in self?.stage.draw() }
-        }, timer: { [weak self] in self?.closeControls(); self?.stage.showTimer() }))
-        popover.contentSize = NSSize(width: 370, height: 365)
+        }, timer: { [weak self] in self?.closeControls(); self?.stage.showTimer() }, personas: { [weak self] in
+            self?.closeControls(); self?.stage.showPersonas()
+        }))
+        popover.contentSize = NSSize(width: 370, height: 400)
         model.onPhaseChange = { [weak self] in
             guard let self else { return }
             if self.model.phase != .idle { self.keyboard?.stopInteraction(); self.stage.escape() }
@@ -171,6 +178,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let savePrompt = menu.addItem(withTitle: "Save clipboard as prompt…", action: #selector(saveClipboardPrompt), keyEquivalent: "s")
         savePrompt.keyEquivalentModifierMask = [.command, .shift]
         windows.submenu = menu; main.addItem(windows); NSApp.mainMenu = main; NSApp.windowsMenu = menu
+        let help = NSMenuItem(); help.title = "Help"
+        let helpMenu = NSMenu(title: "Help")
+        helpMenu.addItem(withTitle: "Workbench Guide", action: #selector(showGuide), keyEquivalent: "")
+        help.submenu = helpMenu; main.addItem(help); NSApp.helpMenu = helpMenu
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.autosaveName = NSStatusItem.AutosaveName("Workbench.MenuBar")
         statusItem.button?.target = self; statusItem.button?.action = #selector(statusClicked(_:))
@@ -190,6 +201,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         } else { toggleControls() }
     }
     @objc func toggleControls() { if popover.isShown { closeControls() } else { showControls() } }
+    @objc func showGuide() { NSWorkspace.shared.open(URL(string: "https://workbench-mac.vercel.app/guide/")!) }
     func showControls() {
         guard let button = statusItem.button else { return }
         menuTarget = TextDelivery.capture()
@@ -299,10 +311,12 @@ func runCLI(_ args: [String]) async -> Int32 {
         let engine = RecognitionEngine()
         switch args.first {
         case "--check-core":
-            try CoreChecks.run(); try CleanupChecks.run(); try DemoLibraryChecks.run(); try ProviderChecks.run()
+            try CoreChecks.run(); try CleanupChecks.run(); try DemoLibraryChecks.run(); try ProviderChecks.run(); try CaptureHUDChecks.run(); try CaptureSettingsChecks.run(); try LocalRefinementChecks.run()
             try await MainActor.run { try DemoLibraryChecks.runModelChecks(); try IntegrationChecks.run(); try KeyboardCoachChecks.run(); try ClipboardReceiptChecks.run() }
         case "--check-providers":
             try ProviderChecks.run(); try await ProviderChecks.runTransportChecks()
+        case "--check-refinement":
+            try LocalRefinementChecks.run(); try await LocalRefinementChecks.runTransportChecks()
         case "--check-input":
             try await MainActor.run { try InputChecks.run() }
         case "--check-cleanup":

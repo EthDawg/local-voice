@@ -17,6 +17,7 @@ struct DemoScene: Codable, Identifiable, Equatable {
     var logo: SceneLogo? = nil
     var viewport: DeviceViewport? = nil
     var hand: SceneHand? = nil
+    var persona: PersonaPlacement? = nil
 
     func validated() throws -> DemoScene {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -29,6 +30,7 @@ struct DemoScene: Codable, Identifiable, Equatable {
         value.logo = try logo?.validated()
         value.viewport = try viewport?.validated()
         value.hand = try hand?.validated()
+        value.persona = try persona?.validated()
         value.backgroundX = min(1, max(0, backgroundX)); value.backgroundY = min(1, max(0, backgroundY))
         value.zoom = min(3, max(1, zoom))
         value.phoneHeight = min(ViewportGeometry.heightRange.upperBound, max(ViewportGeometry.heightRange.lowerBound, phoneHeight))
@@ -38,9 +40,10 @@ struct DemoScene: Codable, Identifiable, Equatable {
 }
 
 enum SceneError: LocalizedError {
-    case invalidScene, futureVersion, invalidImage, storageBlocked, noScene, desktopUnavailable, missingLogo, invalidHand, missingHand
+    case invalidScene, futureVersion, invalidImage, storageBlocked, noScene, desktopUnavailable, missingLogo, invalidHand, missingHand, missingPersona
     var errorDescription: String? {
         switch self {
+        case .missingPersona: return "The persona image is missing. Replace or remove it before presenting or exporting."
         case .invalidHand: return "Choose a hand cutout PNG with real transparency. A white background or checkerboard photograph cannot wrap around the device."
         case .missingHand: return "The hand cutout is missing. Replace or remove it before presenting or exporting."
         case .missingLogo: return "The customer logo is missing. Replace or remove it before exporting or applying this scene."
@@ -91,7 +94,7 @@ enum SceneRenderer {
         return CGRect(x: left ? margin : size.width - margin - width,
                       y: top ? size.height - margin - height : margin, width: width, height: height)
     }
-    static func draw(_ scene: DemoScene, image: NSImage, size: CGSize, logoImage: NSImage? = nil, handImage: NSImage? = nil) {
+    static func draw(_ scene: DemoScene, image: NSImage, size: CGSize, logoImage: NSImage? = nil, handImage: NSImage? = nil, personaImage: NSImage? = nil) {
         let bounds = CGRect(origin: .zero, size: size)
         NSGraphicsContext.saveGraphicsState()
         NSBezierPath(rect: bounds).addClip()
@@ -118,6 +121,7 @@ enum SceneRenderer {
             NSBezierPath(roundedRect: geometry.screen, xRadius: geometry.innerRadius, yRadius: geometry.innerRadius).fill()
         }
         drawLogo(scene, size: size, image: logoImage)
+        drawPersona(scene, size: size, image: personaImage)
         NSGraphicsContext.restoreGraphicsState()
     }
     static func drawLogo(_ scene: DemoScene, size: CGSize, image: NSImage?) {
@@ -131,13 +135,18 @@ enum SceneRenderer {
             logoImage.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
         }
     }
-    static func png(_ scene: DemoScene, image: NSImage, size: CGSize, logoImage: NSImage? = nil, handImage: NSImage? = nil) throws -> Data {
+    static func drawPersona(_ scene: DemoScene, size: CGSize, image: NSImage?) {
+        guard let persona = scene.persona, let image else { return }
+        image.draw(in: PersonaGeometry.rect(persona, imageSize: image.size, in: size),
+                   from: .zero, operation: .sourceOver, fraction: 1)
+    }
+    static func png(_ scene: DemoScene, image: NSImage, size: CGSize, logoImage: NSImage? = nil, handImage: NSImage? = nil, personaImage: NSImage? = nil) throws -> Data {
         guard size.width >= 1, size.height >= 1, size.width <= 8192, size.height <= 8192,
               let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width), pixelsHigh: Int(size.height),
                     bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0),
               let context = NSGraphicsContext(bitmapImageRep: bitmap) else { throw SceneError.invalidImage }
         NSGraphicsContext.saveGraphicsState(); NSGraphicsContext.current = context
-        draw(scene, image: image, size: size, logoImage: logoImage, handImage: handImage)
+        draw(scene, image: image, size: size, logoImage: logoImage, handImage: handImage, personaImage: personaImage)
         NSGraphicsContext.restoreGraphicsState()
         guard let data = bitmap.representation(using: .png, properties: [:]) else { throw SceneError.invalidImage }
         return data
@@ -191,11 +200,14 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     @Published var query = "" { didSet { reconcileSelection() } }
     @Published var selectedID: UUID?
     @Published var notice: String?
+    @Published var choosingPersonas = false
+    var personaSceneID: UUID?
     @Published private(set) var storageBlocked = false
     @Published private(set) var hasDesktopSnapshot = false
     @Published private(set) var desktopBusy = false
     @Published private(set) var screenAspect: CGFloat = 16.0 / 9.0
     let root: URL
+    let personas: PersonaLibrary
     private var window: NSWindow?
     private var presentation: DemoPresentation?
     var onOpen: (() -> Void)?
@@ -218,6 +230,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     private var snapshotURL: URL { root.appendingPathComponent("desktop-restore.json") }
     init(root: URL? = nil, readOnlyReason: String? = nil) {
         self.root = root ?? Workbench.supportDirectory(component: "StageMark").appendingPathComponent("Scenes")
+        self.personas = PersonaLibrary(root: self.root, readOnlyReason: readOnlyReason)
         super.init()
         if let readOnlyReason {
             storageBlocked = true; logoLibraryBlocked = true; starterLibraryBlocked = true
@@ -273,6 +286,11 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
         let cost = Int(min(200_000_000, image.size.width * image.size.height * 4))
         imageCache.setObject(image, forKey: scene.background as NSString, cost: cost); return image
     }
+    func showPersonas(for sceneID: UUID? = nil) {
+        personaSceneID = sceneID
+        choosingPersonas = true
+        show()
+    }
     func saveMyDevice() {
         guard let scene = selected else { return }
         do {
@@ -286,9 +304,11 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
         guard let scene = selected, let image = image(for: scene) else { return }
         if scene.logo != nil && logoImage(for: scene) == nil { notice = SceneError.missingLogo.localizedDescription; return }
         if scene.hand != nil && handImage(for: scene) == nil { notice = SceneError.missingHand.localizedDescription; return }
+        if scene.persona != nil && personaImage(for: scene) == nil { notice = SceneError.missingPersona.localizedDescription; return }
         if presentation != nil { presentation?.bringForward(); return }
+        personas.hideOverlay()
         onBeginPresentation?()
-        let presenter = DemoPresentation(scene: scene, image: image, logo: logoImage(for: scene), hand: handImage(for: scene), screen: targetScreen, root: root)
+        let presenter = DemoPresentation(scene: scene, image: image, logo: logoImage(for: scene), hand: handImage(for: scene), persona: personaImage(for: scene), screen: targetScreen, root: root)
         presenter.onEnd = { [weak self] in self?.presentation = nil; self?.objectWillChange.send(); self?.show() }
         presentation = presenter
         objectWillChange.send()
@@ -297,6 +317,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     }
     func endPresentation() { presentation?.end() }
     func shutdown() {
+        personas.shutdown()
         presentation?.onEnd = nil; presentation?.end(); presentation = nil
         window?.orderOut(nil); window?.contentView = nil; window?.delegate = nil; window = nil
         imageCache.removeAllObjects()
@@ -356,6 +377,17 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
         imageCache.setObject(image, forKey: logo.image as NSString,
                              cost: Int(min(200_000_000, image.size.width * image.size.height * 4)))
         return image
+    }
+    func personaImage(for scene: DemoScene) -> NSImage? {
+        guard let persona = scene.persona, (try? persona.validated()) != nil else { return nil }
+        return personas.image(named: persona.image)
+    }
+    func usePersona(_ persona: SavedPersona, in sceneID: UUID) {
+        guard var scene = scenes.first(where: { $0.id == sceneID }) else { return }
+        var placement = scene.persona ?? PersonaPlacement(image: persona.image)
+        placement.image = persona.image
+        scene.persona = placement
+        update(scene)
     }
     func handImage(for scene: DemoScene) -> NSImage? {
         guard let hand = scene.hand, (try? hand.validated()) != nil else { return nil }
@@ -425,7 +457,9 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
         if scene.logo != nil && logoImage == nil { throw SceneError.missingLogo }
         let handImage = handImage(for: scene)
         if scene.hand != nil && handImage == nil { throw SceneError.missingHand }
-        return try SceneRenderer.png(scene, image: image, size: size, logoImage: logoImage, handImage: handImage)
+        let personaImage = personaImage(for: scene)
+        if scene.persona != nil && personaImage == nil { throw SceneError.missingPersona }
+        return try SceneRenderer.png(scene, image: image, size: size, logoImage: logoImage, handImage: handImage, personaImage: personaImage)
     }
     private func rememberLogo(_ filename: String, name: String) throws {
         guard !logoLibraryBlocked else { throw SceneError.storageBlocked }
