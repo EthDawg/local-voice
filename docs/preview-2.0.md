@@ -1,8 +1,8 @@
 # Workbench 2 Preview: current evidence
 
 Updated 12 September 2026. Voice and StageMark share one app. The final signed local
-package and full regression run passed, and the Preview was installed. This record
-is not a public release announcement or a claim that all acceptance checks pass.
+package and full regression run passed, and the Preview was installed. The evaluation prerelease is published; the hardware limits below remain.
+Publication does not mean all acceptance checks pass.
 
 ## Current implementation
 
@@ -92,8 +92,25 @@ Workbench did not send it or claim delivery.
 - Verify what a real recipient sees in Teams and Zoom for the chosen sharing
   surface; do not claim presenter-only controls or infer receiver behavior.
 - Check a fresh Mac's download, first model setup and Gatekeeper first opening.
-- Publish the reviewed source, tested guide and signed Preview archive with its
-  checksum, then verify downloaded bytes. Publication remains pending.
 
-App Store submission and notarization upload remain on hold. A signed local
-package is not a published or notarized release.
+## Published evaluation Preview
+
+[2.0.0-preview.1](https://github.com/EthDawg/local-voice/releases/tag/v2.0.0-preview.1)
+was published on 12 September 2026 from app source
+`67eef5111016548524729633f14d449f15ed26e5`, build `20260912133744`.
+[GitHub CI 34697004573](https://github.com/EthDawg/local-voice/actions/runs/34697004573)
+passed for that exact source, including packaging and native Shortcuts metadata.
+The final local rerun also passed, including all thirteen draft-cleanup checks.
+
+The public ZIP was downloaded again. Its checksum, release manifest and bundle
+identity matched the installed signed Preview:
+`2992d703ab5130500cad0f6a0bf5fe5c78e7a58a818be5c683a9ab8dd43d6b96`.
+The archive, checksum and machine-readable `release.json` are release assets.
+The [public guide](https://workbench-mac.vercel.app/guide/) is maintained with the
+site source; subsequent guide-only commits do not change this app archive.
+
+App Store submission and notarization upload remain on hold. This evaluation
+archive is Developer ID signed with hardened runtime and a secure timestamp,
+but **not notarized**. It is outside the normal notarized release pipeline and
+may be blocked by Gatekeeper on a fresh download. No human co-maintainer approval
+is claimed; the implementation pull request remains a draft.
