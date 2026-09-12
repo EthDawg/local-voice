@@ -184,6 +184,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         Task { try? await Task.sleep(nanoseconds: 160_000_000); action(target) }
     }
     func menuRecording() {
+        if model.phase == .requesting { closeControls(); model.cancelRecording(); return }
         if model.phase == .recording { closeControls(); model.stopRecording(); return }
         resumeTarget { [weak self] target in self?.model.toggleRecording(target: target) }
     }

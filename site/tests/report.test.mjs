@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { apps, createReport, agentHandoff } from '../report.mjs';
 const input = { app:'voice',version:'1.2.1',environment:'M2, macOS 26',task:'Copy a capture & preserve “café”',expected:'The original words',observed:'Different text\nSecond line',impact:'Small friction',help:'I can test a fix' };
-test('routes each app to its own repository and preserves feedback through URL encoding',()=>{
-  for(const [app,repo] of [['voice','local-voice'],['stagemark','StageMark']]){
+test('routes both Workbench areas to the unified repository and preserves feedback through URL encoding',()=>{
+  for(const [app,repo] of [['voice','local-voice'],['stagemark','local-voice']]){
     const report=createReport({...input,app});const url=new URL(report.url);
     assert.equal(url.origin,'https://github.com');assert.equal(url.pathname,`/EthDawg/${repo}/issues/new`);
     assert.equal(url.searchParams.get('body'),report.body);assert.match(report.body,/“café”/);assert.match(report.body,/Different text\nSecond line/);

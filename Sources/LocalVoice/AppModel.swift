@@ -156,6 +156,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     }
 
     func toggleRecording(fromShortcut: Bool = false, target: TextDelivery.Target? = nil) {
+        if phase == .requesting { cancelRecording(); return }
         if phase == .recording { stopRecording(); return }
         guard phase == .idle, ready, !rendering else { return }
         previewingPanel = false

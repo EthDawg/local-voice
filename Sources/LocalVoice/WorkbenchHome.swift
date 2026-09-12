@@ -7,6 +7,7 @@ struct WorkbenchHome: View {
     @ObservedObject var model: AppModel
     @ObservedObject var stage: StageKitController
     @ObservedObject var keyboard: KeyboardCoachModel
+    @StateObject private var introduction = FounderIntroductionModel()
     @State private var loginEnabled = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
     private let navItems: [(String, String, String)] = [
@@ -76,6 +77,7 @@ struct WorkbenchHome: View {
                     Spacer()
                     Button("Try the keyboard") { model.page = "shortcuts" }.buttonStyle(.bordered)
                 }.padding(20).background(Workbench.surface, in: RoundedRectangle(cornerRadius: 14))
+                if !introduction.isDismissed { FounderIntroductionCard(model: introduction) }
                 HStack(alignment: .top, spacing: 24) {
                     Label("Free tools, no account needed", systemImage: "checkmark.seal")
                     Label("Your files stay yours", systemImage: "folder")
@@ -122,6 +124,8 @@ struct WorkbenchHome: View {
             Button("Models and local server") { model.page = "models" }
             Button("Keyboard and practice") { model.page = "shortcuts" }
             Text("Preview keeps its own session. Your previous Voice and StageMark data remains in place.").font(.caption).foregroundStyle(.secondary)
+            Divider()
+            FounderIntroductionCard(model: introduction, canDismiss: false)
         }.padding(32).frame(maxWidth: .infinity, alignment: .leading) }
     }
 }
@@ -135,9 +139,9 @@ struct WorkbenchQuickPanel: View {
         VStack(alignment: .leading, spacing: 16) {
             WorkbenchHeader(title: "Workbench", subtitle: "A little less friction.", symbol: "square.stack.3d.up.fill")
             Button { model.onMenuRecording?() } label: {
-                HStack { Label(model.phase == .recording ? "Finish dictation" : "Dictate", systemImage: model.phase == .recording ? "stop.fill" : "mic"); Spacer(); Text(model.preferences.dictationShortcut.label).font(.caption.monospaced()) }
+                HStack { Label(model.phase == .requesting ? "Cancel microphone request" : model.phase == .recording ? "Finish dictation" : "Dictate", systemImage: model.phase == .requesting ? "xmark" : model.phase == .recording ? "stop.fill" : "mic"); Spacer(); Text(model.preferences.dictationShortcut.label).font(.caption.monospaced()) }
             }.buttonStyle(.borderedProminent).controlSize(.large)
-                .disabled(!model.ready || (model.phase != .idle && model.phase != .recording) || model.rendering)
+                .disabled(!model.ready || (model.phase != .idle && model.phase != .recording && model.phase != .requesting) || model.rendering)
             quick("Read aloud", "speaker.wave.2") { open("speak") }
             quick("Draw on screen", "pencil.tip") { draw() }
             quick("Present a device", "iphone") { open("present") }

@@ -1,33 +1,64 @@
-# Preview and production
+# Workbench Preview and production
 
-Local development installs **Workbench Voice Preview** into `~/Applications`. It has a separate name, executable, bundle ID, app preferences, shared appearance domain and Application Support directory. Keep production installed. Open one edition at a time when using its global shortcuts; macOS only gives each shortcut to one owner.
+Workbench is one Mac app containing Voice, annotation, boards, timers and device presentation. Preview is a separate distribution channel for that same app.
+
+| Identity | Production | Preview |
+| --- | --- | --- |
+| App bundle | `Workbench.app` | `Workbench Preview.app` |
+| Bundle ID | `com.ethdawg.workbench` | `com.ethdawg.workbench.preview` |
+| Executable | `Workbench` | `WorkbenchPreview` |
+| `WorkbenchChannel` in Info.plist | Absent | `preview` |
+| Application Support | `Workbench/` | `Workbench Preview/` |
+| Final archive | `Workbench.zip` | `Workbench Preview.zip` |
+| Official output directory | `.build/releases/VERSION-BUILD/` | `.build/releases/VERSION-BUILD-preview/` |
+
+Keep production installed. Run one channel at a time when using the same global shortcuts; macOS gives each combination to one owner. Preview uses separate preferences and saved-data directories. Initial migration copies supported legacy Voice/StageMark data into the unified location; it preserves the original files and does not replace an existing unified session. Both channels currently target Apple Silicon because the speech backend's Intel path has not been verified.
+
+## Local development
 
 ```sh
 bash scripts/install.sh --no-open
 ```
 
-Run the same command for the next update after quitting Preview. The installer uses the existing Developer ID certificate in Keychain, validates the replacement, keeps a rollback ZIP, and swaps only the Preview bundle. It never deletes app data or resets system permissions. The first Preview launch copies missing app settings and known saved-data files from production once; later updates preserve the Preview's own changes. Production is never written. Voice reuses the public FluidAudio model cache to avoid another download; transcripts and library metadata are separate.
+After quitting Preview, run the same command to update it. The installer uses an existing Developer ID certificate in Keychain, validates the replacement, keeps a rollback ZIP and swaps only the Preview app. It does not remove app data or reset macOS permissions.
 
-Preview has its own initial macOS permission prompts. Consistent signing identity, bundle ID and installed path keep later releases eligible to retain those grants; macOS controls the final decision. `--ad-hoc` is only for disposable contributor builds and is refused by the normal installer. If more than one Developer ID exists, select its public SHA-1 fingerprint with `--identity`. No private key or password belongs in command arguments.
+Preview has its own first-run permission prompts. Keeping the signing identity, bundle ID and installed path stable helps preserve later grants; macOS controls the final decision. Contributors can use `--ad-hoc` for disposable builds. The normal installer requires Developer ID signing unless the disposable mode is explicitly selected. Select a public certificate fingerprint with `--identity` when more than one Developer ID is available.
 
-`bash scripts/build.sh --preview` only builds the ZIP. `python3 scripts/release/preview.py install --archive "PATH_TO_PREVIEW.zip" --no-open` installs an existing signed candidate. StageMark Preview contains both Apple Silicon and Intel slices by default; `--native` opts into a local architecture build. Voice remains Apple Silicon because its recognition backend has not been verified on Intel.
+Build a local signed candidate without installing:
 
-These local signed candidates are not notarized public downloads. Publication remains the explicit release process below. To update production in place from a finished release, pass `--production --archive "PATH_TO_NOTARIZED_ZIP"` to the installer. It verifies the selected bundle ID, Developer ID signature, notarization ticket and Gatekeeper before replacing the installed app. Production updates never build an ad-hoc replacement.
+```sh
+bash scripts/build.sh --preview
+```
 
-# Developer ID releases
+Install an existing signed Preview ZIP without rebuilding:
 
-Run from an interactive release Mac, with the installed copy of the app quit.
-Ordinary contributors use the existing build/test scripts and do not need paid
-Apple accounts. Python 3 and Apple's command-line tools are required here.
+```sh
+python3 scripts/release/preview.py install \
+  --archive "PATH_TO_PREVIEW.zip" --no-open
+```
 
-1. Install a Developer ID Application certificate and its private key in Keychain.
-2. Save a notarization profile using `xcrun notarytool store-credentials Workbench`.
-   Enter credentials at its secure prompts. Never put a password, private key,
-   signing export or API key in source control, an issue, or a command argument.
-3. Bump the app version/build, review the changes, and commit. Keep the existing
-   bundle identifier. Quit the installed app so it releases global shortcuts.
-4. Run `security find-identity -v -p codesigning` to find the public fingerprint.
-5. Run:
+Local signed candidates are not automatically notarized public downloads. Use the official process below for a downloadable Preview. Installation and GitHub publication remain separate actions.
+
+## Official signed and notarized releases
+
+Run on an interactive release Mac after quitting the installed app so it releases global shortcuts. Ordinary contributors can build and test without a paid Apple account.
+
+1. Have a Developer ID Application certificate and its private key available in Keychain.
+2. Create the notarytool Keychain profile using `xcrun notarytool store-credentials Workbench` and its secure prompts. Keep passwords, private keys and signing exports out of arguments, source control and public conversations.
+3. Set the marketing version in `scripts/Info.plist`, review the work and commit it. Production uses its committed build number; the Preview builder assigns a UTC timestamp build number. Keep the channel identities above unchanged.
+4. Find the public certificate fingerprint with `security find-identity -v -p codesigning`.
+5. Choose the channel explicitly when making a Preview.
+
+Official **Preview**:
+
+```sh
+python3 scripts/release/release.py --preview \
+  --identity CERTIFICATE_SHA1_FINGERPRINT \
+  --team-id APPLE_TEAM_ID \
+  --keychain-profile Workbench
+```
+
+Official **production** retains the existing default:
 
 ```sh
 python3 scripts/release/release.py \
@@ -36,57 +67,57 @@ python3 scripts/release/release.py \
   --keychain-profile Workbench
 ```
 
-The command requires a clean commit, validates credentials and identity, runs
-regressions, builds, signs nested code inside-out with hardened runtime and a
-timestamp, runs configured checks against the signed executable, submits once,
-saves Apple's response/log, staples and verifies the ticket, and assesses
-Gatekeeper. It extracts the final ZIP again to verify the exact packaged app.
-Outputs are in ignored `.build/releases/VERSION-BUILD/`. Existing release output
-directories are never overwritten. `release.json` records the source and digest.
+Both routes enforce the same release gates:
 
-If interrupted, consult `submission.json` and use `notarytool info`, `wait` or
-`log` with that ID before retrying. If rejected, fix the reported cause and make a
-new candidate. No final ZIP or checksum is emitted before successful acceptance,
-stapling and Gatekeeper assessment. The local build script's ad-hoc ZIP is a
-development artifact, not the signed release output.
+- A clean Git commit before work begins, and the same clean commit after regressions and building.
+- The selected Developer ID Application private key, Apple team and working notarization profile.
+- The configured regression suite and executable self-checks. Preview reuses `preview.py` for its identity conversion and signing; production keeps its build-then-sign route.
+- Exact bundle name, bundle ID, executable, channel, version and archive contents. The archive cannot contain another app, unrelated files, duplicate paths or extraction traversal paths.
+- Nested signing with hardened runtime and a secure timestamp, Apple Silicon executable coverage and full signature verification.
+- A single notarization submission, explicit `Accepted` status, stapling and Gatekeeper assessment.
+- Re-extraction of the final ZIP, another identity/version/signature/ticket check and Gatekeeper assessment of that exact packaged app.
 
-## Native acceptance before general availability
+The final channel ZIP, `SHA256SUMS.txt` and `release.json` appear only after these checks succeed. Release directories are never overwritten. `release.json` records the source commit, channel, bundle ID, executable, version/build, architecture, signing team, notarization ID and final archive SHA-256. The tool does not install the app, create a GitHub release or publish website links.
 
-Signed early-access prereleases may be published for independent testing once
-signing, notarisation, packaging and local regressions pass. Their notes must
-identify the remaining fresh-Mac and live workflow checks below. Do not describe
-those checks as completed or the release as generally validated.
+## Interrupted notarization and recovery evidence
 
-- Confirm the packaged version and expected developer identity.
-- Download the candidate through a browser on a separate Mac or clean account.
-  Verify its checksum, normal Gatekeeper opening, and first-run permissions.
-  A shell extraction or synthetic quarantine attribute is not this test.
-- Voice: initial model download, live microphone start/stop, transcription,
-  clipboard-only mode, optional Accessibility paste into a harmless TextEdit
-  document, focus-change protection, reading and audio export, restart/history.
-- StageMark: menu controls, global shortcuts, draw/erase/undo, board persistence,
-  timer, pointer/click effects, display changes and real screen sharing.
-- Publish a new GitHub version with the final ZIP and SHA256SUMS.txt; download
-  back and compare the digest. Then update the website's versioned links.
+Each output directory retains `candidate.json`, `signature.txt`, the exact `submission.zip`, `submission-SHA256SUMS.txt` and, once Apple returns it, `submission.json`. Later evidence includes `notarization.json` and `notarization-log.json`. `submission.zip` is the submitted, unstapled candidate; it is not the final public download.
 
-## Mac App Store is a separate distribution target
+An interrupted observation is not a rejected submission. Read the saved submission ID and inspect that same submission before considering another release run:
 
-Developer ID notarization does not create an App Store listing. Store releases
-need App Sandbox, a registered App ID, appropriate Mac App Distribution and
-Installer Distribution certificates/profiles, an App Store Connect record,
-screenshots, privacy/support metadata, upload validation and Apple review.
+```sh
+xcrun notarytool info SUBMISSION_ID \
+  --keychain-profile Workbench --output-format json
+xcrun notarytool wait SUBMISSION_ID --keychain-profile Workbench
+xcrun notarytool log SUBMISSION_ID \
+  --keychain-profile Workbench PATH_TO_SAVED_LOG.json
+```
 
-Voice's current `TextDelivery.swift` reads other apps through Accessibility and
-posts paste keystrokes. Apple lists assistive Accessibility APIs as incompatible
-with App Sandbox. A store edition needs an explicit copy/manual-paste workflow
-or a supported alternative, plus sandbox-safe audio rendering/export and model
-storage/download validation. Do not silently remove automatic paste from the
-direct-download app.
+Use `wait` only while that submission remains in progress. Check the saved submission checksum before recovering its bytes. After acceptance, recovery must staple the app extracted from those exact bytes and repeat the signature, ticket, Gatekeeper, final-archive extraction and checksum gates above. The script preserves recovery evidence but does not automatically resume an old directory. Do not rerun it merely because waiting was interrupted, and do not publish `submission.zip` or a partially verified archive. If Apple rejected the candidate, inspect the saved log, fix the cause and make a new clean candidate.
 
-StageMark is the smaller store candidate, but global pointer/click observation,
-hotkeys, cross-display overlays, launch at login and shared Workbench preferences
-must be tested in a sandboxed build. Passing non-sandboxed tests does not establish
-store compatibility. Apple review remains an external release gate.
+## Native acceptance and publication
 
-Sources: [Apple notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution),
-[App Sandbox](https://developer.apple.com/documentation/security/protecting-user-data-with-app-sandbox).
+A signed, notarized Preview may be published as a GitHub **prerelease** for independent testing after packaging and local regressions pass. Its notes must state the remaining fresh-Mac and live workflow checks. Keep stable production download links unchanged until production has its own accepted release.
+
+- Download the final channel ZIP through a browser on another Mac or clean account. Verify its SHA-256, expected app identity, normal Gatekeeper opening and first-run permissions. Shell extraction alone is not this test.
+- Verify one app and one menu-bar icon; home-window reopen/close behavior; onboarding; shortcut recording, conflicts and practice; and safe switching between speech, drawing and presenting.
+- Voice: first model download, microphone start/stop/cancel, transcription, clipboard-only delivery, optional Accessibility paste into a harmless TextEdit document, focus protection, reading/export, and restart/history.
+- Annotation: draw/erase/undo, pointer effects, saved boards, timer, display changes and real screen sharing.
+- Present: scene and logo persistence, USB device selection/reconnection and actual video, full-screen start/end, and the separate QuickTime/iPhone Mirroring launch paths where supported.
+- Confirm Preview preserves existing production/legacy apps and saved data. Never imply unperformed hardware or fresh-Mac tests passed.
+- Publish only the final channel ZIP and `SHA256SUMS.txt` as public download assets. Keep the release evidence with the maintainer. Download the published asset back and compare its digest before updating the landing page's matching channel link.
+
+To update production in place from a finished notarized release:
+
+```sh
+python3 scripts/release/preview.py install --production \
+  --archive "PATH_TO_NOTARIZED_WORKBENCH.zip" --no-open
+```
+
+That installer validates the production identity, Developer ID signature, notarization ticket and Gatekeeper. It does not build an ad-hoc production replacement.
+
+## App Store scope
+
+This is the Developer ID direct-download workflow. It performs no App Store Connect, submission or listing operations. A future App Store edition needs separate sandbox and distribution validation; this release does not establish that compatibility.
+
+Reference: [Apple's notarization guidance](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).

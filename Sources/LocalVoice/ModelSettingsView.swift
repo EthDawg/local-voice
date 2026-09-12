@@ -51,6 +51,8 @@ struct ModelSettingsView: View {
                     }
                     Text("OpenAI-compatible audio transcription · WAV, M4A, MP3 or FLAC · up to 64 MB · 3-minute timeout")
                         .font(.caption).foregroundStyle(.secondary)
+                    Text("Some servers, including whisper.cpp, load their model when they start. For those servers, change the model in the server itself; this name alone does not switch it.")
+                        .font(.caption).foregroundStyle(.secondary)
                     Text("Workbench connects only to loopback addresses and never follows redirects. Your server controls whether it forwards audio elsewhere. Start it before recording; applying settings does not test its model.")
                         .font(.caption).foregroundStyle(.secondary)
                 }

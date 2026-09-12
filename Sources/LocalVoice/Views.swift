@@ -14,7 +14,7 @@ struct ContentView: View {
             if !embedded { sidebar }
             VStack(alignment: .leading, spacing: 24) {
                 HStack {
-                    Label(model.page == "speak" && model.readingProvider == .speko ? "SPEKO · ONLINE READING" : "ON YOUR MAC", systemImage: model.page == "speak" && model.readingProvider == .speko ? "network" : "lock.shield").font(.system(size: 10, weight: .semibold)).tracking(1.6).foregroundStyle(mint)
+                    Label(model.page == "speak" && model.readingProvider == .speko ? "SPEKO · ONLINE READING" : "SPEECH & TEXT", systemImage: model.page == "speak" && model.readingProvider == .speko ? "network" : "waveform").font(.system(size: 10, weight: .semibold)).tracking(1.6).foregroundStyle(mint)
                     Spacer()
                     ShortcutControl(model: model, id: 1, title: "Dictation").frame(width: 300)
                 }
@@ -103,19 +103,21 @@ struct ContentView: View {
             heading("Speak your mind.", "Turn a thought into text. Record here, or use the shortcut from any app.")
             HStack(spacing: 22) {
                 Button { model.toggleRecording() } label: {
-                    Image(systemName: model.phase == .recording ? "stop.fill" : "mic.fill")
+                    Image(systemName: model.phase == .requesting ? "xmark" : model.phase == .recording ? "stop.fill" : "mic.fill")
                         .font(.system(size: 27)).frame(width: 66, height: 66)
                         .foregroundStyle(ink).background(model.phase == .recording ? Color.red.opacity(0.9) : mint, in: Circle())
-                }.buttonStyle(.plain).disabled(!model.ready || model.phase == .transcribing || model.phase == .requesting || model.phase == .cleaning || model.rendering)
-                    .accessibilityLabel(model.phase == .recording ? "Stop recording" : "Start recording")
+                }.buttonStyle(.plain).disabled(!model.ready || model.phase == .transcribing || model.phase == .cleaning || model.rendering)
+                    .accessibilityLabel(model.phase == .requesting ? "Cancel microphone request" : model.phase == .recording ? "Stop recording" : "Start recording")
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(model.phase == .recording ? "Listening to you" : model.phase == .cleaning ? "Tidying your words…" : model.phase == .transcribing ? "Finding your words…" : "Ready for your next thought")
+                    Text(model.phase == .requesting ? "Waiting for microphone access" : model.phase == .recording ? "Listening to you" : model.phase == .cleaning ? "Tidying your words…" : model.phase == .transcribing ? "Finding your words…" : "Ready for your next thought")
                         .font(.system(size: 16, weight: .medium))
                     HStack(spacing: 10) {
                         if model.phase == .recording {
                             WaveBars(level: model.level).frame(width: 100, height: 22)
                             Text(time(model.elapsed)).monospacedDigit()
                             Button("Discard") { model.cancelRecording() }.buttonStyle(.plain).foregroundStyle(.secondary)
+                        } else if model.phase == .requesting {
+                            Text("Allow access in the macOS prompt, or cancel this attempt.")
                         } else if model.phase == .transcribing || model.phase == .cleaning || model.preparing {
                             ProgressView().controlSize(.small)
                             Text(model.preparing ? "Preparing your speech engine" : "Transcribing with your selected engine")
