@@ -71,6 +71,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     @Published var speechText = "" { didSet { persist() } }
     @Published var history: [Transcript] = []
     @Published var replacements: [Replacement] = []
+    @Published private(set) var rememberedCorrection: RememberedCorrection?
     @Published var voice = "Karen" { didSet { persist() } }
     @Published var rate = 180.0 { didSet { persist() } }
     @Published var elapsed = 0.0
@@ -296,6 +297,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     }
 
     private func captureSettings() -> CaptureSettings {
+        rememberedCorrection = nil
         let settings = CaptureSettings(preferences: preferences, cleanup: CleanupConfigurationStore().snapshot(), replacements: replacements)
         captureOutputModeLabel = settings.outputLabel
         captureShortcutInstruction = captureUsesHoldShortcut
@@ -415,9 +417,10 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         onPhaseChange?()
     }
     func openTranscript(_ item: Transcript) {
+        rememberedCorrection = nil
         transcript = item.text; rawTranscript = item.rawText ?? item.text; cleanupMethod = item.cleanupMethod ?? "Original"; page = "dictate"; persist()
     }
-    func useOriginal() { transcript = rawTranscript; cleanupMethod = "Original restored"; status = "Original transcript restored."; persist() }
+    func useOriginal() { rememberedCorrection = nil; transcript = rawTranscript; cleanupMethod = "Original restored"; status = "Original transcript restored."; persist() }
     func requestAccessibility() {
         let key = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         accessibilityGranted = AXIsProcessTrustedWithOptions([key: true] as CFDictionary)
@@ -503,9 +506,46 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     func addReplacement(heard: String, written: String) {
         let heard = heard.trimmingCharacters(in: .whitespacesAndNewlines), written = written.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !heard.isEmpty, !written.isEmpty else { return }
+        rememberedCorrection = nil
         replacements.append(Replacement(heard: heard, written: written)); persist()
     }
-    func removeReplacement(_ item: Replacement) { replacements.removeAll { $0.id == item.id }; persist() }
+    func removeReplacement(_ item: Replacement) { rememberedCorrection = nil; replacements.removeAll { $0.id == item.id }; persist() }
+
+    // Save the complete prospective session before publishing success. A failed
+    // write leaves the draft, dictionary and receipt unchanged for a safe retry.
+    func rememberCorrection(heard: String, written: String, expectedDraft: String) throws {
+        guard loaded else { throw VoiceError.message("Session saving is unavailable. Reopen Workbench before remembering a correction.") }
+        guard phase == .idle else { throw VoiceError.message("Finish the current dictation before remembering a correction.") }
+        guard transcript == expectedDraft else { throw VoiceError.message("The draft changed. Close this sheet and review the new draft first.") }
+        let proposal = try CorrectionRule.propose(heard: heard, written: written, draft: transcript, replacements: replacements)
+        guard !proposal.isAlreadyRemembered || proposal.changesDraft else { return }
+        let beforeRules = replacements
+        try store.save(SavedState(draft: proposal.previewText, speechText: speechText, history: history,
+                                  replacements: proposal.updatedRules, voice: voice, rate: rate, rawDraft: rawTranscript))
+        persistWork?.cancel()
+        replacements = proposal.updatedRules
+        if proposal.changesDraft { transcript = proposal.previewText }
+        rememberedCorrection = RememberedCorrection(written: proposal.rule.written, beforeRules: beforeRules,
+            afterRules: replacements, beforeDraft: expectedDraft, afterDraft: transcript, appliedRevision: draftRevision)
+        status = proposal.changesDraft ? "Correction saved. This draft is updated; copy it when you’re ready." : "Correction saved for future dictations."
+    }
+
+    func undoRememberedCorrection() throws {
+        guard let receipt = rememberedCorrection else { return }
+        guard loaded, phase == .idle else { throw VoiceError.message("Finish the current dictation before undoing the correction.") }
+        guard replacements == receipt.afterRules else { throw VoiceError.message("Your dictionary has changed. Review the correction in Dictionary instead.") }
+        // A revision check also protects edits that return to the same string.
+        let restoreDraft = draftRevision == receipt.appliedRevision && transcript == receipt.afterDraft
+        let draft = restoreDraft ? receipt.beforeDraft : transcript
+        try store.save(SavedState(draft: draft, speechText: speechText, history: history,
+                                  replacements: receipt.beforeRules, voice: voice, rate: rate, rawDraft: rawTranscript))
+        persistWork?.cancel()
+        replacements = receipt.beforeRules
+        if transcript != draft { transcript = draft }
+        rememberedCorrection = nil
+        status = restoreDraft ? "Correction undone." : "Dictionary change undone. Your newer draft edits are kept."
+    }
+    func dismissRememberedCorrection() { rememberedCorrection = nil }
     func removeTranscript(_ item: Transcript) { history.removeAll { $0.id == item.id }; persist() }
     func fail(_ text: String) {
         if phase != .idle { captureFailure = text }

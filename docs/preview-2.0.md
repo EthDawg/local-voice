@@ -1,6 +1,6 @@
 # Workbench 2 Preview: current evidence
 
-Updated 12 September 2026. Voice and StageMark share one app. The final signed local
+Updated 13 September 2026. Voice and StageMark share one app. The final signed local
 package and full regression run passed, and the Preview was installed. The evaluation prerelease is published; the hardware limits below remain.
 Publication does not mean all acceptance checks pass.
 
@@ -114,3 +114,9 @@ archive is Developer ID signed with hardened runtime and a secure timestamp,
 but **not notarized**. It is outside the normal notarized release pipeline and
 may be blocked by Gatekeeper on a fresh download. No human co-maintainer approval
 is claimed; the implementation pull request remains a draft.
+
+## Correction increment: 2.0.0-preview.2
+
+This increment adds **Remember correction…** to transcript review, with explicit heard/preferred spelling, exact draft preview, reuse of the local dictionary and Undo that preserves newer edits. Earlier captures and recognizer originals stay unchanged; saving does not paste again. See the [comparison, decision and checks](dictation-comparison.md).
+
+The complete local regression suite passed again, including 43 correction-rule and 43 transaction checks. Native interface checks used production UI and methods with synthetic, in-memory state. Signed packaging and native Shortcuts metadata validation passed. Apple submission and notarization remain on hold. The release asset manifest records the final source and archive identity; earlier Preview evidence above remains dated historical evidence.

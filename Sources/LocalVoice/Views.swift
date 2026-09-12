@@ -9,6 +9,10 @@ struct ContentView: View {
     @ObservedObject var model: AppModel
     var embedded = false
     @State private var showOriginal = false
+    @State private var showCorrection = false
+    @State private var selectedCorrection = ""
+    @State private var correctionSeed = ""
+    @State private var correctionDraft = ""
     var body: some View {
         HStack(spacing: 0) {
             if !embedded { sidebar }
@@ -56,6 +60,11 @@ struct ContentView: View {
             }.padding(24).frame(width: 560, height: 380)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in model.refreshPermissions() }
+        .sheet(isPresented: $showCorrection) {
+            RememberCorrectionView(model: model, heard: correctionSeed, draft: correctionDraft)
+        }
+        .modifier(CorrectionSelectionObserver(transcript: model.transcript,
+            active: model.page == "dictate" && !showCorrection, selection: $selectedCorrection))
     }
 
     private var sidebar: some View {
@@ -131,10 +140,29 @@ struct ContentView: View {
                 HStack {
                     Text("YOUR WORDS").font(.system(size: 10, weight: .semibold)).tracking(1.6).foregroundStyle(.secondary)
                     Spacer()
+                    Button("Remember correction…") {
+                        correctionSeed = selectedCorrection
+                        correctionDraft = model.transcript
+                        showCorrection = true
+                    }.disabled(model.transcript.isEmpty || model.phase != .idle)
+                        .help("Select a mistaken word or phrase, then remember its spelling for future dictations.")
                     Button("Original…") { showOriginal = true }.disabled(model.rawTranscript.isEmpty)
                     Text("\(TextRules.wordCount(model.transcript)) words").font(.system(size: 11)).foregroundStyle(.tertiary)
                 }
                 editor(text: $model.transcript, placeholder: "Your transcript will appear here.\nYou can edit it before copying or saving.", label: "Transcript")
+                if let correction = model.rememberedCorrection {
+                    HStack(spacing: 10) {
+                        Image(systemName: "text.book.closed").foregroundStyle(mint).accessibilityHidden(true)
+                        Text("Remembered “\(correction.written)”").lineLimit(2)
+                        Spacer()
+                        Button("Undo") {
+                            do { try model.undoRememberedCorrection() }
+                            catch { model.error = error.localizedDescription }
+                        }.disabled(model.phase != .idle)
+                        Button { model.dismissRememberedCorrection() } label: { Image(systemName: "xmark") }
+                            .buttonStyle(.plain).accessibilityLabel("Dismiss remembered correction")
+                    }.font(.system(size: 12)).padding(12).background(mint.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+                }
             }.frame(maxHeight: .infinity)
             HStack(spacing: 12) {
                 Button { model.copyTranscript() } label: { Label("Copy text", systemImage: "doc.on.doc") }.buttonStyle(PrimaryButton()).disabled(model.transcript.isEmpty)
