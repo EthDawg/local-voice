@@ -39,6 +39,12 @@ Microphone capture is capped at five minutes; file import at 30 minutes. Very sh
 
 Automatic paste checks both the original application and accessibility field immediately before delivery, excludes secure fields, and never submits. Captures are saved before delivery. Clipboard restoration requires confirmed insertion and unchanged clipboard ownership; uncertainty leaves the transcript copied for recovery.
 
+The fixed-size, nonactivating `CapturePanel` exposes recording, processing, cancellation, failure and delivery states without displaying transcript text. `AppModel` retains the transcription task and invocation ID, checks cancellation after each asynchronous stage, and keeps the capture gate closed until an engine unwinds. Delivery follows the history commit and is not offered as cancellable. Manual cleanup also guards the draft revision so a delayed result cannot overwrite newer edits.
+
+`TextDelivery.Outcome` distinguishes a successful copy, confirmed insertion and an attempted but unconfirmed paste. `ClipboardReceiptModel` stores only delivery metadata and the clipboard generation returned by Workbench's write. It checks that generation while a receipt exists, clears stale cues when another copy occurs, and never reads unrelated clipboard text. Automatic receipts expire after eight seconds for copy or four for confirmed paste; still-current clipboard metadata remains in quick controls. Pinning extends the HUD until dismissal or clipboard change. A typed paste-attempt flag prevents duplicate-paste suggestions. The menu-bar icon exposes current readiness after the floating receipt hides.
+
+`PresentationControlsPolicy` reveals controls only on entering the top 24 points or an explicit command. Four seconds of idle time hides them; toolbar hover, keyboard focus, a source sheet, session pinning or VoiceOver retains them. Command-Slash is handled by the presentation window even when SwiftUI removes the toolbar. Source state comes from the capture model, with fitting details in the Source sheet. Reduce Motion and Reduce Transparency are honoured. Beginning a StageKit interaction dismisses any voice receipt HUD. Window layering is not a guarantee of exclusion from a screen share.
+
 ## Replaceable recognition and reading
 
 `RecognitionEngine` snapshots configuration per request, prevents concurrent transcription, and rejects configuration changes during preparation/transcription. The UI disables model changes while the voice workflow is busy. Provider changes release unused in-memory Parakeet state but retain its downloaded cache.

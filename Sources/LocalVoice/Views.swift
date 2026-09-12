@@ -106,10 +106,10 @@ struct ContentView: View {
                     Image(systemName: model.phase == .requesting ? "xmark" : model.phase == .recording ? "stop.fill" : "mic.fill")
                         .font(.system(size: 27)).frame(width: 66, height: 66)
                         .foregroundStyle(ink).background(model.phase == .recording ? Color.red.opacity(0.9) : mint, in: Circle())
-                }.buttonStyle(.plain).disabled(!model.ready || model.phase == .transcribing || model.phase == .cleaning || model.rendering)
+                }.buttonStyle(.plain).disabled(!model.ready || ![.idle, .requesting, .recording].contains(model.phase) || model.rendering)
                     .accessibilityLabel(model.phase == .requesting ? "Cancel microphone request" : model.phase == .recording ? "Stop recording" : "Start recording")
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(model.phase == .requesting ? "Waiting for microphone access" : model.phase == .recording ? "Listening to you" : model.phase == .cleaning ? "Tidying your words…" : model.phase == .transcribing ? "Finding your words…" : "Ready for your next thought")
+                    Text(model.phase == .requesting ? "Waiting for microphone access" : model.phase == .recording ? "Listening to you" : model.phase == .cleaning ? "Tidying your words…" : model.phase == .transcribing ? "Finding your words…" : model.phase == .delivering ? "Delivering text…" : model.phase == .cancelling ? "Cancelling…" : "Ready for your next thought")
                         .font(.system(size: 16, weight: .medium))
                     HStack(spacing: 10) {
                         if model.phase == .recording {
@@ -118,9 +118,10 @@ struct ContentView: View {
                             Button("Discard") { model.cancelRecording() }.buttonStyle(.plain).foregroundStyle(.secondary)
                         } else if model.phase == .requesting {
                             Text("Allow access in the macOS prompt, or cancel this attempt.")
-                        } else if model.phase == .transcribing || model.phase == .cleaning || model.preparing {
+                        } else if [.transcribing, .cleaning, .delivering, .cancelling].contains(model.phase) || model.preparing {
                             ProgressView().controlSize(.small)
-                            Text(model.preparing ? "Preparing your speech engine" : "Transcribing with your selected engine")
+                            Text(model.preparing ? "Preparing your speech engine" : model.phase == .cancelling ? "Waiting for the speech engine to stop" : model.phase == .delivering ? "Checking the destination" : model.captureProcessingLabel)
+                            if model.canCancelCurrentCapture { Button("Cancel") { model.cancelCurrentCapture() } }
                         } else { Text("Click the microphone or use \(model.preferences.dictationShortcut.label)") }
                     }.font(.system(size: 11)).foregroundStyle(.secondary)
                 }
@@ -284,6 +285,7 @@ struct PrimaryButton: ButtonStyle {
 }
 struct WaveBars: View {
     let level: Double
-    var body: some View { HStack(spacing: 3) { ForEach(0..<16) { index in RoundedRectangle(cornerRadius: 2).fill(mint).frame(width: 3, height: 3 + level * Double([10, 18, 12, 22, 15, 24, 16, 10][index % 8])) } }.animation(.easeOut(duration: 0.1), value: level) }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View { HStack(spacing: 3) { ForEach(0..<16) { index in RoundedRectangle(cornerRadius: 2).fill(mint).frame(width: 3, height: 3 + level * Double([10, 18, 12, 22, 15, 24, 16, 10][index % 8])) } }.animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: level) }
 }
 func time(_ seconds: Double) -> String { String(format: "%d:%02d", max(0, Int(seconds)) / 60, max(0, Int(seconds)) % 60) }

@@ -138,6 +138,9 @@ struct WorkbenchQuickPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             WorkbenchHeader(title: "Workbench", subtitle: "A little less friction.", symbol: "square.stack.3d.up.fill")
+            WorkbenchClipboardShelf(receipts: model.clipboardReceipt, review: { model.clipboardReceipt.dismissHUD(); open("history") }, showCue: {
+                model.onCloseMenu?(); model.clipboardReceipt.revealHUD()
+            })
             Button { model.onMenuRecording?() } label: {
                 HStack { Label(model.phase == .requesting ? "Cancel microphone request" : model.phase == .recording ? "Finish dictation" : "Dictate", systemImage: model.phase == .requesting ? "xmark" : model.phase == .recording ? "stop.fill" : "mic"); Spacer(); Text(model.preferences.dictationShortcut.label).font(.caption.monospaced()) }
             }.buttonStyle(.borderedProminent).controlSize(.large)
@@ -153,5 +156,31 @@ struct WorkbenchQuickPanel: View {
     }
     private func quick(_ title: String, _ symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { Label(title, systemImage: symbol).frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 3) }.buttonStyle(.plain)
+    }
+}
+
+private struct WorkbenchClipboardShelf: View {
+    @ObservedObject var receipts: ClipboardReceiptModel
+    let review: () -> Void
+    let showCue: () -> Void
+    var body: some View {
+        if let receipt = receipts.receipt, receipt.isClipboardCurrent {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label(receipt.canSuggestPaste ? "Ready to paste" : receipt.title, systemImage: receipt.symbolName)
+                        .font(.callout.weight(.semibold)).lineLimit(1)
+                    Spacer(minLength: 4)
+                    if receipt.canSuggestPaste { Text("⌘V").font(.callout.monospaced()).foregroundStyle(.secondary) }
+                }
+                Text(receipt.canSuggestPaste ? "\(receipt.wordCount) words from Workbench. Paste where you need them." : receipt.detail)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                HStack {
+                    Button("Review text", action: review)
+                    Spacer()
+                    Button("Show cue", action: showCue)
+                }.controlSize(.small)
+            }.padding(12)
+                .background(Workbench.accent.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+        }
     }
 }

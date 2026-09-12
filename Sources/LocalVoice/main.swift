@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import Carbon
 import AVFoundation
+import Combine
 import StageKit
 
 @MainActor
@@ -18,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     var keyboard: KeyboardCoachModel!
     var shortcutsSuspended = false
     var navigationObserver: NSObjectProtocol?
+    var receiptObservations = Set<AnyCancellable>()
+    private var receiptStatus: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Workbench.preparePreviewData(component: "LocalVoice", files: ["state.json", "demo-library.json"])
@@ -29,7 +32,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             return self.model.phase == .idle && !self.model.rendering && !self.shortcutsSuspended
         }
         stage.onEditShortcuts = { [weak self] in self?.navigate("shortcuts") }
-        stage.onBeginActivity = { [weak self] in self?.closeControls(); self?.window?.orderOut(nil) }
+        stage.onBeginActivity = { [weak self] in
+            guard let self else { return }
+            self.closeControls()
+            self.model.previewingPanel = false
+            self.model.dismissCaptureFailure()
+            self.model.clipboardReceipt.dismissHUD()
+            self.window?.orderOut(nil)
+        }
         stage.validateExternalShortcut = { [weak self] code, modifiers in
             guard let self else { return nil }
             for id in [UInt32(1), 2, 3] {
@@ -90,6 +100,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             Task { @MainActor in self?.navigate(page) }
         }
         setupMenus(); registerShortcuts(); showWindow()
+        model.clipboardReceipt.$receipt.receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                let receipt = self.model.clipboardReceipt.receipt
+                if receipt != nil { self.receiptStatus = self.model.status }
+                else {
+                    if self.model.phase == .idle, let previous = self.receiptStatus, self.model.status == previous {
+                        self.model.status = "Ready when you are."
+                    }
+                    self.receiptStatus = nil
+                }
+                self.updateRecordingUI()
+            }
+            .store(in: &receiptObservations)
     }
     func registerShortcuts() {
         guard model.editingShortcut == nil, !shortcutsSuspended else { return }
@@ -195,12 +219,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         guard !text.isEmpty, model.phase == .idle else { return }
         resumeTarget { [weak self] target in
             guard let self else { return }
-            Task { self.model.status = await TextDelivery.deliver(text, target: target, mode: .paste, restoreClipboard: self.model.preferences.restoreClipboard) }
+            guard self.model.phase == .idle else { return }
+            self.model.clipboardReceipt.clear(); self.model.dismissCaptureFailure()
+            self.model.phase = .delivering; self.model.onPhaseChange?()
+            Task {
+                let outcome = await TextDelivery.deliver(text, target: target, mode: .paste, restoreClipboard: self.model.preferences.restoreClipboard)
+                self.model.status = outcome.message
+                self.model.clipboardReceipt.record(outcome: outcome, wordCount: TextRules.wordCount(text))
+                self.model.phase = .idle; self.model.onPhaseChange?()
+            }
         }
     }
     func updateRecordingUI() {
-        statusItem?.button?.image = NSImage(systemSymbolName: model.phase == .recording ? "mic.fill" : "square.stack.3d.up", accessibilityDescription: "Workbench")
-        statusItem?.button?.toolTip = "Workbench · " + model.preferences.controlsShortcut.label
+        let receipt = model.clipboardReceipt.receipt
+        let symbol: String
+        let state: String
+        switch model.phase {
+        case .recording: symbol = "mic.fill"; state = "Recording"
+        case .requesting: symbol = "mic.badge.plus"; state = "Starting microphone"
+        case .transcribing, .cleaning: symbol = "waveform"; state = "Processing speech"
+        case .delivering: symbol = "arrow.up.doc"; state = "Delivering text"
+        case .cancelling: symbol = "xmark.circle"; state = "Cancelling"
+        case .idle:
+            symbol = receipt?.isClipboardCurrent == true ? "doc.on.clipboard" : "square.stack.3d.up"
+            state = receipt?.isClipboardCurrent == true ? (receipt?.title ?? "Transcript copied") : "Quick controls"
+        }
+        statusItem?.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Workbench · " + state)
+        statusItem?.button?.toolTip = "Workbench · " + state + " · " + model.preferences.controlsShortcut.label
         capturePanel?.update(model: model)
     }
     @objc func showSettings() { model.page = "settings"; showWindow() }
@@ -255,7 +300,7 @@ func runCLI(_ args: [String]) async -> Int32 {
         switch args.first {
         case "--check-core":
             try CoreChecks.run(); try CleanupChecks.run(); try DemoLibraryChecks.run(); try ProviderChecks.run()
-            try await MainActor.run { try DemoLibraryChecks.runModelChecks(); try IntegrationChecks.run(); try KeyboardCoachChecks.run() }
+            try await MainActor.run { try DemoLibraryChecks.runModelChecks(); try IntegrationChecks.run(); try KeyboardCoachChecks.run(); try ClipboardReceiptChecks.run() }
         case "--check-providers":
             try ProviderChecks.run(); try await ProviderChecks.runTransportChecks()
         case "--check-input":

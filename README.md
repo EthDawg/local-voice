@@ -33,6 +33,10 @@ The core app requires no account or subscription. Built-in Parakeet recognition 
 
 The menu-bar icon provides quick access while another app is active. The normal window is for editing and setup. Closing it leaves the utility available; **Quit Workbench** stops the app. **Open Workbench at login** is optional in Settings.
 
+During dictation, a draggable panel shows the microphone level, elapsed time and **Finish** / **Cancel**. Processing can be cancelled before the transcript is saved. The result shows **Ready to paste**, a confirmed destination, or **Paste unconfirmed**; review uncertain insertion before pasting again. Pin the receipt if useful. A clipboard cue remains in quick controls until that copied text is replaced. Only Workbench transcript copies are tracked, using clipboard change counts; other clipboard contents are not collected.
+
+During a demo, controls hide after four idle seconds. Reach the top edge or press **⌘/** in the presentation window to reveal them. **Keep controls visible** lasts for that session; **Esc** ends it. These controls may appear in a meeting screen share.
+
 Keyboard recording and practice temporarily suspend Workbench's global shortcuts. Practice counts three full presses and releases; Escape, leaving the window or changing the selected action ends the interaction. Workbench checks its own duplicates, common Mac commands and registration failures; macOS does not expose a complete list of other apps' shortcuts. The virtual keyboard uses ANSI geometry with labels from the current input layout.
 
 ## Choose your speech tools

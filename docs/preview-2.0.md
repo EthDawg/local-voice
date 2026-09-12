@@ -71,6 +71,40 @@ audio sheet or add test captures to the user's history.
   Escape ended the session and returned to the scene editor. Live USB video
   remains unverified without the video-access grant.
 
+## HUD follow-up on 12 September
+
+The locally installed Preview was exercised with its updated native recording,
+clipboard and presentation controls:
+
+- The final signed package build and full regression suite pass, including 25
+  clipboard checks and StageKit's 54 tests / 959 assertions (40 new presentation
+  visibility assertions). Run the exclusive global-shortcut tests with the
+  installed app quit; an earlier concurrent run correctly found its occupied
+  shortcuts, and the final run passed after quitting it.
+
+- The microphone-off positioning preview, live recording meter/timer and direct
+  Cancel control were visible and usable. Cancelling discarded the live test.
+- A loopback test server held a synthetic response until explicitly released.
+  Cancel from the floating processing HUD returned to idle with no session
+  change. Releasing the response afterward still left the state file unchanged.
+  This is cancellation evidence, not a speech-quality test.
+- Copying synthetic text displayed a receipt; pinning kept it visible. Quick
+  controls showed the word count and Command-V cue without transcript text.
+  Copying unrelated text through a normal native field cleared the pinned
+  receipt and the quick-controls shelf.
+- A scene-only full-screen demo hid its toolbar, left it hidden during movement
+  over the scene, revealed it at the top edge and with Command-Slash, retained
+  it when pinned, and ended with Escape. Its device-frame setting was restored.
+- The temporary provider was removed from active use and Parakeet plus the
+  prior inactive endpoint/model were restored. The test server was stopped.
+  One deliberately completed synthetic request was removed by restoring the
+  exact guarded pre-test session snapshot, preserving all 100 original history
+  entries and the original draft. Imported synthetic audio remained intact.
+
+Physical device capture, audience screen-sharing, VoiceOver interaction and
+real multiple-display changes remain separate acceptance checks. The HUD's
+placement and presentation-retention policies have synthetic test coverage.
+
 ## Still to verify or deliver
 
 - Automatic paste into a harmless target needs the new app's Accessibility

@@ -6,6 +6,7 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
     var onEnd: (() -> Void)?
     private var window: DemoStageWindow?
     private let capture: DemoCapture
+    private let controls = PresentationControlsModel()
     private let scene: DemoScene
     private let backdrop: NSImage
     private let logo: NSImage?
@@ -30,7 +31,8 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
         window.isReleasedWhenClosed = false; window.delegate = self
         window.onEscape = { [weak self] in self?.end() }
         window.onReconnect = { [weak self] in self?.capture.reconnect() }
-        window.contentView = NSHostingView(rootView: DemoStageContent(scene: scene, backdrop: backdrop, logo: logo, hand: hand, capture: capture) { [weak self] in self?.end() })
+        window.onRevealControls = { [weak self] in self?.controls.revealForKeyboard() }
+        window.contentView = NSHostingView(rootView: DemoStageContent(scene: scene, backdrop: backdrop, logo: logo, hand: hand, capture: capture, controls: controls) { [weak self] in self?.end() })
         self.window = window
         NSApp.activate(ignoringOtherApps: true); window.makeKeyAndOrderFront(nil)
         entering = true; window.toggleFullScreen(nil)
@@ -44,6 +46,7 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
         else { finish() }
     }
     private func finish() {
+        controls.stop()
         capture.stop(); releaseKeepAwake()
         window?.delegate = nil; window?.orderOut(nil); window?.contentView = nil; window?.close(); window = nil
         let callback = onEnd; onEnd = nil; callback?()
@@ -65,8 +68,14 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
 private final class DemoStageWindow: NSWindow {
     var onEscape: (() -> Void)?
     var onReconnect: (() -> Void)?
+    var onRevealControls: (() -> Void)?
     override func cancelOperation(_ sender: Any?) { onEscape?() }
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if PresentationControlsPolicy.isRevealCommand(characters: event.charactersIgnoringModifiers,
+            command: event.modifierFlags.contains(.command), option: event.modifierFlags.contains(.option),
+            control: event.modifierFlags.contains(.control)) {
+            onRevealControls?(); return true
+        }
         if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
            event.charactersIgnoringModifiers?.lowercased() == "r" {
             onReconnect?(); return true
@@ -78,18 +87,63 @@ private final class DemoStageWindow: NSWindow {
     }
 }
 
+/// AppKit owns the reveal command so it remains available while the toolbar
+/// is absent from the SwiftUI hierarchy. All state updates are on the main queue.
+private final class PresentationControlsModel: ObservableObject {
+    @Published private(set) var policy = PresentationControlsPolicy()
+    @Published private(set) var focusRequest = 0
+    private var hideWork: DispatchWorkItem?
+    private var voiceOverObservation: NSKeyValueObservation?
+    private var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
+
+    func start() {
+        setHold(.voiceOver, active: NSWorkspace.shared.isVoiceOverEnabled)
+        voiceOverObservation = NSWorkspace.shared.observe(\.isVoiceOverEnabled, options: [.new]) { [weak self] workspace, _ in
+            let enabled = workspace.isVoiceOverEnabled
+            DispatchQueue.main.async { self?.setHold(.voiceOver, active: enabled) }
+        }
+        reveal()
+    }
+    func stop() { hideWork?.cancel(); hideWork = nil; voiceOverObservation = nil }
+    func reveal() { policy.reveal(at: now); scheduleHide() }
+    func revealForKeyboard() { reveal(); focusRequest += 1 }
+    func setHold(_ hold: PresentationControlsPolicy.Hold, active: Bool) {
+        guard policy.holds.contains(hold) != active else { return }
+        policy.setHold(hold, active: active, at: now); scheduleHide()
+    }
+    func pointerMoved(y: CGFloat?) {
+        var next = policy
+        next.pointerMoved(y: y.map(Double.init), at: now)
+        guard next != policy else { return }
+        policy = next; scheduleHide()
+    }
+    private func scheduleHide() {
+        hideWork?.cancel(); hideWork = nil
+        guard let deadline = policy.hideDeadline else { return }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.policy.hideIfDue(at: self.now)
+        }
+        hideWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + max(0, deadline - now), execute: work)
+    }
+    deinit { hideWork?.cancel() }
+}
+
 private struct DemoStageContent: View {
+    private enum Control: Hashable { case source, reconnect, pin, end, deviceSource, deviceReconnect }
     let scene: DemoScene
     let backdrop: NSImage
     let logo: NSImage?
     let hand: NSImage?
     @ObservedObject var capture: DemoCapture
+    @ObservedObject var controls: PresentationControlsModel
     let end: () -> Void
-    @State private var controlsVisible = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var fitToSource = true
-    @State private var hideControls: DispatchWorkItem?
     @State private var choosingSource = false
-    @State private var hoveringControls = false
+    @FocusState private var focusedControl: Control?
     private var liveScene: DemoScene {
         var value = scene
         if fitToSource, capture.dimensions.height > 0 {
@@ -99,61 +153,129 @@ private struct DemoStageContent: View {
         }
         return value
     }
+    private var sourceName: String {
+        guard scene.showsPhone else { return "Saved scene" }
+        return capture.sources.first(where: { $0.id == capture.selectedID })?.name
+            ?? (capture.selectedID == nil ? "Choose a source" : "Selected device")
+    }
+    private var sourceStatus: String {
+        guard scene.showsPhone else { return "Scene only" }
+        if capture.live { return "Live" }
+        if capture.selectedID == nil { return "No device" }
+        if !capture.sources.contains(where: { $0.id == capture.selectedID }) { return "Waiting for device" }
+        // Permission, negotiation and reconnect states have more precise detail
+        // in capture.message. Do not label an unverified feed as live.
+        return "Not live"
+    }
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .topTrailing) {
                 DemoStageSurface(scene: liveScene, image: backdrop, logo: logo, hand: hand, previewLayer: capture.previewLayer, live: capture.live)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .onTapGesture { focusedControl = nil }
                 if scene.showsPhone && !capture.live {
                     let viewport = ViewportGeometry(scene: liveScene, size: geometry.size).screen
                     VStack(spacing: 14) {
                         Image(systemName: "cable.connector").font(.largeTitle)
                         Text(capture.message).font(.body).multilineTextAlignment(.center)
-                        Button("Choose source…") { choosingSource = true; showControls() }
-                        Button("Reconnect") { capture.reconnect() }
+                        Button("Choose source…", action: openSource).focused($focusedControl, equals: .deviceSource)
+                        Button("Reconnect") { capture.reconnect() }.focused($focusedControl, equals: .deviceReconnect)
                     }.padding(20).frame(width: max(120, viewport.width - 20))
                         .foregroundStyle(.white)
                         .position(x: viewport.midX, y: geometry.size.height - viewport.midY)
                 }
-                if controlsVisible || choosingSource {
-                    HStack(spacing: 14) {
-                        if scene.showsPhone {
-                            Button("Source…") { choosingSource = true }
-                            Button("Reconnect") { capture.reconnect(); showControls() }.help("Reconnect device · ⌘R")
-                            Toggle("Match device proportions", isOn: $fitToSource).toggleStyle(.checkbox)
-                        }
-                        Button("End demo · Esc", action: end).keyboardShortcut(.cancelAction)
-                    }.padding(12).background(.ultraThickMaterial, in: RoundedRectangle(cornerRadius: 12)).padding(18)
-                        .onHover { hoveringControls = $0; showControls() }
+                if controls.policy.isVisible {
+                    toolbar.frame(maxWidth: 620).padding(18).transition(.opacity)
                 }
             }.background(.black)
-                .onContinuousHover { phase in if case .active = phase { showControls() } }
-                .onAppear { showControls() }
-                .onDisappear { hideControls?.cancel() }
-                .sheet(isPresented: $choosingSource) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        HStack { Text("Device screen").font(.title2.bold()); Spacer(); Button("Done") { choosingSource = false; showControls() } }
-                        Text("Connect an unlocked iPhone or iPad by USB and trust this Mac. External video sources also work; Android needs a compatible video feed.").foregroundStyle(.secondary)
-                        NativePresentationApps { capture.reportNotice($0) }
-                        if capture.sources.isEmpty { Text("No external sources found.") }
-                        ForEach(capture.sources) { source in
-                            Button {
-                                capture.select(source.id); choosingSource = false; showControls()
-                            } label: {
-                                HStack { Image(systemName: source.isScreen ? "iphone" : "video"); Text(source.name); Spacer(); if capture.selectedID == source.id { Image(systemName: "checkmark") } }
-                            }.buttonStyle(.bordered)
-                        }
-                        Text(capture.message).font(.caption).foregroundStyle(.secondary)
-                        Button("Refresh devices") { capture.refresh() }
-                    }.padding(24).frame(width: 460)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: controls.policy.isVisible)
+                .onContinuousHover { phase in
+                    switch phase {
+                    case .active(let location): controls.pointerMoved(y: location.y)
+                    case .ended: controls.pointerMoved(y: nil)
+                    }
                 }
+                .onAppear { controls.start() }
+                .onDisappear { controls.stop() }
+                .onChange(of: focusedControl) { _, value in controls.setHold(.keyboardFocus, active: value != nil) }
+                .onChange(of: controls.focusRequest) { _, _ in focusedControl = scene.showsPhone ? .source : .pin }
+                .onChange(of: choosingSource) { _, value in controls.setHold(.sheet, active: value) }
+                .sheet(isPresented: $choosingSource) { sourceSheet }
         }.ignoresSafeArea()
     }
-    private func showControls() {
-        controlsVisible = true; hideControls?.cancel()
-        guard !hoveringControls, !choosingSource else { return }
-        let work = DispatchWorkItem { controlsVisible = false }
-        hideControls = work; DispatchQueue.main.asyncAfter(deadline: .now() + 3, execute: work)
+    private var toolbar: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Label(sourceStatus, systemImage: capture.live && scene.showsPhone ? "circle.fill" : "circle")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(capture.live && scene.showsPhone ? Color.green : Color.secondary)
+                    Text(sourceName).font(.callout.weight(.medium)).lineLimit(1).frame(maxWidth: 190, alignment: .leading)
+                }.help(scene.showsPhone ? capture.message : "Showing your saved scene without a device feed")
+                    .accessibilityElement(children: .combine)
+                if scene.showsPhone {
+                    Button("Source…", action: openSource).focused($focusedControl, equals: .source)
+                    Button("Reconnect") { capture.reconnect(); controls.reveal() }
+                        .focused($focusedControl, equals: .reconnect).help("Reconnect device · ⌘R")
+                }
+                Button("End demo · Esc", action: end).keyboardShortcut(.cancelAction)
+                    .focused($focusedControl, equals: .end)
+                    .accessibilityLabel("End demo").accessibilityHint("Escape also ends the demo")
+            }
+            HStack(spacing: 16) {
+                Toggle("Keep controls visible", isOn: Binding(
+                    get: { controls.policy.holds.contains(.pinned) },
+                    set: { controls.setHold(.pinned, active: $0) }))
+                    .toggleStyle(.checkbox).focused($focusedControl, equals: .pin)
+                    .help("Keep these controls visible for this demo")
+                Spacer(minLength: 0)
+                Text("Top edge or ⌘/ to show").foregroundStyle(.secondary)
+                    .accessibilityLabel("Move to the top edge or press Command Slash to show controls")
+            }.font(.caption)
+        }.padding(12)
+            .background {
+                if reduceTransparency {
+                    RoundedRectangle(cornerRadius: 12).fill(Color(nsColor: .windowBackgroundColor))
+                } else {
+                    RoundedRectangle(cornerRadius: 12).fill(.thickMaterial)
+                }
+            }
+            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.primary.opacity(0.12)))
+            .onHover { controls.setHold(.toolbarHover, active: $0) }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Presentation controls")
+            .help("These controls can appear in your screen share")
+    }
+    private func openSource() {
+        controls.setHold(.sheet, active: true)
+        choosingSource = true
+    }
+    private var sourceSheet: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack {
+                Text("Device screen").font(.title2.bold())
+                Spacer()
+                Button("Done") { choosingSource = false; controls.reveal() }.keyboardShortcut(.defaultAction)
+            }
+            Text("Connect an unlocked iPhone or iPad by USB and trust this Mac. External video sources also work; Android needs a compatible video feed.").foregroundStyle(.secondary)
+            if capture.sources.isEmpty { Text("No external sources found.") }
+            ForEach(capture.sources) { source in
+                Button {
+                    capture.select(source.id); choosingSource = false; controls.reveal()
+                } label: {
+                    HStack { Image(systemName: source.isScreen ? "iphone" : "video"); Text(source.name); Spacer(); if capture.selectedID == source.id { Image(systemName: "checkmark") } }
+                }.buttonStyle(.bordered)
+            }
+            Text(capture.message).font(.caption).foregroundStyle(.secondary)
+            Toggle("Match device proportions", isOn: $fitToSource).toggleStyle(.checkbox)
+            if capture.dimensions.width > 0 && capture.dimensions.height > 0 {
+                Text("Video size: \(Int(capture.dimensions.width)) × \(Int(capture.dimensions.height))")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Button("Refresh devices") { capture.refresh() }
+            Divider()
+            NativePresentationApps { capture.reportNotice($0) }
+        }.padding(24).frame(width: 460)
     }
 }
 

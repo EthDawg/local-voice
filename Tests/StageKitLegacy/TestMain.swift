@@ -44,6 +44,7 @@ struct TestRunner {
             ("viewport geometry and saved device profiles", demo.testViewportGeometryAndProfiles),
             ("independent Space recovery and manual changes", demo.testIndependentSpaceRecoveryAndManualChanges),
             ("capture source identity and stale frames", demo.testCaptureSourceIdentityAndStaleFrames),
+            ("presentation controls intentional reveal and retention", demo.testPresentationControlsRevealAndRetention),
             ("hand transparency persistence and no stretching", demo.testHandTransparencyPersistenceAndNoStretch),
             ("saved logo adoption reuse and removal", demo.testLogoLibraryMigrationReuseAndRemoval),
             ("library customization and corrupt file safety", demo.testLibraryCustomizationAndCorruptFileSafety),
