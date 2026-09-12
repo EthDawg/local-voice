@@ -1,100 +1,106 @@
-# Workbench Voice
+# Workbench
 
-**[Download the apps, try a workflow, and share feedback](https://workbench-mac.vercel.app)**
-
-![Workbench — small native Mac tools](docs/assets/workbench.svg)
+**Free everyday Mac tools for speaking, explaining and presenting.**
 
 [![CI](https://github.com/EthDawg/local-voice/actions/workflows/ci.yml/badge.svg)](https://github.com/EthDawg/local-voice/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-mintcream.svg)](LICENSE)
-[![Good first issues](https://img.shields.io/github/issues/EthDawg/local-voice/good%20first%20issue)](https://github.com/EthDawg/local-voice/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22)
 
-**[Start contributing](CONTRIBUTING.md)** · **[Pick a starter issue](https://github.com/EthDawg/local-voice/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22)** · **[Ask a question](https://github.com/EthDawg/local-voice/discussions)**
+[Contribute](CONTRIBUTING.md) · [Issues](https://github.com/EthDawg/local-voice/issues) · [Discussions](https://github.com/EthDawg/local-voice/discussions) · [Project website](https://workbench-mac.vercel.app)
 
-A native Mac app for local dictation and text-to-speech. Speak a thought, clean up fillers and corrections, and return the text to the app you started in. Or paste text, listen to it, and save an M4A reading.
+Workbench brings Voice and StageMark into **one native app, one home window and one menu-bar icon**. Dictate a thought, read a draft, draw over a live demo, or give a connected phone a presentation scene. The aim is a useful baseline that improves with better models and small, dependable workflows.
 
-Built for Apple Silicon, with Parakeet v2 through FluidAudio and the voices installed in macOS. Local dictation and Mac voices need no account, API key, subscription, Python environment or background server. Optional Speko reading uses your own account and key.
+**This branch contains the Workbench 2.0 consolidation.** Feature descriptions below describe its implementation, not proof of a published release or successful testing on every supported Mac. The [acceptance record](docs/unification.md) tracks the remaining verification. Older Voice/StageMark releases and their validation records describe those separate apps.
 
-## Help shape Workbench
+## What is in the app?
 
-Workbench is an open-source collection of small native Mac utilities: **[Voice](https://github.com/EthDawg/local-voice)** for dictation and reading, and **[StageMark](https://github.com/EthDawg/StageMark)** for presenting. Each app works independently. Our focus is useful everyday tools, local processing, clear controls, and recoverable user data.
+| Capability | What it does |
+| --- | --- |
+| **Dictate** | Record speech or import audio; keep original and cleaned text, a dictionary and recent transcripts; copy or optionally paste into the original field. |
+| **Read aloud** | Listen with installed Mac voices and export M4A. Speko is an explicit online option using your own key. |
+| **Annotate** | Draw, highlight, add shapes/text, emphasise the pointer and use saved boards over a live presentation. |
+| **Present a device** | Prepare a scene with a background and logo, display a supported USB video source, and use a break timer. QuickTime and iPhone Mirroring can be opened separately. |
+| **Saved resources** | Keep searchable prompts, web links and references to local decks, videos and other files. |
+| **Keyboard** | See all Workbench assignments, change or disable them, and practise on a virtual keyboard without activating tools. |
 
-First contribution? Fix a confusing instruction, test a workflow on your Mac, improve keyboard access, or take a small Swift change. You do not need to be a Swift expert. [The contributor guide](CONTRIBUTING.md) takes you from choosing an issue to opening your first pull request. Documentation can be edited directly on GitHub without a Mac.
+The core app requires no account or subscription. Built-in Parakeet recognition and Mac reading work locally after their initial setup. Optional integrations have their own setup and privacy boundaries.
 
-We are early: expect rough edges and a small maintainer team. The [open issues](https://github.com/EthDawg/local-voice/issues) are the live backlog; `good first issue` marks bounded starting points and `help wanted` marks broader work. [Discuss larger ideas](https://github.com/EthDawg/local-voice/discussions) before investing heavily. We welcome documentation, accessibility, design, bug reports, and testing as well as code.
+## First use
 
-## Install from source
+1. Open **Workbench Preview** and choose an action from Home. **Models** prepares the default Parakeet recognizer; its first download can take several minutes.
+2. Try **Dictate** with a short, disposable sentence. Microphone access is requested when recording needs it. Copy works without Accessibility; automatic paste is an optional setting.
+3. Open **Keyboard** to see or practise a shortcut. The defaults include **Control–Option–Space** for dictation, **Control–Option–V** for quick controls and **Control–Option–J** for saved resources.
+4. For a mobile demo, choose **Present a device**, prepare a scene and select an available source. Workbench's device view is video-only. iPhone Mirroring runs in Apple's own window; Workbench does not embed or control it.
 
-Requires an Apple Silicon Mac, macOS 14 or later, Xcode Command Line Tools (Swift 6.2 or later, with the macOS 26 SDK), and an internet connection for the initial dependency/model download. Developed and tested on macOS 26.5.1; older supported OS versions are not yet independently tested.
+The menu-bar icon provides quick access while another app is active. The normal window is for editing and setup. Closing it leaves the utility available; **Quit Workbench** stops the app. **Open Workbench at login** is optional in Settings.
 
-The persistent Preview installer also needs a Developer ID Application signing identity in Keychain. Compiling and running the development checks does not require an Apple membership.
+Keyboard recording and practice temporarily suspend Workbench's global shortcuts. Practice counts three full presses and releases; Escape, leaving the window or changing the selected action ends the interaction. Workbench checks its own duplicates, common Mac commands and registration failures; macOS does not expose a complete list of other apps' shortcuts. The virtual keyboard uses ANSI geometry with labels from the current input layout.
 
-```sh
-git clone https://github.com/EthDawg/local-voice.git
-cd local-voice
-bash scripts/install.sh
-```
+## Choose your speech tools
 
-The installer builds and signs `Workbench Voice Preview.app`, verifies its identity and signature, and installs it in `~/Applications` alongside production. It preserves the previous Preview as a rollback ZIP and opens the new Preview unless you pass `--no-open`. Speech-model preparation happens when the app opens; the first model download can take several minutes. Afterward, speech processing works offline. The installer does not run the speech round-trip tests or start the app automatically at login.
+| Choice | Included / setup | Boundary |
+| --- | --- | --- |
+| **Parakeet on this Mac** | Default English recognizer, using FluidAudio and a downloaded Core ML model | On-device inference; no server or API key. |
+| **Local model server** | You run a compatible server and supply its full transcription URL and model ID | Loopback addresses only. Workbench does not install the server or bundle a Whisper model. The server may itself forward audio; inspect its configuration. |
+| **Mac voices** | Installed macOS reading voices, with pace control | Local text-to-speech and audio export. |
+| **Speko** | Optional personal account and Keychain-stored API key | Explicit readings send text online and may be billed. |
 
-For updates, quit Preview, pull the repository, and run the installer again with the same signing identity. Its data and settings stay in place. Production updates use an explicitly selected notarised archive; see [Preview and production updates](scripts/release/README.md). Run `bash scripts/test.sh` for the automated checks.
+Model settings apply to the next request; the active request keeps its original provider. There is no automatic cloud fallback. A valid local-server configuration is not a successful connectivity or model test—the first real transcription checks those. See [model setup and limits](docs/model-providers.md).
 
-## Use it
+**Apple Shortcuts** can compose `Record Audio → Transcribe with Workbench → a text action`. Apple owns recording; Workbench's App Intent transcribes the supplied audio and returns text. Native discovery requires packaging with full Xcode metadata. See [integration setup and earlier validation](docs/voice-integrations.md). Services, Share extensions and Spotlight actions beyond normal app discovery are future options, not implemented entry points in this consolidation.
 
-- **Dictate:** click the microphone, speak, then click Stop. macOS asks for microphone permission the first time.
-- **From another app:** press **Control + Option + Space** to start and again to finish. Choose **Press & hold** in quick controls if you prefer releasing the shortcut to finish. Shortcuts are editable: click the keycap with the pencil, then press your combination. Escape cancels; Delete disables. Unavailable combinations leave your existing shortcut unchanged.
-- **Quick controls:** click the waveform in the menu bar or press **Control + Option + V**. Dictate, Read, Recent, and Settings tabs cover everyday controls. Shortcuts are editable in the Settings tab and in the editor’s Shortcuts / Settings pages. Command + comma opens Settings.
-- **Cleanup:** **Light** is the fast default for filler sounds, accidental repetition, explicit corrections, and requested lists. **Original** skips cleanup; **Natural** adds guarded, optional editing with Apple Intelligence on supported macOS 26 Macs, falling back to Light when unavailable or an edit changes checked facts. The **Original…** view retains the unedited transcript. **Clean text** also tidies an existing draft.
-- **Automatic paste:** choose **Paste automatically** and enable macOS Accessibility. Voice attempts paste only if the original app and focused field are still current; secure fields are excluded. It never presses Return. Confirmed insertion can restore your previous clipboard. If focus changes or insertion cannot be confirmed, the transcript stays copied. **Copy to clipboard** is always available.
-- **Capture panel:** click **Finish** to stop recording, or use its real **More** menu to discard. Drag the grip at the left to move it; Voice remembers the position across recordings and launches. Settings → **Position dictation panel…** previews it with the microphone off. The menu can reset its position.
-- **Reuse a capture:** open quick controls from a text field, choose **Recent**, and Copy, Open, or Paste any saved capture. The Dictate tab also shows the latest capture and two preceding captures. Opening an older capture does not relabel it as the latest recording.
-- **Demo library:** press **Control + Option + J** or choose **Demo library**. Save prompts, web links, and references to local videos, decks, or demo files. Search checks names, products, personas, contents, and preparation notes; favorites appear first. Resources open in their usual app. **Locate file** reconnects a moved or missing asset. Keep cloud files downloaded before an offline demo.
-- **Save a prompt:** choose **Save prompt** on a transcript, or press **Command + Shift + S** while Voice is active to review and save clipboard text. **Command + N** adds a prompt in the library and **Command + F** focuses search. Copying a saved prompt never submits it to another app.
-- **Move a library:** use the library’s bottom **Library** menu to export/import JSON. Exchange files include prompts, links, notes, and local file paths; media is not copied. Imports preserve existing resources and skip matching IDs. Files from another Mac may need reconnecting.
-- **Workbench:** both Voice and [StageMark](https://github.com/EthDawg/StageMark) share a suite switcher, appearance settings, and Spotlight prefix. Search **Workbench** to find them.
-- **Read aloud:** choose a Mac voice and pace, or explicitly opt in to Speko online reading with your own Keychain-stored API key. Listen, pause, resume, stop, or save M4A. Speko is experimental until a real-key playback/export check is recorded.
-- **Apple Shortcuts:** combine Apple’s Record Audio action with Transcribe with Workbench, then Create Note, Copy to Clipboard, or any text action. Shortcuts owns recording and cancellation; Voice returns the local transcript. Requires a package built with full Xcode metadata; see [integration setup and validation](docs/voice-integrations.md).
-- **Import audio:** transcribe an audio file up to 30 minutes. Original imported files are never modified.
-- **Dictionary:** replace recognised words or phrases with your preferred spelling. Matches whole words, ignoring case. Dictionary replacements run after cleanup.
-- **Recent transcripts:** the last 100 completed captures stay on this Mac, including separate recordings with identical words. Search checks both cleaned and original text. The full history offers original wording and read-aloud actions. Captures are saved before clipboard or paste delivery; existing history survives updates.
+## Build and install Preview
 
-Closing the window keeps the app in the menu bar. Use **Quit Workbench Voice** or Command + Q to exit completely.
+Source development requires an Apple Silicon Mac, macOS 14+, Swift 6.2+ and the macOS 26 SDK. Run `bash scripts/doctor.sh` to check prerequisites. Full Xcode is required for distributable Apple Shortcuts metadata. The macOS 14 deployment target is not evidence of testing on every older OS or device.
 
-## Privacy and limits
-
-Audio is processed locally. Recordings are made only after a button or shortcut starts capture. Recordings are limited to five minutes; Mac reading is limited to 50,000 characters (Speko: 5,000) per reading. Dictation is English. Recognition and cleanup quality vary. Light rules recognise explicit patterns rather than every possible spoken correction; complex or ambiguous wording can remain unchanged. Natural editing checks factual token order, numbers, and negation, but these checks do not prove semantic equivalence. The original remains available. There is no cloud fallback.
-
-The model is downloaded from FluidInference on Hugging Face during setup. FluidAudio caches it in the user's Application Support directory. Dictation audio and transcripts are never uploaded for recognition or cleanup. If you explicitly choose Speko, the text you submit to Listen/Save audio (including Read clipboard) is sent to Speko and its selected voice provider and may be billed. No telemetry is added. Apple Shortcuts controls downstream destinations, which may sync online. See [the integration privacy details](docs/voice-integrations.md).
-
-Drafts, originals, the dictionary, reading settings, and recent transcripts are stored in `~/Library/Application Support/LocalVoice/state.json` for production and `~/Library/Application Support/LocalVoice Preview/state.json` for Preview, readable by the current user. Preview copies missing production settings and saved data once on first launch, then keeps its own state. Successful microphone recordings and temporary readings are deleted. Failed microphone recordings remain temporarily available for Retry until the next recording or app exit. The clipboard retains copied transcripts; automatic paste can restore its previous contents after confirmed insertion. Imported audio is not copied into history.
-
-The demo library is saved separately as `demo-library.json` beside the session, with current-user file permissions. It contains up to 2,000 resources and 16 MB of metadata. Prompts, links and notes are ordinary local text, not a password vault. Local access bookmarks are kept on this Mac and excluded from exchange files. Unreadable library data pauses saving rather than being overwritten.
-
-Official Voice 1.2.2 early-access downloads are Developer ID signed and Apple-notarised. Get the versioned download and trial guide from [the Workbench website](https://workbench-mac.vercel.app). The default Preview installer uses Developer ID signing. Raw `bash scripts/build.sh` packages use disposable ad-hoc signing; they are not the persistent Preview update workflow.
-
-Preview has its own initial Microphone and optional Accessibility permissions. Keep its signing identity, bundle ID, and installed path consistent across updates; macOS controls permission retention. If automatic paste needs attention, check the entry for the exact edition you are running. Clipboard delivery remains available. Removing permission entries or clearing app data is not a release step. The historical ad-hoc permission repair is recorded in [validation history](docs/validation.md).
-
-## Development and checks
+From the unified source checkout:
 
 ```sh
+bash scripts/doctor.sh
 bash scripts/test.sh
-bash scripts/build.sh
-"$HOME/Applications/Workbench Voice.app/Contents/MacOS/LocalVoice" --self-test
-"$HOME/Applications/Workbench Voice.app/Contents/MacOS/LocalVoice" --transcribe /path/to/audio.m4a
+REQUIRE_APP_INTENTS=1 bash scripts/build.sh --preview
+bash scripts/install.sh --archive "dist/Workbench Preview.zip" --no-open
 ```
 
-The self-test synthesizes a known passage with macOS speech, transcribes it with Parakeet, checks key phrases, exports a non-empty M4A, then transcribes that export. Twenty-one core checks cover dictionary boundaries and escaping, state persistence, damaged-state behaviour, and input limits. Sixteen additional cleanup checks cover correction and list cases, factual edit rejection, original line breaks, and version-one state migration. `--check-cleanup` exercises the actual optional Apple language model. They run without XCTest or a full Xcode installation. Microphone permission, recording, and UI behaviour also need interactive testing; file round-trips alone do not prove microphone capture.
+The Preview build needs a **Developer ID Application certificate and its private key** in Keychain. If more than one exists, select its fingerprint with `--identity`. It creates `dist/Workbench Preview.zip`; the installer places `Workbench Preview.app` in `~/Applications`. Open it when ready. The install preserves the previous Preview as `dist/Previous-Workbench Preview.zip` for rollback. Quit the running Preview before updating.
 
-`--check-core` also runs 36 demo-library checks and model checks covering persistence, search and row selection, favorites, moved/missing files, safe resource opening, non-destructive import, portable export, corruption preservation, and migration of existing shortcut settings.
+Without a signing identity, `bash scripts/build.sh --preview --ad-hoc` creates a disposable development archive. The default installer requires Developer ID signing; ad-hoc packages are for disposable development testing. `bash scripts/build.sh` produces the separate, ad-hoc `dist/Workbench.zip`. Neither command alone establishes notarization or publication.
 
-## Design and credits
+The installer does **not** run the regression suite or speech round-trip. First-open model preparation and optional live checks are separate:
 
-The shared platform contract is [Workbench](docs/workbench.md). See [the implementation notes](docs/design.md) and [validation results](docs/validation.md).
+```sh
+"$HOME/Applications/Workbench Preview.app/Contents/MacOS/WorkbenchPreview" --self-test
+"$HOME/Applications/Workbench Preview.app/Contents/MacOS/WorkbenchPreview" --transcribe /path/to/audio.m4a
+```
 
+The Swift target/module retains its internal `LocalVoice` name for compatibility. Packaged executables are `Workbench` and `WorkbenchPreview`. The self-test synthesizes known text, transcribes it with the selected recognizer, exports audio and transcribes the export; it does not prove live microphone capture, paste or device presentation.
+
+Keep a consistent Preview identity and path between updates. Preview has its own macOS permissions. Quit older Voice/StageMark copies when testing global shortcuts; they may compete for the same combinations. Do not clear permissions or erase saved data as an update step. [Release tooling](scripts/release/README.md) describes the separate production workflow.
+
+## Data, privacy and recovery
+
+- **Transcripts:** originals, drafts, dictionary, reading preferences and the last 100 captures are stored locally. Cleanup is optional: Original, deterministic Light, or guarded Natural editing using Apple Intelligence where available. The original remains available; cleanup checks cannot prove meaning is unchanged.
+- **Capture and delivery:** microphone capture is explicitly started and limited to five minutes; imported audio to 30 minutes. Automatic paste checks the original app/field, excludes secure fields and never presses Return. If delivery cannot be confirmed, the transcript stays on the clipboard. Imported originals are not modified.
+- **Resources:** the library stores prompts, links, notes and local file references, not copies of media or a password vault. Its JSON import preserves existing entries and skips matching IDs. Exported paths may need reconnecting on another Mac. Unreadable data is preserved rather than overwritten.
+- **Models and services:** setup downloads Parakeet from FluidInference's Hugging Face hosting. Recognition uses the selected local engine or user-managed loopback server. Speko sends only explicitly submitted readings online. Downstream Shortcuts actions may sync their results elsewhere.
+- **Presentation:** the device preview does not record video or microphone audio. Share its presentation window through your meeting app. QuickTime and iPhone Mirroring have their own requirements, permissions and lifecycle.
+
+Unified Preview stores voice files under `~/Library/Application Support/Workbench Preview/LocalVoice` and presentation files under `~/Library/Application Support/Workbench Preview/StageMark`. The non-Preview equivalents are under `Workbench`. First use copies supported legacy data into a missing component directory; it does not move or delete the old app's data. Once a unified component exists, it is not repeatedly merged with later legacy changes. [Architecture and migration details](docs/design.md) explain the boundaries.
+
+Mac reading is limited to 50,000 characters per reading; Speko to 5,000. The local-server option adds a 64 MB input cap and supports WAV, M4A, MP3 and FLAC subject to that server's decoder. English recognition quality, permissions, hardware support and network-provider behaviour need real workflow testing.
+
+## Contribute and verify
+
+A useful first contribution can be a confusing instruction, an accessibility improvement, a synthetic test case or a hardware report. Use [Issues](https://github.com/EthDawg/local-voice/issues) as the work queue and discuss substantial changes before implementing them. [CONTRIBUTING](CONTRIBUTING.md) explains the workflow and proposed two-maintainer practices.
+
+`bash scripts/test.sh` runs release-tool checks, core/cleanup/history/library/integration/keyboard checks, provider checks and StageKit regressions. Checks use synthetic input; model downloads, real microphone input, other apps' focus, signed-package permissions and actual device sharing require additional evidence. See [the current acceptance record](docs/unification.md), [product contract](docs/workbench.md) and [implementation map](docs/design.md).
+
+## Credits and license
+
+- Voice and [StageMark](https://github.com/EthDawg/StageMark) are the sources of this consolidation; [source provenance](docs/consolidation-source.md) records the import.
 - [FluidAudio](https://github.com/FluidInference/FluidAudio), pinned to 0.15.6: Apache 2.0.
-- [Parakeet TDT v2 CoreML](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml): see the upstream model card and license.
-- Apple AppKit, SwiftUI, AVFoundation, and installed macOS voices.
+- [Parakeet TDT v2 CoreML](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml): see its upstream model card and license.
+- Apple AppKit, SwiftUI, AVFoundation and installed macOS voices.
 - Workflow inspiration: [Pat Simmons's local Wispr Flow replacement](https://www.youtube.com/watch?v=IMQw3aHjf2Q&t=437s).
+- Matt ([@mattywhitenz](https://github.com/mattywhitenz)) proposed Apple Shortcuts dictation and optional Speko reading in [#10](https://github.com/EthDawg/local-voice/issues/10) and [#11](https://github.com/EthDawg/local-voice/issues/11).
 
-The app code is MIT licensed. Third-party components retain their own licenses.
-
-Matt ([@mattywhitenz](https://github.com/mattywhitenz)) proposed Apple Shortcuts dictation and optional Speko reading in #10 and #11.
+The app code is [MIT licensed](LICENSE). Third-party components retain their own licenses. Contribution credit does not imply a GitHub permission level or approval of this branch.

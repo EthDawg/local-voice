@@ -7,10 +7,11 @@ private let mint = Workbench.accent
 
 struct ContentView: View {
     @ObservedObject var model: AppModel
+    var embedded = false
     @State private var showOriginal = false
     var body: some View {
         HStack(spacing: 0) {
-            sidebar
+            if !embedded { sidebar }
             VStack(alignment: .leading, spacing: 24) {
                 HStack {
                     Label(model.page == "speak" && model.readingProvider == .speko ? "SPEKO · ONLINE READING" : "ON YOUR MAC", systemImage: model.page == "speak" && model.readingProvider == .speko ? "network" : "lock.shield").font(.system(size: 10, weight: .semibold)).tracking(1.6).foregroundStyle(mint)
@@ -40,11 +41,11 @@ struct ContentView: View {
                     Circle().fill(model.phase == .recording ? .red : mint).frame(width: 6, height: 6)
                     Text(model.status).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2)
                     Spacer()
-                    Text("WORKBENCH VOICE  /  \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development")\(Workbench.isPreview ? " PREVIEW" : "")").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(.tertiary)
+                    Text("WORKBENCH  /  \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development")\(Workbench.isPreview ? " PREVIEW" : "")").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(.tertiary)
                 }
             }.padding(32).background(ink)
         }
-        .frame(minWidth: 900, minHeight: 680)
+        .frame(minWidth: embedded ? 650 : 900, minHeight: 680)
         .tint(mint).workbenchTheme()
         .sheet(isPresented: $showOriginal) {
             VStack(alignment: .leading, spacing: 16) {
@@ -117,7 +118,7 @@ struct ContentView: View {
                             Button("Discard") { model.cancelRecording() }.buttonStyle(.plain).foregroundStyle(.secondary)
                         } else if model.phase == .transcribing || model.phase == .cleaning || model.preparing {
                             ProgressView().controlSize(.small)
-                            Text(model.preparing ? "Preparing the local model" : "Processing on your Mac")
+                            Text(model.preparing ? "Preparing your speech engine" : "Transcribing with your selected engine")
                         } else { Text("Click the microphone or use \(model.preferences.dictationShortcut.label)") }
                     }.font(.system(size: 11)).foregroundStyle(.secondary)
                 }
@@ -192,7 +193,7 @@ struct ContentView: View {
             VoiceShortcutSettings(model: model).padding(22).background(panelColor, in: RoundedRectangle(cornerRadius: 14))
             VStack(alignment: .leading, spacing: 10) {
                 Text("Apple Shortcuts").font(.headline)
-                Text(Bundle.main.url(forResource: "Metadata", withExtension: "appintents") != nil ? "Add Record Audio, then Transcribe with Workbench, then Create Note, Copy to Clipboard, or another text action. Shortcuts handles recording; Voice returns your words." : "This development build has no Apple Shortcuts metadata. Use the full-Xcode package for the Transcribe with Workbench action.").foregroundStyle(.secondary)
+                Text(Bundle.main.url(forResource: "Metadata", withExtension: "appintents") != nil ? "Add Record Audio, then Transcribe with Workbench, then Create Note, Copy to Clipboard, or another text action. Shortcuts handles recording; Workbench returns your words." : "This development build has no Apple Shortcuts metadata. Use the full-Xcode package for the Transcribe with Workbench action.").foregroundStyle(.secondary)
                 Button("Open Apple Shortcuts") { NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Shortcuts.app")) }
             }
             Spacer()
@@ -209,7 +210,7 @@ struct ContentView: View {
                     else { Button("Retry model") { Task { await model.prepare() } } }
                 }
                 Divider()
-                settingRow("Microphone", "Workbench Voice records only when you start a recording.", "mic") { Button("Open settings") { model.openMicrophoneSettings() } }
+                settingRow("Microphone", "Workbench records only when you start a recording.", "mic") { Button("Open settings") { model.openMicrophoneSettings() } }
                 Divider()
                 VoiceOptions(model: model, showShortcut: false)
                 Divider()
@@ -221,7 +222,7 @@ struct ContentView: View {
                 WorkbenchAppearancePicker()
             }.padding(22).background(panelColor, in: RoundedRectangle(cornerRadius: 14))
             Text("Local by design").font(.system(size: 16, weight: .medium))
-            Text("Dictation and Mac voices work on your Mac without an account. The initial speech model download uses the internet. Optional Speko reading sends only the text you choose to read to Speko and its selected provider, using your personal API key; usage may be billed. Drafts, your dictionary and history remain local. Apple Shortcuts controls any downstream destinations. No analytics are included.")
+            Text("Built-in Parakeet dictation and Mac voices work on your Mac without an account after the initial model download. A local transcription server receives your audio and may forward it, depending on how you configure that server. Optional Speko reading sends the text you choose to its cloud service and selected provider; usage may be billed. Drafts, your dictionary and history remain local. Apple Shortcuts controls any downstream destinations. No analytics are included.")
                 .font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(5).textSelection(.enabled)
             Spacer()
         } }

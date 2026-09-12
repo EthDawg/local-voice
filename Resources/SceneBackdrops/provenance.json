@@ -1,0 +1,61 @@
+{
+  "note": "Exact user-selected PNG originals; generated fictional settings. Operations excluded. No customer logos bundled.",
+  "assets": [
+    {
+      "filename": "stagemark-office-professional.png",
+      "sha256": "0037ba53d6594f2bd23f4b50f34aa917beb153956b902217ddf9ea83f272f353",
+      "ai_generated": true,
+      "source_pack": "general",
+      "generated": "2026-09-09"
+    },
+    {
+      "filename": "stagemark-care-service.png",
+      "sha256": "d264df73f964d5525d9baf376b468192b35186e157a3060b5f61d2927068dffb",
+      "ai_generated": true,
+      "source_pack": "general",
+      "generated": "2026-09-09"
+    },
+    {
+      "filename": "stagemark-higher-education-campus.png",
+      "sha256": "b791eef0a07cc0018a08b7c0d76065e0ae1b6cd43098080ab7bc0fedf6937d20",
+      "ai_generated": true,
+      "source_pack": "australian-sectors",
+      "generated": "2026-09-09"
+    },
+    {
+      "filename": "stagemark-acute-healthcare.png",
+      "sha256": "dcc51adecd46a7fbf89d499b42940bfa20694deef910642f3b229d35b6225759",
+      "ai_generated": true,
+      "source_pack": "australian-sectors",
+      "generated": "2026-09-09"
+    },
+    {
+      "filename": "stagemark-aged-care.png",
+      "sha256": "8a603c008dd0b0526bf4dd8864afbde48688052e3278462450ee954cf610f8a4",
+      "ai_generated": true,
+      "source_pack": "australian-sectors",
+      "generated": "2026-09-09"
+    },
+    {
+      "filename": "stagemark-allied-health-ndis.png",
+      "sha256": "8c58050c879e2a504cedb97069eff26fd919743e763b2419bc7c4767deb33a83",
+      "ai_generated": true,
+      "source_pack": "australian-sectors",
+      "generated": "2026-09-09"
+    },
+    {
+      "filename": "stagemark-financial-services.png",
+      "sha256": "21d98333a116f141ec6775ae4921a598a342715351b5c83607843d84c4bb1f1d",
+      "ai_generated": true,
+      "source_pack": "australian-sectors",
+      "generated": "2026-09-09"
+    },
+    {
+      "filename": "stagemark-mining-resources.png",
+      "sha256": "0ac73d5b88d398a3ef96e60ddaf323863b6eaa9f60cf1fe98506b5b3e0141e7e",
+      "ai_generated": true,
+      "source_pack": "australian-sectors",
+      "generated": "2026-09-09"
+    }
+  ]
+}

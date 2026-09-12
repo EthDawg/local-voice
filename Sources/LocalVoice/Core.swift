@@ -1,5 +1,4 @@
 import Foundation
-import FluidAudio
 import AVFoundation
 
 enum VoiceError: LocalizedError {
@@ -73,33 +72,6 @@ struct StateStore {
         let data = try JSONEncoder().encode(state)
         try data.write(to: url, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
-    }
-}
-
-actor RecognitionEngine {
-    private var manager: AsrManager?
-    private var preparation: Task<AsrManager, Error>?
-
-    func prepare() async throws {
-        if manager != nil { return }
-        if let preparation { manager = try await preparation.value; return }
-        let task = Task<AsrManager, Error> {
-            let models = try await AsrModels.downloadAndLoad(version: .v2)
-            let engine = AsrManager(config: .default)
-            try await engine.loadModels(models)
-            return engine
-        }
-        preparation = task
-        do { manager = try await task.value; preparation = nil }
-        catch { preparation = nil; throw error }
-    }
-
-    func transcribe(_ url: URL) async throws -> String {
-        try await prepare()
-        guard let manager else { throw VoiceError.message("The speech model is not ready. Try preparing it again.") }
-        var decoderState = try TdtDecoderState(decoderLayers: 2)
-        let result = try await manager.transcribe(url, decoderState: &decoderState)
-        return result.text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

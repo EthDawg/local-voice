@@ -1,20 +1,22 @@
-# Contributing to Workbench Voice
+# Contributing to Workbench
 
-Welcome! A small, useful improvement is a great first contribution. Bug reports, documentation, accessibility checks, design feedback, and hardware testing all count.
+A small, useful improvement is a good first contribution. Bug reports, documentation, accessibility checks, design feedback and hardware testing all count.
+
+This branch combines Voice and StageMark into one app. Workbench's purpose is dependable everyday Mac utilities for speaking, annotating and presenting. Improve a concrete workflow and compare against what macOS already offers before adding another feature.
 
 ## Choose a first step
 
-1. Pick an unassigned [good first issue](https://github.com/EthDawg/local-voice/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22). Each has starting files and a definition of done. Comment that you would like to work on it so others can coordinate; no invitation or repository write access is needed.
-2. For a quick typo or clear small fix, send a PR directly. For a larger feature, start with an [idea](https://github.com/EthDawg/local-voice/discussions) or [feature request](https://github.com/EthDawg/local-voice/issues/new/choose) so we can agree on scope.
-3. Need help? Ask on the issue or in [Workbench Discussions](https://github.com/EthDawg/local-voice/discussions). Describe where you got stuck; incomplete attempts are welcome.
+1. Check the [open issues](https://github.com/EthDawg/local-voice/issues). An unassigned [good first issue](https://github.com/EthDawg/local-voice/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22) is a useful starting point. Comment that you want to take it so others can coordinate; no repository write access is needed.
+2. A typo or clear, small fix can go directly to a PR. Discuss a larger feature in an issue or [Discussions](https://github.com/EthDawg/local-voice/discussions) first. Agree the smallest useful outcome and who is working on it.
+3. Ask for help on the issue when stuck. Incomplete attempts and draft PRs are welcome. Coordinate before replacing work another contributor has offered to do.
 
-**No Mac or no Swift experience?** Open a documentation file on GitHub, click the pencil, make the edit, and follow GitHub's fork-and-pull-request prompts. You do not need to run native checks for a text-only change; say “documentation only” in the PR. A hardware test report can be contributed as an issue comment.
+**No Mac or no Swift experience?** Edit documentation through GitHub's pencil and fork/PR workflow. Say “documentation only” in the PR; native checks are unnecessary for that change. Hardware findings can be an issue comment with the Mac/device/OS versions and steps tried.
 
 ## Build and check
 
-Apple Silicon Mac, macOS 14+, Swift 6.2+, and the macOS 26 SDK. The deployment target is macOS 14; building needs the newer SDK because optional Apple Intelligence support is compiled in. Install current Apple Command Line Tools with `xcode-select --install`, or select a compatible Xcode toolchain. The first build downloads the pinned FluidAudio dependency.
+Use an Apple Silicon Mac, macOS 14+, Swift 6.2+ and the macOS 26 SDK. The deployment target and build SDK are different: optional newer Apple features need the newer SDK to compile. Full Xcode is required for App Intents metadata; Command Line Tools support source development.
 
-Click **Fork** at the top of this repository, then substitute your GitHub username below:
+Fork this repository, then substitute your username. Check out the branch or PR you intend to work on; default-branch and historical release contents may differ from this consolidation.
 
 ```sh
 git clone https://github.com/YOUR-USERNAME/local-voice.git
@@ -26,31 +28,34 @@ bash scripts/test.sh
 bash scripts/build.sh
 ```
 
-Full Xcode is required to extract Apple Shortcuts metadata for distribution; Command Line Tools still support source development. CI sets `REQUIRE_APP_INTENTS=1` so an undiscoverable action cannot pass packaging. See [integration notes](docs/voice-integrations.md).
+The first build downloads the pinned dependency. The default test script covers release tooling, core and integration behaviour, provider contracts/transport, keyboard practice and StageKit. It does not need a speech-model download or microphone access. The ordinary build creates the ad-hoc `dist/Workbench.zip`; it does not install an app.
 
-The default checks do not download the speech model or require microphone access. They test core state, history, dictionary and cleanup behavior. `bash scripts/build.sh` produces `dist/Workbench Voice.zip` without installing it.
+For persistent native testing, use the [signed Preview build/install commands](README.md#build-and-install-preview). A Developer ID Application identity is needed for that workflow. Quit the running Preview before installing, and quit legacy Voice/StageMark instances when checking global shortcuts. The installer preserves the previous Preview archive and saved data; it does **not** run the speech round-trip or prepare a model until the app is opened.
 
-For microphone, speech-engine, or paste changes, quit any running Voice app and use `bash scripts/install.sh` to test the installed bundle. This **updates the separate Voice Preview app**, preserves its previous version as a rollback ZIP, downloads/prepares the model, and runs a speech round-trip. Use only synthetic text/audio for shared examples. Accessibility is optional for paste; microphone permission is needed for recording. See [privacy and limits](README.md#privacy-and-limits) and [validation](docs/validation.md).
+`REQUIRE_APP_INTENTS=1` makes packaging fail if real action metadata cannot be extracted. A successful source compile does not establish Shortcuts discovery. See [the integration guide](docs/voice-integrations.md).
 
-CI runs the same tests and package build on a fresh Apple Silicon macOS runner. A maintainer may need to approve the first workflow run from a new fork. CI cannot prove live microphone permissions, cross-app paste, screen sharing, or physical hardware behavior; document relevant manual checks in the PR.
+CI runs automated checks and packaging on a macOS runner. A maintainer may need to approve a fork's first workflow run. For a behavioural change, add or run focused checks for the actual risk. Record relevant manual evidence: microphone permission/cancellation, cross-app paste, device disconnect/reconnect, keyboard conflicts, light/dark layout or other affected behaviour. Use synthetic content in public screenshots and recordings. If something cannot be tested, say why.
 
 ## Find the code
 
 | Area | Start here |
 | --- | --- |
-| Dictation state and recording | `Sources/LocalVoice/AppModel.swift` |
-| Recent transcripts | `Sources/LocalVoice/CaptureHistoryView.swift`, `Core.swift` |
+| App lifecycle, menu bar and shared navigation | `Sources/LocalVoice/main.swift`, `WorkbenchHome.swift` |
+| Dictation, recent captures and delivery | `Sources/LocalVoice/AppModel.swift`, `CaptureHistoryView.swift`, `TextDelivery.swift` |
+| Recognition selection and transport | `Sources/LocalVoice/RecognitionProviders.swift`, `ModelSettingsView.swift`, `ProviderChecks.swift` |
 | Cleanup and regression cases | `Sources/LocalVoice/Cleanup.swift`, `CleanupChecks.swift` |
-| Focus, clipboard, automatic paste | `Sources/LocalVoice/TextDelivery.swift` |
-| Capture panel and quick controls | `Sources/LocalVoice/CapturePanel.swift`, `QuickControls.swift` |
-| Core / keyboard checks | `Sources/LocalVoice/CoreChecks.swift`, `InputChecks.swift` |
-| Shared suite appearance and switcher | `Sources/LocalVoice/Workbench.swift` |
+| Unified keyboard assignment and practice | `Sources/LocalVoice/KeyboardCoach.swift`, `KeyboardCoachChecks.swift` |
+| StageKit's public boundary | `Sources/StageKit/StageKitController.swift` |
+| Drawing, boards, timer and presentation | `Sources/StageKit/AppCoordinator.swift`, `DemoScenes.swift`, `DemoPresentation.swift` |
+| Device capture and Apple alternatives | `Sources/StageKit/DemoCapture.swift`, `NativePresentationApps.swift` |
+| Identity, appearance and legacy-data import | `Sources/LocalVoice/Workbench.swift`, `Sources/StageKit/Workbench.swift` |
+| Packaging and Preview install | `scripts/build.sh`, `scripts/release/preview.py`, `scripts/release/config.json` |
 
-The [suite contract](https://github.com/EthDawg/local-voice/blob/main/docs/workbench.md) owns shared behavior. `Workbench.swift` is currently mirrored in both repositories. App-specific changes need only one PR; shell changes need linked PRs in both repositories and matching file contents. Discuss extraction before introducing a shared package.
+[The product contract](docs/workbench.md) owns app-wide behaviour; [the implementation map](docs/design.md) describes boundaries. Voice currently lives in the `LocalVoice` executable target; `StageKit` is a separate Swift library within the same process. Neither module should grow its own app lifecycle or another menu-bar icon. The original checkouts are provenance, not a requirement to maintain matching implementation PRs in two repos.
 
 ## Send your change
 
-Keep one clear purpose per PR and follow the surrounding Swift style. Add a focused regression check for a behavior change when practical. Avoid unrelated formatting and generated build products.
+Keep one clear purpose per PR. Follow surrounding Swift style and avoid unrelated formatting or generated build products.
 
 ```sh
 git add path/to/changed-file
@@ -58,12 +63,21 @@ git commit -m "Describe the user-visible improvement"
 git push -u origin improve/small-change
 ```
 
-Open **Compare & pull request** on your fork. Fill in the short template: what improves, the linked issue (`Closes #123`), and what you checked. Use a draft PR for early feedback. For visible UI changes, include a screenshot or short recording with synthetic content. If a check cannot be run, say why instead of claiming it passed.
+Open **Compare & pull request** on your fork. Explain what improves, link the issue, and describe the evidence and limitations. Use `Closes #123` only when the change fully resolves it. Draft means ready for feedback; it does not mean ready to release. Screenshots or short recordings help with UI changes.
 
-The maintainer reviews scope, clarity, data safety, and validation; follow-up edits on the same branch update the PR. There is no CLA or DCO signing step. Your contribution is provided under this repository's [MIT license](LICENSE); only contribute code and assets you have the right to share. AI-assisted contributions are welcome with the same review and testing expectations: understand the change and never include private prompts, recordings, or credentials.
+AI-assisted work has the same ownership and testing expectations. The submitting person must understand the change and check its claims. Never include private prompts, recordings, credentials or customer assets. There is no CLA or DCO signing step. Contributions use this repository's [MIT license](LICENSE); preserve upstream notices and contribute only material you have the right to share.
 
-## Project direction and review
+## Proposed Ethan–Matt working agreement
 
-EthDawg maintains the project and merges releases. We prefer small independent native utilities, local processing, optional permissions, explicit actions, and recoverable user data. New network services, telemetry, large dependencies, data migrations, or suite-wide changes need a design discussion first. Existing GitHub issues are the backlog; there is no separate project board to maintain. Response times vary; no support SLA is promised.
+**This is a proposal for the two people to agree, not a statement of existing GitHub roles, branch protections or delegated publishing authority.**
 
-Be kind and specific in feedback. Read the [community expectations](CODE_OF_CONDUCT.md) and use [private security reporting](SECURITY.md) for vulnerabilities.
+- Ethan and Matt share direction and review meaningful changes from each other.
+- Either can experiment. Claim a shared issue before implementation; coordinate if the work overlaps an existing contribution.
+- Keep independent features in separate PRs. Automated checks and AI review support the other person's review.
+- Agree together before introducing services, telemetry, broad permissions, major dependencies, migrations or a public release.
+- AI can investigate, implement and draft. Public replies and commitments follow the submitting maintainer's explicit delegation. Writing in Ethan's style alone does not grant permission to speak or commit for him.
+- Keep consequential WhatsApp decisions in the relevant issue or PR. Issues are the work queue; releases are the download and change record.
+
+A maintainer review should establish scope, clarity, user-data preservation and relevant validation. A green build, merge, signed archive and published release are distinct states. Keep previews labelled and verify the actual packaged app before promotion. Response times vary; no support SLA is promised.
+
+Be kind and specific. Read [community expectations](CODE_OF_CONDUCT.md) and use [private security reporting](SECURITY.md) for vulnerabilities.

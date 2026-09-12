@@ -9,7 +9,7 @@ struct ReadingProviderView: View {
                 ForEach(ReadingProvider.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }.pickerStyle(.segmented)
             if model.readingProvider == .speko {
-                Text("Speko sends this reading to its cloud service and selected voice provider. Your Speko account may be charged. Dictation stays local.")
+                Text("Speko sends this reading to its cloud service and selected voice provider. Your Speko account may be charged. Your dictation engine is selected separately in Models.")
                     .font(.callout).foregroundStyle(.secondary)
                 HStack {
                     SecureField("Personal Speko API key", text: $key).textFieldStyle(.roundedBorder)

@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import Carbon
 import AVFoundation
+import StageKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
@@ -13,24 +14,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     var popover: NSPopover!
     var recorderMonitor: Any?
     var menuTarget: TextDelivery.Target?
+    var stage: StageKitController!
+    var keyboard: KeyboardCoachModel!
+    var shortcutsSuspended = false
+    var navigationObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Workbench.preparePreviewData(component: "LocalVoice", files: ["state.json", "demo-library.json"])
         _ = WorkbenchSettings.shared
         model = AppModel()
-        window = NSWindow(contentViewController: NSHostingController(rootView: ContentView(model: model)))
+        stage = StageKitController(onOpenControls: { [weak self] in self?.navigate("annotate") }, onOpenScenes: { [weak self] in self?.navigate("present") })
+        stage.mayBeginInteraction = { [weak self] in
+            guard let self else { return false }
+            return self.model.phase == .idle && !self.model.rendering && !self.shortcutsSuspended
+        }
+        stage.onEditShortcuts = { [weak self] in self?.navigate("shortcuts") }
+        stage.onBeginActivity = { [weak self] in self?.closeControls(); self?.window?.orderOut(nil) }
+        stage.validateExternalShortcut = { [weak self] code, modifiers in
+            guard let self else { return nil }
+            for id in [UInt32(1), 2, 3] {
+                let saved = self.model.preferences.shortcut(id)
+                if saved.enabled && saved.keyCode == code && saved.modifiers == modifiers { return "Already used by a Workbench voice action." }
+            }
+            return nil
+        }
+        stage.start()
+        keyboard = KeyboardCoachModel(entries: shortcutEntries(), update: { [weak self] id, shortcut in guard let self else { return "Workbench is unavailable." }; return self.saveShortcut(id, shortcut) }, suspend: { [weak self] suspended in
+            guard let self else { return }
+            self.shortcutsSuspended = suspended
+            if suspended { self.hotkeys.unregister(); self.stage.escape(); self.stage.setShortcutsSuspended(true) }
+            else { self.stage.setShortcutsSuspended(false); self.registerShortcuts(); self.keyboard.replaceEntries(self.shortcutEntries()) }
+        })
+        window = NSWindow(contentViewController: NSHostingController(rootView: WorkbenchHome(model: model, stage: stage, keyboard: keyboard)))
         window.title = Workbench.displayName
-        window.setContentSize(NSSize(width: 1060, height: 760))
-        window.minSize = NSSize(width: 900, height: 700)
+        window.setContentSize(NSSize(width: 1180, height: 800))
+        window.minSize = NSSize(width: 1050, height: 730)
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true; window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false; window.center()
         capturePanel = CapturePanelController(model: model)
         popover = NSPopover(); popover.behavior = .transient; popover.animates = false; popover.delegate = self
-        popover.contentViewController = NSHostingController(rootView: VoiceQuickControls(model: model)); popover.contentSize = VoiceQuickControls.size
-        model.onPhaseChange = { [weak self] in self?.updateRecordingUI() }
+        popover.contentViewController = NSHostingController(rootView: WorkbenchQuickPanel(model: model, open: { [weak self] page in self?.navigate(page) }, draw: { [weak self] in
+            self?.resumeTarget { _ in self?.stage.draw() }
+        }, timer: { [weak self] in self?.closeControls(); self?.stage.showTimer() }))
+        popover.contentSize = NSSize(width: 370, height: 365)
+        model.onPhaseChange = { [weak self] in
+            guard let self else { return }
+            if self.model.phase != .idle { self.keyboard?.stopInteraction(); self.stage.escape() }
+            self.updateRecordingUI()
+        }
         model.onShortcutsChanged = { [weak self] in self?.registerShortcuts() }
-        model.onEditShortcut = { [weak self] id in self?.editShortcut(id) }
+        model.onEditShortcut = { [weak self] id in self?.navigate("shortcuts") }
         model.onShowEditor = { [weak self] page in self?.model.page = page; self?.showWindow() }
         model.onMenuRecording = { [weak self] in self?.menuRecording() }
         model.onCloseMenu = { [weak self] in self?.closeControls() }
@@ -51,10 +85,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             else if down, id == 3 { self.model.showLibrary() }
             else if down { self.toggleControls() }
         }
-        setupMenus(); registerShortcuts(); showControls()
+        navigationObserver = NotificationCenter.default.addObserver(forName: .workbenchNavigate, object: nil, queue: .main) { [weak self] notification in
+            guard let page = notification.object as? String else { return }
+            Task { @MainActor in self?.navigate(page) }
+        }
+        setupMenus(); registerShortcuts(); showWindow()
     }
     func registerShortcuts() {
-        guard model.editingShortcut == nil else { return }
+        guard model.editingShortcut == nil, !shortcutsSuspended else { return }
         hotkeys.register(model.preferences); model.shortcutFailures = hotkeys.failures
     }
     func editShortcut(_ id: UInt32) {
@@ -92,24 +130,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
     private func setupMenus() {
         let main = NSMenu(); let application = NSMenuItem(); let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "About Workbench Voice", action: #selector(showAbout), keyEquivalent: "")
+        appMenu.addItem(withTitle: "About Workbench", action: #selector(showAbout), keyEquivalent: "")
         appMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         appMenu.addItem(withTitle: "Keyboard shortcuts…", action: #selector(showShortcuts), keyEquivalent: "")
         appMenu.addItem(.separator())
-        appMenu.addItem(withTitle: "Hide Workbench Voice", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
-        appMenu.addItem(withTitle: "Quit Workbench Voice", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(withTitle: "Hide Workbench", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: "Quit Workbench", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         application.submenu = appMenu; main.addItem(application)
         let edit = NSMenuItem(); edit.title = "Edit"; let editMenu = NSMenu(title: "Edit")
         for (title, action, key) in [("Undo", "undo:", "z"), ("Cut", "cut:", "x"), ("Copy", "copy:", "c"), ("Paste", "paste:", "v"), ("Select All", "selectAll:", "a")] { editMenu.addItem(withTitle: title, action: Selector(action), keyEquivalent: key) }
         edit.submenu = editMenu; main.addItem(edit)
         let windows = NSMenuItem(); windows.title = "Window"; let menu = NSMenu(title: "Window")
-        menu.addItem(withTitle: "Open editor", action: #selector(showWindow), keyEquivalent: "0")
-        menu.addItem(withTitle: "Demo library", action: #selector(showLibrary), keyEquivalent: "l")
+        menu.addItem(withTitle: "Open Workbench", action: #selector(showWindow), keyEquivalent: "0")
+        menu.addItem(withTitle: "Quick controls", action: #selector(toggleControls), keyEquivalent: "")
+        menu.addItem(withTitle: "Saved resources", action: #selector(showLibrary), keyEquivalent: "l")
         let savePrompt = menu.addItem(withTitle: "Save clipboard as prompt…", action: #selector(saveClipboardPrompt), keyEquivalent: "s")
         savePrompt.keyEquivalentModifierMask = [.command, .shift]
         windows.submenu = menu; main.addItem(windows); NSApp.mainMenu = main; NSApp.windowsMenu = menu
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.autosaveName = NSStatusItem.AutosaveName("LocalVoice.MenuBar")
+        statusItem.autosaveName = NSStatusItem.AutosaveName("Workbench.MenuBar")
         statusItem.button?.target = self; statusItem.button?.action = #selector(statusClicked(_:))
         statusItem.button?.sendAction(on: [.leftMouseUp, .rightMouseUp]); updateRecordingUI()
     }
@@ -117,12 +156,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if NSApp.currentEvent?.type == .rightMouseUp {
             let menu = NSMenu()
             menu.addItem(withTitle: "Quick controls", action: #selector(toggleControls), keyEquivalent: "")
-            menu.addItem(withTitle: "Open editor", action: #selector(showWindow), keyEquivalent: "")
+            menu.addItem(withTitle: "Open Workbench", action: #selector(showWindow), keyEquivalent: "")
             menu.addItem(withTitle: "Recent transcripts…", action: #selector(showHistory), keyEquivalent: "")
-            menu.addItem(withTitle: "Demo library…", action: #selector(showLibrary), keyEquivalent: "")
+            menu.addItem(withTitle: "Saved resources…", action: #selector(showLibrary), keyEquivalent: "")
             menu.addItem(withTitle: "Keyboard shortcuts…", action: #selector(showShortcuts), keyEquivalent: "")
             menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
-            menu.addItem(.separator()); menu.addItem(withTitle: "Quit Workbench Voice", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            menu.addItem(.separator()); menu.addItem(withTitle: "Quit Workbench", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
             statusItem.menu = menu; statusItem.button?.performClick(nil); statusItem.menu = nil
         } else { toggleControls() }
     }
@@ -130,7 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     func showControls() {
         guard let button = statusItem.button else { return }
         menuTarget = TextDelivery.capture()
-        model.refreshPermissions(); window.orderOut(nil); NSApp.activate(ignoringOtherApps: true)
+        model.refreshPermissions(); keyboard.stopInteraction(); NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
     }
@@ -159,8 +198,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
     func updateRecordingUI() {
-        statusItem?.button?.image = NSImage(systemSymbolName: model.phase == .recording ? "mic.fill" : "waveform", accessibilityDescription: "Workbench Voice")
-        statusItem?.button?.toolTip = "Workbench Voice · " + model.preferences.controlsShortcut.label
+        statusItem?.button?.image = NSImage(systemSymbolName: model.phase == .recording ? "mic.fill" : "square.stack.3d.up", accessibilityDescription: "Workbench")
+        statusItem?.button?.toolTip = "Workbench · " + model.preferences.controlsShortcut.label
         capturePanel?.update(model: model)
     }
     @objc func showSettings() { model.page = "settings"; showWindow() }
@@ -172,10 +211,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         model.savePrompt(text)
     }
     @objc func showWindow() { closeControls(); window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
-    @objc func showAbout() { NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Workbench Voice", .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development", .credits: NSAttributedString(string: "Local dictation and text-to-speech.\nPowered by Parakeet, FluidAudio, and macOS voices.")]) }
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showControls(); return true }
+    @objc func showAbout() { NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Workbench", .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development", .credits: NSAttributedString(string: "Everyday tools for speaking, explaining and presenting.\nSpeech powered by Parakeet, FluidAudio, macOS voices and your chosen providers.")]) }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showWindow(); return true }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
-    func applicationWillTerminate(_ notification: Notification) { model?.shutdown(); hotkeys.unregister() }
+    func applicationWillTerminate(_ notification: Notification) {
+        keyboard?.stopInteraction(); stage?.shutdown(); model?.shutdown(); hotkeys.unregister()
+        if let navigationObserver { NotificationCenter.default.removeObserver(navigationObserver) }
+    }
+    func navigate(_ page: String) {
+        keyboard?.stopInteraction(); keyboard?.replaceEntries(shortcutEntries()); model.page = page; showWindow()
+    }
+    func shortcutEntries() -> [ShortcutEntry] {
+        let voiceEntries = [(UInt32(1), "Dictate"), (UInt32(2), "Quick controls"), (UInt32(3), "Saved resources")].map { id, title in
+            ShortcutEntry(id: "voice.\(id)", title: title, shortcut: model.preferences.shortcut(id), error: model.shortcutFailures[id])
+        }
+        let entries = voiceEntries + stage.shortcutDescriptors.map { entry in
+            ShortcutEntry(id: "stage." + entry.id, title: entry.label, shortcut: VoiceShortcut(keyCode: entry.keyCode, modifiers: entry.modifiers, enabled: entry.enabled), error: entry.error)
+        }
+        // Imported custom combinations are preserved, but their conflicts must be
+        // just as visible as conflicts discovered while assigning new keys.
+        return entries.map { entry in
+            var result = entry
+            if result.error == nil { result.error = ShortcutConflict.message(for: entry.shortcut, replacing: entry.id, in: entries) }
+            return result
+        }
+    }
+    func saveShortcut(_ id: String, _ shortcut: VoiceShortcut) -> String? {
+        if shortcut.enabled, let duplicate = shortcutEntries().first(where: { $0.id != id && $0.shortcut.enabled && $0.shortcut.keyCode == shortcut.keyCode && $0.shortcut.modifiers == shortcut.modifiers }) {
+            return "Already used by \(duplicate.title)."
+        }
+        if id.hasPrefix("voice."), let key = UInt32(id.dropFirst(6)) {
+            model.preferences.setShortcut(shortcut, for: key); return nil
+        }
+        if id.hasPrefix("stage.") { return stage.updateShortcut(id: String(id.dropFirst(6)), keyCode: shortcut.keyCode, modifiers: shortcut.modifiers, enabled: shortcut.enabled) }
+        return "Unknown shortcut."
+    }
 }
 
 func runCLI(_ args: [String]) async -> Int32 {
@@ -183,8 +253,10 @@ func runCLI(_ args: [String]) async -> Int32 {
         let engine = RecognitionEngine()
         switch args.first {
         case "--check-core":
-            try CoreChecks.run(); try CleanupChecks.run(); try DemoLibraryChecks.run()
-            try await MainActor.run { try DemoLibraryChecks.runModelChecks(); try IntegrationChecks.run() }
+            try CoreChecks.run(); try CleanupChecks.run(); try DemoLibraryChecks.run(); try ProviderChecks.run()
+            try await MainActor.run { try DemoLibraryChecks.runModelChecks(); try IntegrationChecks.run(); try KeyboardCoachChecks.run() }
+        case "--check-providers":
+            try ProviderChecks.run(); try await ProviderChecks.runTransportChecks()
         case "--check-input":
             try await MainActor.run { try InputChecks.run() }
         case "--check-cleanup":
@@ -198,7 +270,7 @@ func runCLI(_ args: [String]) async -> Int32 {
             let result = await CleanupEngine().clean(text, style: args.count > 2 ? (CleanupStyle(rawValue: args[2]) ?? .light) : .light)
             print(result.text)
         case "--prepare-model":
-            try await engine.prepare(); print("MODEL_READY: Parakeet v2")
+            try await engine.prepare(); print("MODEL_READY: \(await engine.statusDescription())")
         case "--transcribe":
             guard args.count == 2 else { throw VoiceError.message("Usage: LocalVoice --transcribe AUDIO_FILE") }
             print(try await engine.transcribe(URL(fileURLWithPath: args[1])))
@@ -232,7 +304,7 @@ if CommandLine.arguments.count > 1, CommandLine.arguments[1].hasPrefix("--") {
 } else {
     MainActor.assumeIsolated {
         let app = NSApplication.shared
-        app.setActivationPolicy(.accessory)
+        app.setActivationPolicy(.regular)
         let delegate = AppDelegate()
         app.delegate = delegate
         app.run()

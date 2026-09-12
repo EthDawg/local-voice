@@ -1,0 +1,406 @@
+import AppKit
+import SwiftUI
+
+struct DemoScenesView: View {
+    @ObservedObject var model: DemoScenes
+    @State private var rename = ""
+    @State private var confirmingRemoval = false
+    @State private var choosingStarter = false
+    @State private var choosingLogo = false
+    @State private var creatingTextLogo = false
+    @State private var textLogoName = "Your company"
+    var body: some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 14) {
+                WorkbenchHeader(title: "Demo scenes", subtitle: "Your saved mobile demos.", symbol: "iphone.and.landscape")
+                TextField("Find a customer or scene", text: $model.query).textFieldStyle(.roundedBorder)
+                    .accessibilityLabel("Find a scene")
+                List(selection: $model.selectedID) {
+                    ForEach(model.matches) { scene in
+                        HStack(spacing: 9) {
+                            Image(systemName: scene.showsPhone ? "iphone" : "photo").foregroundStyle(Workbench.accent)
+                            Text(scene.name).lineLimit(2)
+                        }.padding(.vertical, 5).tag(scene.id)
+                    }
+                }.listStyle(.sidebar)
+                Button { choosingStarter = true } label: { Label("Choose a starter…", systemImage: "square.grid.2x2") }
+                    .disabled(model.storageBlocked)
+                Button { model.importImage() } label: { Label("Add backdrop…", systemImage: "plus") }
+                    .buttonStyle(.borderedProminent).disabled(model.storageBlocked)
+                Text("Images and layouts stay on this Mac.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }.padding(18).frame(width: 245)
+            Divider()
+            GeometryReader { editor in
+            VStack(spacing: 0) {
+            ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                if let scene = model.selected {
+                    HStack {
+                        TextField("Scene name", text: $rename, onCommit: commitName)
+                            .font(.title2.weight(.semibold)).textFieldStyle(.plain)
+                            .onChange(of: model.selectedID) { _, _ in rename = model.selected?.name ?? "" }
+                            .onAppear { rename = scene.name }
+                        Button("Rename") { commitName() }.disabled(rename.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || rename == scene.name)
+                        Menu {
+                            Button("Duplicate scene") { model.duplicate() }
+                            Button("Move up") { model.moveScene(scene.id, by: -1) }.disabled(model.scenes.first?.id == scene.id)
+                            Button("Move down") { model.moveScene(scene.id, by: 1) }.disabled(model.scenes.last?.id == scene.id)
+                            Button("Remove scene…", role: .destructive) { confirmingRemoval = true }
+                        } label: { Image(systemName: "ellipsis.circle") }.menuStyle(.borderlessButton).fixedSize()
+                            .accessibilityLabel("Scene options")
+                    }
+                    if let image = model.image(for: scene) {
+                        SceneCanvas(scene: scene, image: image, logoImage: model.logoImage(for: scene), handImage: model.handImage(for: scene)) { value in model.update(value) }
+                            .frame(width: previewSize(in: editor.size).width, height: previewSize(in: editor.size).height)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.primary.opacity(0.12)))
+                            .accessibilityLabel("Scene preview. Drag the phone to position it; drag the background to crop it.")
+                            .frame(maxWidth: .infinity)
+                        HStack {
+                            Text("Drag to position")
+                            Spacer()
+                            Text("Layout saved automatically").foregroundStyle(Workbench.accent)
+                        }.font(.caption).foregroundStyle(.secondary)
+                        HStack(spacing: 22) {
+                            Toggle("Device frame", isOn: binding(\.showsPhone)).toggleStyle(.switch)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text("Device size").font(.caption).foregroundStyle(.secondary)
+                                Slider(value: binding(\.phoneHeight), in: ViewportGeometry.heightRange).disabled(!scene.showsPhone)
+                                    .accessibilityLabel("Device size")
+                            }
+                            Button("Maximise") {
+                                var value = scene; value.phoneHeight = ViewportGeometry.heightRange.upperBound; model.update(value)
+                            }.disabled(!scene.showsPhone).help("Fill the available height while keeping the whole frame visible")
+                        }
+                        logoControls(scene)
+                        DisclosureGroup("Adjust layout") {
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack {
+                                Text("Backdrop zoom").font(.caption).foregroundStyle(.secondary)
+                                Slider(value: binding(\.zoom), in: 1...3).accessibilityLabel("Backdrop zoom")
+                            }
+                        viewportControls(scene)
+                        HStack(spacing: 12) {
+                            Text("Device position").foregroundStyle(.secondary)
+                            Button("Left") { position(0.12) }.disabled(!scene.showsPhone)
+                            Button("Centre") { position(0.5) }.disabled(!scene.showsPhone)
+                            Button("Right") { position(0.88) }.disabled(!scene.showsPhone)
+                            Spacer()
+                            Button("Reset layout") {
+                                var reset = scene; reset.backgroundX = 0.5; reset.backgroundY = 0.5; reset.zoom = 1
+                                reset.phoneX = 0.5; reset.phoneY = 0.5; reset.phoneHeight = 0.88; reset.viewport = .phone
+                                model.update(reset)
+                            }.buttonStyle(.link)
+                        }.font(.caption)
+                        handControls(scene)
+                        }.padding(.top, 10)
+                        }.font(.caption)
+                    } else {
+                        ContentUnavailableView("Backdrop missing", systemImage: "photo.badge.exclamationmark", description: Text("Add the original image again to create a new scene."))
+                    }
+                } else if !model.scenes.isEmpty {
+                    VStack(spacing: 14) {
+                        Image(systemName: "magnifyingglass").font(.system(size: 38)).foregroundStyle(.secondary)
+                        Text("No matching scenes").font(.title2.weight(.semibold))
+                        Button("Clear search") { model.query = "" }
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    VStack(spacing: 14) {
+                        Image(systemName: "iphone.and.landscape").font(.system(size: 48)).foregroundStyle(Workbench.accent)
+                        Text("Set the scene for your next demo").font(.title2.weight(.semibold))
+                        Text("Choose a backdrop, add your logo, and start presenting.\nYour setup is saved for next time.")
+                            .multilineTextAlignment(.center).foregroundStyle(.secondary)
+                        Button("Choose a starter…") { choosingStarter = true }.buttonStyle(.borderedProminent).disabled(model.storageBlocked)
+                        Button("Add your own backdrop…") { model.importImage() }.disabled(model.storageBlocked)
+                    }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                Spacer(minLength: 0)
+                if let notice = model.notice {
+                    HStack(alignment: .top) {
+                        Image(systemName: "info.circle")
+                        Text(notice).textSelection(.enabled)
+                        Spacer()
+                        Button { model.notice = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain).accessibilityLabel("Dismiss notice")
+                    }.font(.caption).padding(10).background(Workbench.surface, in: RoundedRectangle(cornerRadius: 8))
+                }
+                #if !APP_STORE
+                if model.hasDesktopSnapshot {
+                    HStack {
+                        Text(model.desktopBusy ? "Waiting for macOS…" : "Desktop recovery details are saved.").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Restore desktop") { model.restoreDesktop() }.disabled(model.desktopBusy)
+                    }
+                }
+                #endif
+            }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+            if let scene = model.selected, model.image(for: scene) != nil {
+                Divider()
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        #if !APP_STORE
+                        Button("Start demo") { commitName(); model.startDemo() }.buttonStyle(.borderedProminent).controlSize(.large).disabled(model.desktopBusy)
+                        #else
+                        Button("Export image…") { commitName(); model.exportPNG() }.buttonStyle(.borderedProminent).controlSize(.large)
+                        #endif
+                        Spacer()
+                        Menu("More") {
+                        #if !APP_STORE
+                        Button("Export image…") { commitName(); model.exportPNG() }
+                        Button("Use as desktop") { commitName(); model.applyDesktop() }.disabled(model.desktopBusy)
+                        #endif
+                        }.fixedSize().accessibilityLabel("More demo actions")
+                    }
+                    #if !APP_STORE
+                    Text("Full-screen demo. Press Esc to finish.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    #else
+                    Text("Export your scene, then position a QuickTime movie preview over its device frame.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    #endif
+                    NativePresentationApps { model.notice = $0 }
+                }.padding(.horizontal, 24).padding(.vertical, 16).background(Workbench.surface)
+            }
+            }
+            }
+        }
+        .background(Workbench.background).tint(Workbench.accent).workbenchTheme()
+        .sheet(isPresented: $choosingStarter) {
+            SceneStarterGallery(model: model) { starter in
+                do { try model.useStarter(starter); choosingStarter = false }
+                catch { model.notice = error.localizedDescription; choosingStarter = false }
+            }
+        }
+        .sheet(isPresented: $choosingLogo) { SavedLogoGallery(model: model) }
+        .alert("Create a text logo", isPresented: $creatingTextLogo) {
+            TextField("Company name", text: $textLogoName)
+            Button("Create") { model.makeTextLogo(String(textLogoName.prefix(80))) }
+            Button("Cancel", role: .cancel) {}
+        } message: { Text("A simple wordmark you can use now and replace with the real logo later.") }
+        .alert("Remove this scene?", isPresented: $confirmingRemoval) {
+            Button("Cancel", role: .cancel) {}
+            Button("Remove", role: .destructive) { model.remove() }
+        } message: { Text("The saved layout will be removed. The imported picture stays on this Mac.") }
+    }
+    private func previewSize(in editor: CGSize) -> CGSize {
+        // Keep the saved scene and everyday controls together at the minimum
+        // window size. Expanded adjustments can scroll without stretching it.
+        let width = max(1, editor.width - 48)
+        let logoControlsHeight: CGFloat = model.selected?.logo == nil ? 0 : 64
+        let height = max(200, editor.height - 365 - logoControlsHeight)
+        return CGSize(width: min(width, height * model.screenAspect), height: min(width / model.screenAspect, height))
+    }
+    @ViewBuilder private func viewportControls(_ scene: DemoScene) -> some View {
+        if scene.showsPhone {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Menu("Device shape") {
+                        Button("Phone") { setViewport(.phone) }
+                        Button("Tablet") { setViewport(.tablet) }
+                        Button("Tablet landscape") { setViewport(.landscape) }
+                        Divider()
+                        Button("My device") { if let profile = model.myDevice { setViewport(profile) } }.disabled(model.myDevice == nil)
+                    }.fixedSize()
+                    Button("Rotate") { var value = scene.viewport ?? .legacy; value.aspect = 1 / value.aspect; setViewport(value) }
+                    Spacer()
+                    Button("Save as my device") { model.saveMyDevice() }.buttonStyle(.link)
+                }.font(.caption)
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Width").font(.caption).foregroundStyle(.secondary)
+                        Slider(value: viewportBinding(\.aspect), in: 0.3...2.4).accessibilityLabel("Device width")
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Corners").font(.caption).foregroundStyle(.secondary)
+                        Slider(value: viewportBinding(\.corners), in: 0...0.3).accessibilityLabel("Corner radius")
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Border").font(.caption).foregroundStyle(.secondary)
+                        Slider(value: viewportBinding(\.border), in: 0.003...0.035).accessibilityLabel("Border thickness")
+                    }
+                }
+            }
+        }
+    }
+    private func setViewport(_ viewport: DeviceViewport) {
+        guard var scene = model.selected else { return }; scene.viewport = viewport; model.update(scene)
+    }
+    private func viewportBinding(_ key: WritableKeyPath<DeviceViewport, Double>) -> Binding<Double> {
+        Binding(get: { (model.selected?.viewport ?? .legacy)[keyPath: key] }, set: { value in
+            var viewport = model.selected?.viewport ?? .legacy; viewport[keyPath: key] = value; setViewport(viewport)
+        })
+    }
+    @ViewBuilder private func handControls(_ scene: DemoScene) -> some View {
+        if let hand = scene.hand {
+            DisclosureGroup("Hand cutout") {
+                VStack(spacing: 10) {
+                    HStack {
+                        Picker("Tone", selection: handBinding(\.tone, fallback: .original)) {
+                            ForEach(HandTone.allCases, id: \.self) { Text($0.label).tag($0) }
+                        }
+                        Toggle("Flip", isOn: handBinding(\.mirrored, fallback: false))
+                        Button("Replace…") { model.importHand() }
+                        Button("Remove") { var value = scene; value.hand = nil; model.update(value) }
+                    }
+                    HStack {
+                        Text("Size"); Slider(value: handBinding(\.scale, fallback: 1), in: 0.35...2).accessibilityLabel("Hand size")
+                        Text("Across"); Slider(value: handBinding(\.x, fallback: 0), in: -1...1).accessibilityLabel("Hand horizontal position")
+                        Text("Up"); Slider(value: handBinding(\.y, fallback: 0), in: -1...1).accessibilityLabel("Hand vertical position")
+                    }
+                    if model.handImage(for: scene) == nil { Text("Hand missing — replace or remove it to present.").foregroundStyle(.orange) }
+                }.font(.caption).padding(.top, 8)
+            }.font(.caption).id(hand.image)
+        } else {
+            Button("Add hand cutout…") { model.importHand() }.font(.caption)
+        }
+    }
+    private func handBinding<T>(_ key: WritableKeyPath<SceneHand, T>, fallback: T) -> Binding<T> {
+        Binding(get: { model.selected?.hand?[keyPath: key] ?? fallback }, set: { value in
+            guard var scene = model.selected, var hand = scene.hand else { return }
+            hand[keyPath: key] = value; scene.hand = hand; model.update(scene)
+        })
+    }
+    @ViewBuilder private func logoControls(_ scene: DemoScene) -> some View {
+        if scene.logo != nil {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("Customer logo", systemImage: "photo.badge.checkmark").font(.caption)
+                    Spacer()
+                    Button("Paste logo") { model.pasteLogo() }
+                    logoMenu("Replace…")
+                    Button("Remove") { var value = scene; value.logo = nil; model.update(value) }
+                }
+                HStack(spacing: 16) {
+                    Picker("Corner", selection: logoBinding(\.corner, fallback: .topRight)) {
+                        ForEach(LogoCorner.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }.fixedSize()
+                    Picker("Backing", selection: logoBinding(\.backing, fallback: .light)) {
+                        ForEach(LogoBacking.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }.fixedSize()
+                    Text("Size").foregroundStyle(.secondary)
+                    Slider(value: logoBinding(\.width, fallback: 0.16), in: 0.08...0.28)
+                        .accessibilityLabel("Logo size")
+                }.font(.caption)
+                if model.logoImage(for: scene) == nil {
+                    Text("Logo missing — replace or remove it to export this scene.").font(.caption).foregroundStyle(.orange)
+                }
+            }
+        } else {
+            HStack {
+                logoMenu("Add logo…")
+                Button("Paste logo") { model.pasteLogo() }
+            }
+        }
+    }
+    private func logoMenu(_ title: String) -> some View {
+        Menu(title) {
+            Button("Choose image…") { model.importLogo() }
+            Button("Saved logos…") { choosingLogo = true }.disabled(model.savedLogos.isEmpty)
+            Button("Create text logo…") { creatingTextLogo = true }
+            if !model.savedLogos.isEmpty {
+                Divider()
+                ForEach(model.savedLogos.prefix(8)) { logo in Button(logo.name) { model.useSavedLogo(logo) } }
+            }
+        }.fixedSize()
+    }
+    private func logoBinding<T>(_ key: WritableKeyPath<SceneLogo, T>, fallback: T) -> Binding<T> {
+        Binding(get: { model.selected?.logo?[keyPath: key] ?? fallback }, set: { value in
+            guard var scene = model.selected, var logo = scene.logo else { return }
+            logo[keyPath: key] = value; scene.logo = logo; model.update(scene)
+        })
+    }
+    private func binding<T>(_ key: WritableKeyPath<DemoScene, T>) -> Binding<T> {
+        let fallback = model.selected![keyPath: key]
+        return Binding(get: { model.selected?[keyPath: key] ?? fallback }, set: { value in
+            guard var scene = model.selected else { return }; scene[keyPath: key] = value; model.update(scene)
+        })
+    }
+    private func position(_ x: Double) {
+        guard var scene = model.selected else { return }; scene.phoneX = x; model.update(scene)
+    }
+    private func commitName() {
+        guard var scene = model.selected else { return }
+        let trimmed = rename.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { rename = scene.name; return }
+        guard trimmed != scene.name else { return }
+        scene.name = String(trimmed.prefix(160))
+        // A rename can leave the current search. Keep this customer selected so
+        // the following Start or Export action cannot act on a different scene.
+        if !model.query.isEmpty && !scene.name.localizedCaseInsensitiveContains(model.query) { model.query = "" }
+        model.update(scene)
+    }
+}
+
+private struct SceneCanvas: NSViewRepresentable {
+    let scene: DemoScene
+    let image: NSImage
+    let logoImage: NSImage?
+    let handImage: NSImage?
+    let update: (DemoScene) -> Void
+    func makeNSView(context: Context) -> SceneCanvasView { SceneCanvasView() }
+    func updateNSView(_ view: SceneCanvasView, context: Context) {
+        view.scene = scene; view.image = image; view.logoImage = logoImage; view.handImage = handImage; view.update = update; view.needsDisplay = true
+    }
+}
+
+private final class SceneCanvasView: NSView {
+    var scene: DemoScene?
+    var image: NSImage?
+    var logoImage: NSImage?
+    var handImage: NSImage?
+    var update: ((DemoScene) -> Void)?
+    private var origin = CGPoint.zero
+    private var initial: DemoScene?
+    private var movingPhone = false
+    private var resizingWidth = false
+    private var resizingSize = false
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func draw(_ dirtyRect: NSRect) {
+        guard let scene, let image else { return }
+        SceneRenderer.draw(scene, image: image, size: bounds.size, logoImage: logoImage, handImage: handImage)
+        if scene.showsPhone {
+            let rect = SceneRenderer.phoneRect(scene, in: bounds.size)
+            NSColor.controlAccentColor.setFill()
+            for point in [CGPoint(x: rect.maxX, y: rect.midY), CGPoint(x: rect.maxX, y: rect.minY)] {
+                NSBezierPath(ovalIn: CGRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8)).fill()
+            }
+        }
+    }
+    override func mouseDown(with event: NSEvent) {
+        origin = convert(event.locationInWindow, from: nil); initial = scene
+        if let scene {
+            let rect = SceneRenderer.phoneRect(scene, in: bounds.size)
+            resizingWidth = scene.showsPhone && abs(origin.x - rect.maxX) < 12 && abs(origin.y - rect.midY) < 12
+            resizingSize = scene.showsPhone && abs(origin.x - rect.maxX) < 12 && abs(origin.y - rect.minY) < 12
+            movingPhone = scene.showsPhone && rect.contains(origin)
+        }
+    }
+    override func mouseDragged(with event: NSEvent) {
+        guard var draft = initial, let image else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        let delta = CGPoint(x: point.x - origin.x, y: point.y - origin.y)
+        if resizingWidth {
+            let geometry = ViewportGeometry(scene: draft, size: bounds.size)
+            var viewport = draft.viewport ?? .legacy
+            viewport.aspect = max(1, geometry.screen.width + delta.x) / max(1, geometry.screen.height)
+            draft.viewport = try? viewport.validated()
+            let resized = SceneRenderer.phoneRect(draft, in: bounds.size)
+            draft.phoneX = geometry.outer.minX / max(1, bounds.width - resized.width)
+        } else if resizingSize {
+            let rect = SceneRenderer.phoneRect(draft, in: bounds.size)
+            draft.phoneHeight = min(ViewportGeometry.heightRange.upperBound, max(ViewportGeometry.heightRange.lowerBound, (rect.height - delta.y) / max(1, bounds.height)))
+        } else if movingPhone {
+            let frame = SceneRenderer.phoneRect(draft, in: bounds.size)
+            draft.phoneX += delta.x / max(1, bounds.width - frame.width)
+            draft.phoneY += delta.y / max(1, bounds.height - frame.height)
+        } else {
+            let scale = max(bounds.width / image.size.width, bounds.height / image.size.height) * draft.zoom
+            let overflowX = image.size.width * scale - bounds.width
+            let overflowY = image.size.height * scale - bounds.height
+            if overflowX > 1 { draft.backgroundX -= delta.x / overflowX }
+            if overflowY > 1 { draft.backgroundY -= delta.y / overflowY }
+        }
+        if let value = try? draft.validated() { update?(value) }
+    }
+}

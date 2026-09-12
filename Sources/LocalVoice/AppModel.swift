@@ -12,8 +12,8 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         shortcutRequest.cancel(); cancelRecording()
     }
     func transcribeForShortcut(_ url: URL, id: UUID = UUID()) async throws -> String {
-        guard ready else { throw VoiceError.message("Open Voice and finish preparing the speech model, then run this shortcut again.") }
-        guard phase == .idle, !rendering else { throw VoiceError.message("Voice is busy. Finish the current recording or reading first.") }
+        guard ready else { throw VoiceError.message("Open Workbench and finish preparing the speech model, then run this shortcut again.") }
+        guard phase == .idle, !rendering else { throw VoiceError.message("Workbench is busy. Finish the current recording or reading first.") }
         let file = try AVAudioFile(forReading: url)
         let duration = Double(file.length) / file.processingFormat.sampleRate
         guard duration > 0, duration <= 1800 else { throw VoiceError.message("Choose an audio recording up to 30 minutes long.") }
@@ -47,7 +47,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     @Published var previewingPanel = false
     @Published var shortcutFailures: [UInt32: String] = [:]
     @Published var quickTab = "Dictate"
-    @Published var page = "dictate"
+    @Published var page = "home"
     @Published var libraryFocusToken = UUID()
     @Published var phase: Phase = .idle
     @Published var ready = false
@@ -149,8 +149,8 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
 
     func prepare() async {
         guard !preparing, !ready else { return }
-        preparing = true; modelMessage = "Preparing Parakeet · first setup may take a few minutes"
-        do { try await engine.prepare(); ready = true; modelMessage = "Parakeet · English · on your Mac" }
+        preparing = true; modelMessage = "Preparing speech · first setup may take a few minutes"
+        do { try await engine.prepare(); ready = true; modelMessage = await engine.statusDescription() }
         catch { modelMessage = "Speech model needs attention"; self.error = "Could not prepare the speech model. Check your connection and click Retry model. \(error.localizedDescription)" }
         preparing = false
     }
@@ -185,7 +185,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         }
         guard recordingAttempt == attempt else { return }
         guard granted else {
-            fail("Microphone access is off. Open Settings → Privacy & Security → Microphone and allow Workbench Voice."); return
+            fail("Microphone access is off. Open System Settings → Privacy & Security → Microphone and allow \(Workbench.displayName)."); return
         }
         do {
             if let old = recordURL { try? FileManager.default.removeItem(at: old) }
@@ -234,7 +234,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     func importAudio() {
         guard phase == .idle, ready else { return }
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.audio]; panel.canChooseDirectories = false
-        panel.message = "Choose an audio file up to 30 minutes. It stays on your Mac."
+        panel.message = "Choose an audio file up to 30 minutes. Your selected speech engine will transcribe it."
         guard panel.runModal() == .OK, let url = panel.url else { return }
         importAudio(url)
     }

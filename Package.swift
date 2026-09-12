@@ -11,12 +11,13 @@ if let protocols = environment["VOICE_INTENT_PROTOCOLS"], let output = environme
 }
 
 let package = Package(
-    name: "LocalVoice",
+    name: "Workbench",
     platforms: [.macOS(.v14)],
     products: [.executable(name: "LocalVoice", targets: ["LocalVoice"])],
     dependencies: [.package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.15.6")],
     targets: [
-        .executableTarget(name: "LocalVoice", dependencies: [.product(name: "FluidAudio", package: "FluidAudio")], swiftSettings: intentSettings)
+        .target(name: "StageKit", linkerSettings: [.linkedFramework("Carbon")]),
+        .executableTarget(name: "LocalVoice", dependencies: ["StageKit", .product(name: "FluidAudio", package: "FluidAudio")], swiftSettings: intentSettings, linkerSettings: [.linkedFramework("Carbon")])
     ],
     swiftLanguageModes: [.v5]
 )

@@ -1,4 +1,4 @@
-// Workbench shell contract v2. Keep this file identical in the suite apps.
+// Unified Workbench identity and non-destructive legacy data import.
 import AppKit
 import SwiftUI
 
@@ -13,40 +13,41 @@ enum Workbench {
     static var suiteDomain: String { "com.ethdawg.workbench" + (isPreview ? ".preview" : "") }
     static func supportDirectory(component: String) -> URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent(component + (isPreview ? " Preview" : ""), isDirectory: true)
+            .appendingPathComponent(isPreview ? "Workbench Preview" : "Workbench", isDirectory: true)
+            .appendingPathComponent(component, isDirectory: true)
     }
-    // Seed once from a read-only snapshot. Subsequent updates never overwrite Preview data.
-    // Explicit file allowlist avoids copying model caches, credentials or unrelated state.
     static func preparePreviewData(component: String, files: [String]) {
-        guard isPreview, let identifier = Bundle.main.bundleIdentifier, identifier.hasSuffix(".preview") else { return }
-        let defaults = UserDefaults.standard
-        guard !defaults.bool(forKey: "workbench.previewSeeded.v1") else { return }
-        let originalID = String(identifier.dropLast(".preview".count))
-        let current = defaults.persistentDomain(forName: identifier) ?? [:]
-        for (key, value) in defaults.persistentDomain(forName: originalID) ?? [:] where current[key] == nil {
-            defaults.set(value, forKey: key)
-        }
-        let suite = UserDefaults(suiteName: suiteDomain)!
-        if suite.object(forKey: "appearance") == nil,
-           let appearance = defaults.persistentDomain(forName: "com.ethdawg.workbench")?["appearance"] {
-            suite.set(appearance, forKey: "appearance")
-        }
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let destination = supportDirectory(component: component)
-        let source = destination.deletingLastPathComponent().appendingPathComponent(component, isDirectory: true)
+        // A complete component directory is the import boundary: never merge a later
+        // legacy snapshot into an existing unified session.
+        guard !FileManager.default.fileExists(atPath: destination.path) else { return }
+        let choices = [base.appendingPathComponent(component + " Preview"), base.appendingPathComponent(component)]
+        let source = choices.first { FileManager.default.fileExists(atPath: $0.path) }
+        let staging = destination.deletingLastPathComponent().appendingPathComponent(".import-" + UUID().uuidString)
         do {
-            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            for file in files where !file.contains("/") && file != ".." {
-                let from = source.appendingPathComponent(file), to = destination.appendingPathComponent(file)
-                if FileManager.default.fileExists(atPath: from.path), !FileManager.default.fileExists(atPath: to.path) {
-                    try FileManager.default.copyItem(at: from, to: to)
-                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: to.path)
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            defer { try? FileManager.default.removeItem(at: staging) }
+            if let source {
+                for file in files where !file.contains("/") && file != ".." {
+                    let from = source.appendingPathComponent(file)
+                    if FileManager.default.fileExists(atPath: from.path) {
+                        try FileManager.default.copyItem(at: from, to: staging.appendingPathComponent(file))
+                        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: staging.appendingPathComponent(file).path)
+                    }
                 }
             }
-            defaults.set(true, forKey: "workbench.previewSeeded.v1")
-        } catch {
-            // Preserve the original and retry any missing snapshot files next launch.
-            NSLog("Workbench Preview could not finish its initial snapshot: %@", error.localizedDescription)
-        }
+            try FileManager.default.moveItem(at: staging, to: destination)
+            let defaults = UserDefaults.standard
+            if defaults.object(forKey: VoicePreferences.key) == nil {
+                let legacyIDs = ["com.ethdawg.localvoice.preview", "com.ethdawg.localvoice"]
+                for id in legacyIDs {
+                    if let value = defaults.persistentDomain(forName: id)?[VoicePreferences.key] {
+                        defaults.set(value, forKey: VoicePreferences.key); break
+                    }
+                }
+            }
+        } catch { NSLog("Workbench could not import the previous session: %@", error.localizedDescription) }
     }
     static let background = Color(nsColor: .windowBackgroundColor)
     static let surface = Color(nsColor: .controlBackgroundColor)
@@ -58,28 +59,17 @@ enum Workbench {
     static let border = Color.primary.opacity(0.08)
     static let controlWidth: CGFloat = 370
     static func open(_ app: String) {
-        let suffix = isPreview ? " Preview" : ""
-        let bundleName = "Workbench \(app)\(suffix).app"
-        let home = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/" + bundleName)
-        let global = URL(fileURLWithPath: "/Applications/" + bundleName)
-        let id = (app == "Voice" ? "com.ethdawg.localvoice" : "local.ethan.StageMark") + (isPreview ? ".preview" : "")
-        let location = [home, global].first { FileManager.default.fileExists(atPath: $0.path) }
-            ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: id)
-        if let location {
-            NSWorkspace.shared.openApplication(at: location, configuration: NSWorkspace.OpenConfiguration())
-        }
+        NotificationCenter.default.post(name: .workbenchNavigate, object: app == "Voice" ? "dictate" : "annotate")
     }
+
 }
 
 final class WorkbenchSettings: ObservableObject {
     enum Appearance: String, CaseIterable { case system = "System", light = "Light", dark = "Dark" }
     static let shared = WorkbenchSettings()
-    #if APP_STORE
-    // Store editions keep preferences within their own sandbox container.
+    // Both modules now live in this application's domain. Opening that same
+    // domain as a separate suite can return nil in a signed installed app.
     private let defaults = UserDefaults.standard
-    #else
-    private let defaults = UserDefaults(suiteName: Workbench.suiteDomain)!
-    #endif
     private let notification = Notification.Name(Workbench.suiteDomain + ".appearance")
     private var observer: NSObjectProtocol?
     private var systemObserver: NSObjectProtocol?
@@ -134,9 +124,9 @@ struct WorkbenchSwitcher: View {
     var body: some View {
         Menu {
             Button("Voice · dictate and read") { beforeOpen(); Workbench.open("Voice") }
-            Button("StageMark · draw and present") { beforeOpen(); Workbench.open("StageMark") }
+            Button("Annotate · draw and present") { beforeOpen(); Workbench.open("StageMark") }
         } label: { Label(Workbench.isPreview ? "Workbench Preview" : "Workbench", systemImage: "square.grid.2x2") }
-        .menuStyle(.borderlessButton).fixedSize().font(.system(size: 11)).accessibilityLabel("Workbench apps")
+        .menuStyle(.borderlessButton).fixedSize().font(.system(size: 11)).accessibilityLabel("Workbench tools")
     }
 }
 struct WorkbenchAppearancePicker: View {
@@ -157,3 +147,5 @@ struct WorkbenchTheme: ViewModifier {
 extension View {
     func workbenchTheme() -> some View { modifier(WorkbenchTheme()) }
 }
+
+extension Notification.Name { static let workbenchNavigate = Notification.Name("com.ethdawg.workbench.navigate") }
