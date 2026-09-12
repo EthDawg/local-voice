@@ -23,14 +23,21 @@ This is a working acceptance record, not a claim that any unchecked item is deli
 
 Current evidence and remaining installed workflows: [Workbench 2 Preview](preview-2.0.md).
 
-- [x] Unified native app builds and core, provider, keyboard and StageKit regressions pass. The final HUD regression run passed core 21, cleanup 16, library 36, provider 37 plus real loopback transport, integration 42, keyboard checks, clipboard 25, and StageKit 54 tests/959 assertions on 12 September 2026.
+On 12 September 2026, GitHub workflow scope was granted with the user's
+authorization. [Draft PR #13](https://github.com/EthDawg/local-voice/pull/13)
+is open, and [CI run 34686749639](https://github.com/EthDawg/local-voice/actions/runs/34686749639)
+passed at `0651133`. The initial runner lacked `rg`; `scripts/test-stage.sh`
+now uses the system `grep` to check the result. Review and public release
+remain separate steps.
+
+- [x] Unified native app builds and core, provider, keyboard and StageKit regressions pass. The final HUD regression run passed core 21, cleanup 16, library 36, provider 37 plus real loopback transport, integration 42, keyboard checks, clipboard 25, and StageKit 54 tests/965 assertions on 12 September 2026 after the automatic-recovery token fix.
 - [x] One installed Preview process/status item; home, menus, Dock, reopen, close and Quit verified.
 - [x] Original Voice and StageMark data preserved; imported data and settings verified.
-- [ ] Dictation, cancellation, history, read-aloud/export and App Intents verified in installed package.
+- [ ] Dictation, cancellation, history, read-aloud/export and App Intents verified in installed package. Physical Command-3 dictation pasted the exact disposable test sentence into TextEdit with Accessibility enabled and Automatic paste ready; the previous synthetic clipboard was restored. Existing-file App Intents dispatch and Apple Record Audio → installed Preview transcription → Stop and Output passed. The separate Show Content presentation remains unverified.
 - [x] Switching local speech engines verified with a real compatible local server plus failure/cancellation checks. Installed Settings selection was consumed by the installed executable for synthetic WAV/M4A inference; transport cancellation/failure has separate automated coverage.
 - [x] Virtual keyboard assignment/conflicts/practice verified using real keys without activating tools.
 - [x] Annotation/board/timer focus and shutdown verified alongside speech.
-- [ ] Device presentation, QuickTime and iPhone Mirroring paths exercised with available hardware; limitations disclosed.
+- [ ] Device presentation, QuickTime and iPhone Mirroring paths exercised with available hardware; limitations disclosed. With Camera access enabled, the native iPhone feed showed Live at 1320 × 2868; manual Reconnect briefly showed Not live before resuming. Physical USB unplug/replug and the audience's screen-sharing view remain unverified. Stale-frame invalidation has regression coverage. Earlier QuickTime and iPhone Mirroring handoffs are recorded in the Preview evidence.
 - [ ] Downloadable signed/notarised unified Preview published on GitHub; public bytes and installed copy verified.
 - [ ] Unified landing page explains one app and its download. No website signup is needed.
 - [x] Optional introduction during app use opens an editable draft to Ethan and Matt in the user's email app. The user explicitly chose this flow on 12 September; Workbench does not send email or claim delivery. No website signup, transcript, device or usage data is included.

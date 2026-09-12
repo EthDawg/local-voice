@@ -120,8 +120,18 @@ final class DemoModeTests {
         let retry = state.select(phone.id)
         XCTAssertFalse(state.accepts(first, source: phone.id), "Queued frames from the former session are stale")
         XCTAssertTrue(state.accepts(retry, source: phone.id))
+        state.invalidateSession()
+        let automaticRetry = state.generation
+        XCTAssertEqual(state.desiredID, phone.id, "Automatic teardown preserves the user's selected device")
+        XCTAssertFalse(state.accepts(retry, source: phone.id), "A queued frame cannot survive same-device automatic recovery")
+        XCTAssertEqual(state.candidate(in: [other, phone, camera]), phone.id)
+        XCTAssertTrue(state.accepts(automaticRetry, source: phone.id), "The replacement session can publish its own frames")
+        state.invalidateSession()
+        XCTAssertFalse(state.accepts(automaticRetry, source: phone.id), "Every teardown invalidates the previous session, including repeated recovery")
+        XCTAssertTrue(state.candidate(in: [other, camera]) == nil, "Recovery still cannot switch to another device")
+        let beforeEnd = state.generation
         _ = state.select(nil)
-        XCTAssertFalse(state.accepts(retry, source: phone.id), "End demo invalidates pending frames")
+        XCTAssertFalse(state.accepts(beforeEnd, source: phone.id), "End demo invalidates pending frames")
     }
     func testHandTransparencyPersistenceAndNoStretch() throws {
         let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }

@@ -68,8 +68,9 @@ audio sheet or add test captures to the user's history.
   and completed action. An earlier run waited in the downstream Show Content
   flow; returning the text directly succeeded. No metadata rewrite was needed.
 - Native device presentation entered its first-use video permission state;
-  Escape ended the session and returned to the scene editor. Live USB video
-  remains unverified without the video-access grant.
+  Escape ended the session and returned to the scene editor. At that point,
+  live USB video had not been verified; the later permission and feed check
+  is recorded below.
 
 ## HUD follow-up on 12 September
 
@@ -101,20 +102,49 @@ clipboard and presentation controls:
   exact guarded pre-test session snapshot, preserving all 100 original history
   entries and the original draft. Imported synthetic audio remained intact.
 
-Physical device capture, audience screen-sharing, VoiceOver interaction and
-real multiple-display changes remain separate acceptance checks. The HUD's
-placement and presentation-retention policies have synthetic test coverage.
+Audience screen-sharing, VoiceOver interaction and real multiple-display
+changes remain separate acceptance checks. The HUD's placement and
+presentation-retention policies have synthetic test coverage.
+
+## CI and hardware follow-up on 12 September
+
+- GitHub workflow scope was granted with the user's authorization. The unified
+  branch is under review in [draft PR #13](https://github.com/EthDawg/local-voice/pull/13).
+  [CI run 34686749639](https://github.com/EthDawg/local-voice/actions/runs/34686749639)
+  passed at commit `0651133`. The earlier runner lacked `rg`; the StageKit
+  test script now checks its result with macOS's `/usr/bin/grep -Eq` instead.
+- With Accessibility enabled and the app reporting Automatic paste ready,
+  the user's physical press of their configured Command-3 shortcut produced
+  exactly “The purple lantern is beside the window” in a scratch TextEdit
+  document. The previous synthetic clipboard content was restored afterward.
+  This verifies microphone dictation and automatic paste into that target.
+- With Camera access enabled, Workbench's native iPhone feed displayed
+  **Live · 1320 × 2868**. Manual Reconnect briefly showed Not live before the
+  feed resumed. Physical USB unplug/replug and stale-frame recovery remain
+  unverified; this observation does not establish either behavior.
+- A separate `Workbench Live QA` shortcut completed Apple Record Audio →
+  Transcribe with the installed Preview → Stop and Output. Apple's recording
+  helper handled Start/Stop, and the downstream output displayed the expected
+  synthetic sentence: “Workbench permission test: the purple lantern is beside
+  the window.” The original dictation shortcut was left unchanged.
+- After quitting the app, exactly three known synthetic QA captures were
+  removed using a guarded snapshot taken after the user's latest real capture.
+  All 100 prior history entries and the prior draft were restored byte for byte.
+- Local review found that automatic recovery could reuse a session's frame
+  token. Every teardown now invalidates that token, so queued frames from a
+  previous session cannot mark its replacement Live. The full regression suite
+  passed after this change, including StageKit's 54 tests / 965 assertions.
+  This covers the stale-frame policy; physical cable recovery remains separate.
+
+No personal recordings or phone images are included in this record. These
+checks do not establish a public release or notarization.
 
 ## Still to verify or deliver
 
-- Automatic paste into a harmless target needs the new app's Accessibility
-  grant. Copy is available without it.
-- Full live Apple Shortcuts Record Audio → Transcribe → downstream action flow
-  with first-use permissions. The action is discoverable and Stop cancels
-  Apple's recording step. File-to-text dispatch is verified below; live capture
-  and the separate Show Content presentation remain unverified.
-- Workbench's native USB selection, reconnection and actual video; display
-  changes and an audience's real screen-sharing view.
+- The separate Shortcuts Show Content presentation has not been accepted;
+  live capture, transcription and downstream Stop and Output are verified above.
+- Physical USB unplug/replug and stale-frame recovery; display changes and
+  an audience's real screen-sharing view.
 - Fresh-Mac download, first model setup and normal Gatekeeper first opening.
 - Public notarized Preview, downloaded-byte verification and the unified site.
 

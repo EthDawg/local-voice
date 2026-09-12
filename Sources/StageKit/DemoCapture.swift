@@ -12,7 +12,8 @@ struct DemoSource: Identifiable, Equatable {
 struct CaptureRecovery {
     var desiredID: String?
     var generation = 0
-    mutating func select(_ id: String?) -> Int { desiredID = id; generation += 1; return generation }
+    mutating func select(_ id: String?) -> Int { desiredID = id; invalidateSession(); return generation }
+    mutating func invalidateSession() { generation += 1 }
     func accepts(_ token: Int, source: String) -> Bool { token == generation && source == desiredID }
     func candidate(in sources: [DemoSource]) -> String? {
         if let desiredID { return sources.contains { $0.id == desiredID } ? desiredID : nil }
@@ -200,6 +201,9 @@ final class DemoCapture: NSObject, ObservableObject, AVCaptureVideoDataOutputSam
         } catch { stopSession(); publish("Cannot open this device. Unlock it, close any other preview using it, then Reconnect.") }
     }
     private func stopSession() {
+        // Automatic error/disconnect recovery can reopen the same device without
+        // another selection. Its new session must never reuse an old frame token.
+        recovery.invalidateSession()
         deliveryLock.lock(); deliveryToken = -1; deliveryLock.unlock()
         session?.stopRunning(); previewLayer.session = nil; session = nil; activeID = nil
         DispatchQueue.main.async { [weak self] in self?.live = false; self?.dimensions = .zero }
