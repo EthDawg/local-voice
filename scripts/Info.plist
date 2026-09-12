@@ -2,33 +2,40 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleExecutable</key>
-	<string>LocalVoice</string>
-	<key>CFBundleIdentifier</key>
-	<string>com.ethdawg.localvoice</string>
-	<key>CFBundleName</key>
-	<string>Workbench Voice</string>
 	<key>CFBundleDisplayName</key>
-	<string>Workbench Voice</string>
+	<string>Workbench</string>
+	<key>CFBundleExecutable</key>
+	<string>Workbench</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.ethdawg.workbench</string>
+	<key>CFBundleName</key>
+	<string>Workbench</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.2.2</string>
+	<string>2.0.0</string>
 	<key>CFBundleVersion</key>
-	<string>5</string>
-	<key>CFBundleIconFile</key>
-	<string>AppIcon</string>
-	<key>LSMinimumSystemVersion</key>
-	<string>14.0</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Workbench Voice records your microphone only when you start dictation. Audio is transcribed on this Mac and is not uploaded.</string>
-	<key>NSHighResolutionCapable</key>
-	<true/>
-	<key>NSPrincipalClass</key>
-	<string>NSApplication</string>
+	<string>1</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
 	<key>LSUIElement</key>
+	<false/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Workbench displays video from the device you select for a presentation.</string>
+	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Workbench records your microphone when you start dictation. Your chosen speech engine processes the recording.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
 </dict>
 </plist>

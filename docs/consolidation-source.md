@@ -1,0 +1,1 @@
+StageKit imported from the StageMark feature/demo-preview checkout on 12 September 2026, including its uncommitted presenter polish. Original checkout remains untouched. StageMark HEAD e7022b7; Voice base 1a68b50. Native modules are being combined into one process; this import alone is not integration or release verification.

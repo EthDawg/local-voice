@@ -7,3 +7,9 @@
 .privacy-card h2 { margin-top: 0; }
 .privacy-card p { max-width: 80ch; line-height: 1.65; }
 .privacy-card a { text-decoration: underline; }
+
+/* One application, four small capabilities. */
+.unified-card{border:1px solid var(--line);border-radius:var(--radius);padding:30px;background:var(--paper)}.unified-intro{display:flex;gap:22px;align-items:center;max-width:780px}.unified-intro img{flex:none}.unified-intro h3{font-size:28px;letter-spacing:-1px;margin:0}.unified-intro .eyebrow{font-size:10px;margin-bottom:6px}.unified-intro p{color:var(--muted);margin:10px 0}.primitive-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;border-top:1px solid var(--line);padding-top:24px;margin:24px 0}.primitive-grid span{font:12px ui-monospace,monospace;color:#547b78}.primitive-grid h4{font-size:18px;margin:9px 0}.primitive-grid p{font-size:14px;color:var(--muted);margin:0}.unified-card .card-actions{border-top:1px solid var(--line);padding-top:24px}@media(max-width:800px){.primitive-grid{grid-template-columns:1fr 1fr}}@media(max-width:450px){.unified-card{padding:22px}.unified-intro{align-items:flex-start;gap:14px}.unified-intro img{width:42px;height:42px}.unified-intro h3{font-size:23px}.primitive-grid{grid-template-columns:1fr}.trial-tabs span{display:none}}
+.example-section { padding-block: 0 4rem; }
+.example-section video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #edf4f2; border: 1px solid var(--line, #ccdcd7); border-radius: 18px; }
+.example-section .fine { max-width: 80ch; margin-top: 1rem; }

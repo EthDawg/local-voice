@@ -7,13 +7,14 @@ private let mint = Workbench.accent
 
 struct ContentView: View {
     @ObservedObject var model: AppModel
+    var embedded = false
     @State private var showOriginal = false
     var body: some View {
         HStack(spacing: 0) {
-            sidebar
+            if !embedded { sidebar }
             VStack(alignment: .leading, spacing: 24) {
                 HStack {
-                    Label("ON YOUR MAC", systemImage: "lock.shield").font(.system(size: 10, weight: .semibold)).tracking(1.6).foregroundStyle(mint)
+                    Label(model.page == "speak" && model.readingProvider == .speko ? "SPEKO · ONLINE READING" : "SPEECH & TEXT", systemImage: model.page == "speak" && model.readingProvider == .speko ? "network" : "waveform").font(.system(size: 10, weight: .semibold)).tracking(1.6).foregroundStyle(mint)
                     Spacer()
                     ShortcutControl(model: model, id: 1, title: "Dictation").frame(width: 300)
                 }
@@ -29,6 +30,7 @@ struct ContentView: View {
                     switch model.page {
                     case "speak": speak
                     case "history": history
+                    case "library": DemoLibraryView(library: model.library, model: model)
                     case "dictionary": DictionaryView(model: model)
                     case "settings": settings
                     case "shortcuts": shortcuts
@@ -39,11 +41,11 @@ struct ContentView: View {
                     Circle().fill(model.phase == .recording ? .red : mint).frame(width: 6, height: 6)
                     Text(model.status).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(2)
                     Spacer()
-                    Text("WORKBENCH VOICE  /  1.2").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(.tertiary)
+                    Text("WORKBENCH  /  \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development")\(Workbench.isPreview ? " PREVIEW" : "")").font(.system(size: 9, weight: .medium, design: .monospaced)).tracking(1).foregroundStyle(.tertiary)
                 }
             }.padding(32).background(ink)
         }
-        .frame(minWidth: 900, minHeight: 680)
+        .frame(minWidth: embedded ? 650 : 900, minHeight: 680)
         .tint(mint).workbenchTheme()
         .sheet(isPresented: $showOriginal) {
             VStack(alignment: .leading, spacing: 16) {
@@ -64,6 +66,7 @@ struct ContentView: View {
             nav("speak", "Read aloud", "speaker.wave.2")
             Divider().padding(.vertical, 14)
             nav("history", "Recent transcripts", "clock")
+            nav("library", "Demo library", "square.stack.3d.up")
             nav("dictionary", "Your dictionary", "text.book.closed")
             nav("shortcuts", "Shortcuts", "command")
             nav("settings", "Settings", "slider.horizontal.3")
@@ -74,7 +77,7 @@ struct ContentView: View {
                     Circle().fill(model.ready ? mint : .orange).frame(width: 6, height: 6)
                     Text(model.ready ? "Local engine ready" : "Preparing engine").font(.system(size: 11, weight: .medium))
                 }
-                Text(model.ready ? "No account. No usage meter.\nYour words stay here." : model.modelMessage).font(.system(size: 10)).foregroundStyle(.secondary).lineSpacing(4)
+                Text(model.ready ? (model.readingProvider == .speko ? "Local dictation.\nSpeko reading sends text online." : "No account. No usage meter.\nYour words stay here.") : model.modelMessage).font(.system(size: 10)).foregroundStyle(.secondary).lineSpacing(4)
                 if !model.ready && !model.preparing { Button("Retry model") { Task { await model.prepare() } }.font(.system(size: 11)) }
             }.padding(14).frame(maxWidth: .infinity, alignment: .leading).background(panelColor, in: RoundedRectangle(cornerRadius: 12))
         }.padding(20).frame(width: 210).background(Workbench.surface.opacity(0.65))
@@ -100,22 +103,25 @@ struct ContentView: View {
             heading("Speak your mind.", "Turn a thought into text. Record here, or use the shortcut from any app.")
             HStack(spacing: 22) {
                 Button { model.toggleRecording() } label: {
-                    Image(systemName: model.phase == .recording ? "stop.fill" : "mic.fill")
+                    Image(systemName: model.phase == .requesting ? "xmark" : model.phase == .recording ? "stop.fill" : "mic.fill")
                         .font(.system(size: 27)).frame(width: 66, height: 66)
                         .foregroundStyle(ink).background(model.phase == .recording ? Color.red.opacity(0.9) : mint, in: Circle())
-                }.buttonStyle(.plain).disabled(!model.ready || model.phase == .transcribing || model.phase == .requesting || model.phase == .cleaning || model.rendering)
-                    .accessibilityLabel(model.phase == .recording ? "Stop recording" : "Start recording")
+                }.buttonStyle(.plain).disabled(!model.ready || ![.idle, .requesting, .recording].contains(model.phase) || model.rendering)
+                    .accessibilityLabel(model.phase == .requesting ? "Cancel microphone request" : model.phase == .recording ? "Stop recording" : "Start recording")
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(model.phase == .recording ? "Listening to you" : model.phase == .cleaning ? "Tidying your words…" : model.phase == .transcribing ? "Finding your words…" : "Ready for your next thought")
+                    Text(model.phase == .requesting ? "Waiting for microphone access" : model.phase == .recording ? "Listening to you" : model.phase == .cleaning ? "Tidying your words…" : model.phase == .transcribing ? "Finding your words…" : model.phase == .delivering ? "Delivering text…" : model.phase == .cancelling ? "Cancelling…" : "Ready for your next thought")
                         .font(.system(size: 16, weight: .medium))
                     HStack(spacing: 10) {
                         if model.phase == .recording {
                             WaveBars(level: model.level).frame(width: 100, height: 22)
                             Text(time(model.elapsed)).monospacedDigit()
                             Button("Discard") { model.cancelRecording() }.buttonStyle(.plain).foregroundStyle(.secondary)
-                        } else if model.phase == .transcribing || model.phase == .cleaning || model.preparing {
+                        } else if model.phase == .requesting {
+                            Text("Allow access in the macOS prompt, or cancel this attempt.")
+                        } else if [.transcribing, .cleaning, .delivering, .cancelling].contains(model.phase) || model.preparing {
                             ProgressView().controlSize(.small)
-                            Text(model.preparing ? "Preparing the local model" : "Processing on your Mac")
+                            Text(model.preparing ? "Preparing your speech engine" : model.phase == .cancelling ? "Waiting for the speech engine to stop" : model.phase == .delivering ? "Checking the destination" : model.captureProcessingLabel)
+                            if model.canCancelCurrentCapture { Button("Cancel") { model.cancelCurrentCapture() } }
                         } else { Text("Click the microphone or use \(model.preferences.dictationShortcut.label)") }
                     }.font(.system(size: 11)).foregroundStyle(.secondary)
                 }
@@ -134,6 +140,7 @@ struct ContentView: View {
                 Button { model.copyTranscript() } label: { Label("Copy text", systemImage: "doc.on.doc") }.buttonStyle(PrimaryButton()).disabled(model.transcript.isEmpty)
                 Button("Clean text") { model.cleanCurrentDraft() }.disabled(model.transcript.isEmpty || model.phase != .idle)
                 Button("Save text…") { model.exportTranscript() }.disabled(model.transcript.isEmpty)
+                Button("Save prompt") { model.savePrompt(model.transcript) }.disabled(model.transcript.isEmpty)
                 Spacer()
                 if model.canRetry { Button("Retry transcription") { model.retryTranscription() } }
                 Button { model.importAudio() } label: { Label("Import audio…", systemImage: "arrow.up.doc") }.disabled(!model.ready || model.phase != .idle)
@@ -146,7 +153,8 @@ struct ContentView: View {
     private var speak: some View {
         VStack(alignment: .leading, spacing: 24) {
             heading("Give your words a voice.", "Paste something to hear it aloud, or save a reading to take with you.")
-            HStack(spacing: 24) {
+            ReadingProviderView(model: model)
+            if model.readingProvider == .mac { HStack(spacing: 24) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("VOICE").font(.system(size: 10, weight: .semibold)).tracking(1.4).foregroundStyle(.secondary)
                     Picker("Voice", selection: $model.voice) { ForEach(model.voices, id: \.self) { Text($0).tag($0) } }.labelsHidden().frame(width: 220)
@@ -155,21 +163,22 @@ struct ContentView: View {
                     HStack { Text("PACE").tracking(1.4); Spacer(); Text("\(Int(model.rate)) words/min").monospacedDigit() }.font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                     Slider(value: $model.rate, in: 100...300, step: 10).accessibilityLabel("Reading pace")
                 }
-            }.padding(20).background(panelColor, in: RoundedRectangle(cornerRadius: 14)).disabled(model.rendering)
+            }.padding(20).background(panelColor, in: RoundedRectangle(cornerRadius: 14)).disabled(model.rendering) }
             editor(text: $model.speechText, placeholder: "Paste an article, a draft, or a thought.\nLet your Mac do the reading.", label: "Text to read").disabled(model.rendering)
             HStack {
-                Text("\(model.speechText.count.formatted()) / 50,000 characters").font(.system(size: 10)).foregroundStyle(.tertiary)
+                Text("\(model.speechText.count.formatted()) / \(model.readingLimit.formatted()) characters").font(.system(size: 10)).foregroundStyle(.tertiary)
                 Spacer()
                 if model.playing || model.paused { Text("\(time(model.playbackTime)) / \(time(model.audioDuration))").font(.system(size: 11, design: .monospaced)).foregroundStyle(mint) }
             }
             HStack(spacing: 12) {
                 Button { model.listen() } label: { Label(model.rendering ? "Making audio…" : model.playing ? "Pause" : model.paused ? "Resume" : "Listen", systemImage: model.playing ? "pause.fill" : "play.fill") }
-                    .buttonStyle(PrimaryButton()).disabled(model.speechText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.rendering || model.phase != .idle || model.speechText.count > 50_000)
+                    .buttonStyle(PrimaryButton()).disabled(model.speechText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.rendering || model.phase != .idle || model.speechText.count > model.readingLimit)
+                if model.cloudRequestActive { Button("Cancel request") { model.cancelReading() } }
                 if model.playing || model.paused { Button("Stop") { model.stopPlayback() } }
                 Spacer()
-                Button { model.saveAudio() } label: { Label("Save audio…", systemImage: "square.and.arrow.down") }.disabled(model.speechText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.rendering || model.speechText.count > 50_000)
+                Button { model.saveAudio() } label: { Label("Save audio…", systemImage: "square.and.arrow.down") }.disabled(model.speechText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.rendering || model.speechText.count > model.readingLimit)
             }.controlSize(.large)
-            Text("Uses installed macOS voices. Saved audio is M4A, ready for QuickTime, Music, or sharing.")
+            Text("Saved audio is M4A, ready for QuickTime, Music, or sharing.")
                 .font(.system(size: 10)).foregroundStyle(.tertiary)
         }
     }
@@ -185,6 +194,11 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 24) {
             heading("Make it your shortcut.", "Change keys here or directly in quick controls, just like StageMark.")
             VoiceShortcutSettings(model: model).padding(22).background(panelColor, in: RoundedRectangle(cornerRadius: 14))
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Apple Shortcuts").font(.headline)
+                Text(Bundle.main.url(forResource: "Metadata", withExtension: "appintents") != nil ? "Add Record Audio, then Transcribe with Workbench, then Create Note, Copy to Clipboard, or another text action. Shortcuts handles recording; Workbench returns your words." : "This development build has no Apple Shortcuts metadata. Use the full-Xcode package for the Transcribe with Workbench action.").foregroundStyle(.secondary)
+                Button("Open Apple Shortcuts") { NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Shortcuts.app")) }
+            }
             Spacer()
         }
     }
@@ -199,7 +213,7 @@ struct ContentView: View {
                     else { Button("Retry model") { Task { await model.prepare() } } }
                 }
                 Divider()
-                settingRow("Microphone", "Workbench Voice records only when you start a recording.", "mic") { Button("Open settings") { model.openMicrophoneSettings() } }
+                settingRow("Microphone", "Workbench records only when you start a recording.", "mic") { Button("Open settings") { model.openMicrophoneSettings() } }
                 Divider()
                 VoiceOptions(model: model, showShortcut: false)
                 Divider()
@@ -211,7 +225,7 @@ struct ContentView: View {
                 WorkbenchAppearancePicker()
             }.padding(22).background(panelColor, in: RoundedRectangle(cornerRadius: 14))
             Text("Local by design").font(.system(size: 16, weight: .medium))
-            Text("Audio is processed on your Mac. No account, API key, analytics, or subscription. The initial model download uses the internet; dictation and reading then work offline. Drafts, your dictionary, and recent transcripts are stored in Application Support/LocalVoice.")
+            Text("Built-in Parakeet dictation and Mac voices work on your Mac without an account after the initial model download. A local transcription server receives your audio and may forward it, depending on how you configure that server. Optional Speko reading sends the text you choose to its cloud service and selected provider; usage may be billed. Drafts, your dictionary and history remain local. Apple Shortcuts controls any downstream destinations. No analytics are included.")
                 .font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(5).textSelection(.enabled)
             Spacer()
         } }
@@ -271,6 +285,7 @@ struct PrimaryButton: ButtonStyle {
 }
 struct WaveBars: View {
     let level: Double
-    var body: some View { HStack(spacing: 3) { ForEach(0..<16) { index in RoundedRectangle(cornerRadius: 2).fill(mint).frame(width: 3, height: 3 + level * Double([10, 18, 12, 22, 15, 24, 16, 10][index % 8])) } }.animation(.easeOut(duration: 0.1), value: level) }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View { HStack(spacing: 3) { ForEach(0..<16) { index in RoundedRectangle(cornerRadius: 2).fill(mint).frame(width: 3, height: 3 + level * Double([10, 18, 12, 22, 15, 24, 16, 10][index % 8])) } }.animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: level) }
 }
 func time(_ seconds: Double) -> String { String(format: "%d:%02d", max(0, Int(seconds)) / 60, max(0, Int(seconds)) % 60) }

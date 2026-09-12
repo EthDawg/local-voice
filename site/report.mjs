@@ -1,11 +1,15 @@
+const version = '2.0.0-preview.1';
+const source = `https://github.com/EthDawg/local-voice/tree/v${version}`;
+const documents = `https://github.com/EthDawg/local-voice/blob/v${version}`;
+const guide = `${documents}/CONTRIBUTING.md`;
 export const apps = Object.freeze({
-  voice: { name: 'Workbench Voice', repo: 'local-voice', version: '1.2.2', guide: 'https://github.com/EthDawg/local-voice/blob/main/CONTRIBUTING.md' },
-  stagemark: { name: 'Workbench StageMark', repo: 'StageMark', version: '1.2.1', guide: 'https://github.com/EthDawg/StageMark/blob/main/CONTRIBUTING.md' }
+  voice: { name: 'Workbench · Speech', repo: 'local-voice', version, guide },
+  stagemark: { name: 'Workbench · Annotation and presentation', repo: 'local-voice', version, guide }
 });
 const fields = ['app', 'version', 'environment', 'task', 'expected', 'observed', 'impact', 'help'];
 export function normalizeReport(input) {
   const data = Object.fromEntries(fields.map(key => [key, String(input[key] ?? '').trim()]));
-  if (!Object.hasOwn(apps, data.app)) throw new Error('Choose Voice or StageMark.');
+  if (!Object.hasOwn(apps, data.app)) throw new Error('Choose a Workbench area.');
   for (const key of ['version', 'environment', 'task', 'expected', 'observed']) {
     if (!data[key]) throw new Error('Complete the app, version, Mac, task, expected and observed fields.');
   }
@@ -25,7 +29,7 @@ export function createReport(input) {
   return { title, body, url: url.href, app };
 }
 export function agentHandoff(report) {
-  const intro = `Help me make a useful contribution to Workbench, a free MIT-licensed suite of native Apple Silicon Mac apps.\n\nStart here: https://github.com/EthDawg/local-voice/discussions/5\nVoice: https://github.com/EthDawg/local-voice\nStageMark: https://github.com/EthDawg/StageMark\n\nRead the relevant CONTRIBUTING.md and the shared suite contract at https://github.com/EthDawg/local-voice/blob/main/docs/workbench.md. First help me install the app and try a real workflow. Do not treat the website or a successful build as native-app usability testing. Ask me to carry out any Mac interaction you cannot verify.\n\n`;
-  const observation = report ? `Here is my observation from using ${report.app.name}:\n\n${report.body}\n` : `Ask what felt awkward or surprising in my trial. If I have no observation yet, help me choose a small unassigned good first issue from either repository.\n\n`;
+  const intro = `Help me make a useful contribution to Workbench, a free MIT-licensed native Apple Silicon Mac app.\n\nThis website offers Workbench ${version}.\nSource for this Preview: ${source}\n\nRead ${guide} and the product contract at ${documents}/docs/workbench.md. Start from the matching release or agreed follow-up branch; main may describe an earlier app. If my report concerns a different version, identify that release first and compare it with this Preview. First help me install the app and try a real workflow. Do not treat the website or a successful build as native-app usability testing. Ask me to carry out any Mac interaction you cannot verify.\n\n`;
+  const observation = report ? `Here is my observation from using ${report.app.name}:\n\n${report.body}\n` : `Ask what felt awkward or surprising in my trial. If I have no observation yet, help me choose a small unassigned good first issue in the Workbench repository.\n\n`;
   return intro + observation + `Search existing issues before creating another. Agree a small scope with me, comment on the issue to coordinate, fork the relevant repository, reproduce the behavior with synthetic data, and make one focused change. Run the documented checks and report relevant manual results and limits. Open a PR for maintainer review. Do not alter unrelated code, private user data, signing credentials, or repository settings. Do not claim observations or test results you did not verify.\n`;
 }
