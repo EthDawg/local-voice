@@ -119,6 +119,71 @@ final class WorkbenchUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts[original].waitForExistence(timeout: 5))
     }
 
+    func testCleanupUndoKeepsLaterTypingAndSavedOriginal() {
+        let app = launchIsolatedApp()
+        let original = "Um, meet at 2pm, actually 3pm."
+        let cleaned = "Meet at 3pm."
+        app.buttons["tool.dictate"].tap()
+        let draft = app.textViews["dictate.draft"]
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        reveal(draft, in: app); draft.tap(); draft.typeText(original)
+        let done = app.buttons["Done"]
+        if done.exists && done.isHittable { done.tap() }
+        let cleanup = app.buttons["Clean up"]
+        reveal(cleanup, in: app); cleanup.tap()
+        XCTAssertEqual(draft.value as? String, cleaned)
+        let undo = app.buttons["Undo cleanup"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 5))
+        reveal(undo, in: app); undo.tap()
+        XCTAssertEqual(draft.value as? String, original, "Immediate Undo must restore the pre-cleanup draft")
+
+        cleanup.tap()
+        let addition = "Bring the drawings. "
+        reveal(draft, in: app); draft.tap(); draft.typeText(addition)
+        let edited = draft.value as? String ?? ""
+        XCTAssertTrue(edited.contains(addition))
+        XCTAssertEqual(edited.replacingOccurrences(of: addition, with: ""), cleaned)
+        if done.exists && done.isHittable { done.tap() }
+        // Exercise the old destructive action if it remains available. The fixed
+        // UI must retire this cleanup snapshot as soon as the user edits.
+        if undo.exists { reveal(undo, in: app); undo.tap() }
+        XCTAssertEqual(draft.value as? String, edited, "Cleanup Undo must never remove later typing")
+        XCTAssertFalse(undo.exists)
+        let save = app.buttons["dictate.save"]
+        reveal(save, in: app); save.tap()
+        app.navigationBars.buttons.firstMatch.tap()
+        selectTab("Saved", in: app)
+        let title = app.staticTexts[edited].firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 5)); title.tap()
+        XCTAssertEqual(app.textViews["Saved text"].value as? String, edited)
+        let originalDisclosure = app.buttons["Original"]
+        reveal(originalDisclosure, in: app); originalDisclosure.tap()
+        XCTAssertTrue(app.staticTexts[original].waitForExistence(timeout: 5))
+    }
+
+    func testCleanupUndoExpiresWhenTypingReturnsToTheSameText() {
+        let app = launchIsolatedApp()
+        app.buttons["tool.dictate"].tap()
+        let draft = app.textViews["dictate.draft"]
+        XCTAssertTrue(draft.waitForExistence(timeout: 5))
+        reveal(draft, in: app); draft.tap(); draft.typeText("Um, bring the drawings.")
+        let done = app.buttons["Done"]
+        if done.exists && done.isHittable { done.tap() }
+        let cleanup = app.buttons["Clean up"]
+        reveal(cleanup, in: app); cleanup.tap()
+        let cleaned = "Bring the drawings."
+        XCTAssertEqual(draft.value as? String, cleaned)
+        XCTAssertTrue(app.buttons["Undo cleanup"].exists)
+        reveal(draft, in: app); draft.tap(); draft.typeText("X")
+        let mutated = draft.value as? String ?? ""
+        XCTAssertTrue(mutated.contains("X"))
+        XCTAssertEqual(mutated.replacingOccurrences(of: "X", with: ""), cleaned)
+        draft.typeText(XCUIKeyboardKey.delete.rawValue)
+        XCTAssertEqual(draft.value as? String, cleaned)
+        if done.exists && done.isHittable { done.tap() }
+        XCTAssertFalse(app.buttons["Undo cleanup"].exists, "Returning to identical text must not revive a stale cleanup snapshot")
+    }
+
     func testIndependentWallpaperEntryCanCreateAndReopenAStarter() {
         let app = launchIsolatedApp()
         attachScreenshot("Tools home", of: app)
