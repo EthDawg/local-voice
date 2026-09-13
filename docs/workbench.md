@@ -4,6 +4,8 @@ Workbench is one native Mac app for speaking, explaining, presenting and shaping
 
 This contract describes the direction and current consolidation structure. [The acceptance record](unification.md) distinguishes implementation from tested and released behaviour.
 
+The separate native **iOS/iPadOS 26+ Preview** carries these useful jobs into phone/tablet workflows. [Its own contract and test record](ios-preview.md) govern foreground speech, reading, image markup, independent wallpaper export and backdrop preparation. Mobile uses an app window, chosen imports and explicit sharing; the Mac menu bar, global shortcuts, cross-app overlays, USB capture and desktop restoration below are not mobile capabilities. The two targets do not silently sync libraries or edits.
+
 ## Scope
 
 | Primitive | Workbench's responsibility | Boundary |

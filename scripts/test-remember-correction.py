@@ -256,7 +256,7 @@ with tempfile.TemporaryDirectory(prefix="workbench-remember-correction-", dir="/
     binary = directory / "checks"
     subprocess.run([
         "swiftc", "-parse-as-library", "-swift-version", "5", "-module-cache-path", str(directory / "ModuleCache"),
-        str(directory / "CoreValues.swift"), str(PROJECT / "Sources/LocalVoice/CorrectionRule.swift"),
+        str(directory / "CoreValues.swift"), str(PROJECT / "Sources/LocalVoice/TextPrimitives.swift"), str(PROJECT / "Sources/LocalVoice/CorrectionRule.swift"),
         str(directory / "Checks.swift"), "-o", str(binary),
     ], check=True)
     subprocess.run([str(binary)], check=True, timeout=15)

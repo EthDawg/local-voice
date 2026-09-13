@@ -101,3 +101,37 @@ Refinement prompt (built-in edit using the initial image):
 ```text
 Edit this Workbench concept board while preserving the two-row six-frame layout, coastal desktop upper row, woodland desktop at lower End, exact headings and typography. Correct only misleading content: In BOTH lower Prepare and Present screens, the phone must display the SAME plausible white mobile app screen headed "Appointments" with short list rows "09:00 Team check-in", "10:30 Site visit", "14:00 Follow-up". The phone must not display scenery or be transparent. In Prepare replace the enormous wordy persona right panel with a SMALL finished overlay card at the bottom-right of the actual composition preview: round fictional portrait, label "Morgan", second line "Site manager"; no description or biography. In Present retain that SAME small persona card at bottom-right of scene above the little phone-icon/divider/chevron tile. Preserve phone and persona positions consistently between Prepare and Present. In the two upper Notes windows replace all poetic/promo text with a realistic simple document titled "Today" and three short lines "Review the draft", "Prepare the call", "Send the notes". The lower End document also says those same lines under "Today". All screens are proposed design concepts. Do not add controls, logos, language or new features. Keep footer "CONCEPT STUDY · PROPOSED DESKTOP EXPERIENCE".
 ```
+
+## Native mobile Preview studies — 13 September 2026
+
+These image-generation experiments were shown inline during the review. They are hypotheses, not runtime evidence. The mobile page pairs them with unedited Simulator screenshots.
+
+| File | Decision |
+| --- | --- |
+| `site/assets/guide/mobile-first-study.png` | Kept emphasis on Dictate and two tabs. Rejected invented PDF support and confusing Backdrops-as-focus framing. |
+| `site/assets/guide/mobile-refined-study.png` | Kept separate Backdrops and Wallpapers, labelled composition parts, and explicit export. Rejected invented promotional copy and decorative home hero. |
+| `Mobile/Workbench/Assets.xcassets/Coast.imageset/Coast.png` | Accepted as a synthetic bundled starter picture. Generated portrait despite the landscape request; checked visually for useful crop coverage. No real location or photographer attribution is claimed. |
+
+The app icon adapts the existing five-bar Workbench mark using the native Core Graphics script `scripts/mobile-icon.swift`; it is not generated logo artwork.
+
+### Initial mobile UI prompt
+
+```text
+Use case: ui-mockup. Create a polished native iPhone app design study for Workbench, an account-free everyday utility. Landscape board showing THREE full-height iPhone screens at realistic aspect ratio on warm off-white background, not a marketing landing page. Restrained mint/slate palette, Apple system typography, plenty of breathing room, native rounded cards and toolbar buttons, legible ordinary copy. Left screen: large title 'Workbench', small subtitle 'A few useful things.', a large Dictate card with microphone symbol and 'Speak. Review. Share.', then equal Read aloud and Mark up actions, then two smaller entries 'Backdrops' and 'Wallpapers'. Bottom native tab bar only 'Tools' and 'Saved'. Middle screen: a dictation result, title 'Your words', an Original / Clean segmented control, editable text 'Meet at 3pm. Bring the revised drawings.', a small understated status 'Saved on this iPhone', large bottom Share button, Copy secondary. No chat UI, AI sparkles, subscription, sync, hamburger, decorative graphs or made-up Live status. Right screen: independent 'Wallpapers' workspace, a beautiful calm coastal image portrait preview below two simple controls 'Picture' and 'Fit', bottom button 'Share image', one calm line 'Set it in Photos or Wallpaper settings.' Image should make realistic native affordances, touch targets, information hierarchy and one-handed use assessable. Board footer exact text 'CONCEPT • NOT SHIPPING UI'. The three screens should be the focus, crisp and beautiful with sensible spacing.
+```
+
+### Refined mobile UI prompt
+
+```text
+Use case: ui-mockup. A refined native iPhone design study for Workbench, composed of three accurate full-height iPhone screens on a plain off-white landscape board. Understated Apple system type, slate and mint, accessible touch targets, professionally crafted hierarchy. This is an iteration that corrects confusing wallpaper/presentation framing. Left phone: Workbench title, hero Dictate card with 'Speak. Review. Share.', small Read aloud and Mark up cards, then clear separate rows 'Backdrops' with 'Prepare a picture for presenting' and 'Wallpapers' with 'Make a picture fit your screen'. Bottom only Tools and Saved tabs. No PDF claims. Centre phone: title 'Backdrops', wide 16:9 preview with calm coastal background, a modest phone screenshot frame in centre and a small fictional persona round portrait bottom right, elegant but clearly an image composition. Below preview ordinary labeled rows Background, Image, Logo, Persona each with Replace action. Bottom Share image and Show buttons. This is preparation not a live camera or wallpaper dashboard. Right phone: title 'Wallpapers', immersive calm coastal image portrait crop, simple Zoom slider below, visible 'Position' control, bottom 'Share image'. Small helper 'Choose it in Apple’s Wallpaper settings.' Do not depict automatic installation, animatedvideo, live recording, floating controls over other apps, AI sparkle, marketingcopy, paywall or cloud sync. One concept footer 'CONCEPT • NOT SHIPPING UI'. Make the distinction between separate image jobs and reuse obvious through precise UI labels rather than diagrams.
+```
+
+### Coast starter prompt
+
+```text
+Use case: photorealistic-natural. Create a beautiful serene high-resolution landscape wallpaper image that also crops well to a portrait iPhone screen. A secluded Australian coastal headland at early morning, soft peach horizon in upper third, slate-blue ocean, layered sandstone cliffs with natural coastal grasses occupying lower left, gentle surf forming fine white lines, open quiet atmosphere. Realistic editorial landscape photography, restrained natural colour, no exaggerated HDR, no fantasy, no buildings, no people, no words, no logos, no devices, no interface, no border. Balanced composition with clear usable central portrait crop and uncluttered sky for readable clock/icons. This will be a freely bundled synthetic starter picture in Workbench. Produce only the full-bleed photograph.
+```
+
+Claude reviewed a generic public product brief with no repository source or private records. We accepted the emphasis on foreground recording, explicit reuse, retained originals and a small navigation hierarchy. We retained a bounded backdrop composition because it serves the already established presentation job; arbitrary layers, blend modes and a full design editor remain out of scope. Native tests and parent review, rather than model agreement, establish behavior.
+
+Mobile actual evidence: `mobile-tools-actual.png`, `mobile-wallpaper-actual.png`, `mobile-reading-actual.png` and `mobile-markup-focus-actual.png` are unedited iPhone XCTest attachments. `mobile-ipad-tools-actual.png` is the corresponding iPad attachment. `mobile-ipad-present-actual.png` and `mobile-ipad-paused-actual.png` are native Simulator-window captures from manual testing. All use synthetic content; none proves physical-device model quality or audience visibility.

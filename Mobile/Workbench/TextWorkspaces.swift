@@ -1,0 +1,224 @@
+import SwiftUI
+import UniformTypeIdentifiers
+
+struct MobileDictateView: View {
+    @EnvironmentObject private var store: MobileStore
+    @EnvironmentObject private var speech: SpeechService
+    @EnvironmentObject private var reader: ReadingService
+    @State private var draft = ""
+    @State private var original = ""
+    @State private var savedID: UUID?
+    @State private var cleanup = true
+    @State private var importing = false
+    @State private var notice: String?
+    @State private var previousDraft: String?
+    @State private var listening = false
+    @State private var originalVisible = false
+    @State private var discardRecovery = false
+    @FocusState private var editing: Bool
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                captureControls
+                if let recovery = speech.recoveryAudioURL, !speech.isRecording, !speech.isWorking {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Recording kept for recovery", systemImage: "arrow.counterclockwise").font(.headline)
+                        Text("Retry transcription, or share the audio to keep another copy.").font(.subheadline).foregroundStyle(.secondary)
+                        HStack {
+                            Button("Retry transcription") { guard preserveDraft() else { return }; Task { reader.stop(); accept(await speech.transcribe(url: recovery)) } }.buttonStyle(.bordered).disabled(!speech.isReady)
+                            ShareLink(item: recovery) { Image(systemName: "square.and.arrow.up").frame(minWidth: 44, minHeight: 44) }.accessibilityLabel("Share recovered audio")
+                        }
+                        Button("Discard recovery", role: .destructive) { discardRecovery = true }.font(.subheadline).frame(minHeight: 44)
+                    }.padding(16).background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
+                }
+                if let problem = speech.recoveryProblem {
+                    Text(problem).font(.subheadline).foregroundStyle(.secondary)
+                    Button("Discard recovery", role: .destructive) { discardRecovery = true }
+                }
+                if let error = speech.error { Label(error, systemImage: "exclamationmark.circle").font(.subheadline).foregroundStyle(.secondary) }
+                HStack {
+                    Text("Your words").font(.title2.bold())
+                    Spacer()
+                    PasteButton(payloadType: String.self) { values in
+                        if let text = values.first {
+                            guard text.count <= 50_000 else { notice = "Choose a passage under 50,000 characters. Your draft is unchanged."; return }
+                            setDraft(text, original: text)
+                        }
+                    }.labelStyle(.iconOnly).disabled(speech.isWorking || speech.isRecording)
+                }
+                ZStack(alignment: .topLeading) {
+                    if draft.isEmpty { Text("Speak, paste or type something you want to keep.").foregroundStyle(.tertiary).padding(.top, 12).padding(.leading, 5).allowsHitTesting(false) }
+                    TextEditor(text: $draft).frame(minHeight: 200).scrollContentBackground(.hidden).focused($editing).accessibilityLabel("Draft text").accessibilityIdentifier("dictate.draft").disabled(speech.isWorking || speech.isRecording)
+                }.padding(12).background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+                if !draft.isEmpty {
+                    HStack {
+                        Button("Clean up", systemImage: "text.badge.checkmark") {
+                            previousDraft = draft
+                            if original.isEmpty { original = draft }
+                            draft = TextRules.apply(DictationCleanup.light(draft), replacements: store.document.replacements)
+                            store.change { $0.draft = draft; $0.draftOriginal = original }
+                            notice = "Light cleanup applied. Your original is kept."
+                        }.buttonStyle(.bordered).disabled(speech.isWorking || speech.isRecording)
+                        if let before = previousDraft { Button("Undo cleanup") { draft = before; previousDraft = nil } }
+                        Spacer()
+                    }
+                    DisclosureGroup("Original", isExpanded: $originalVisible) {
+                        Text(original.isEmpty ? draft : original).font(.body).frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled).padding(.top, 8)
+                    }.font(.subheadline)
+                    HStack {
+                        ShareLink(item: draft) { Label("Share", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 36) }.buttonStyle(.borderedProminent)
+                        Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = draft; notice = "Copied. Paste when you’re ready." }.buttonStyle(.bordered).frame(minHeight: 44)
+                    }
+                    HStack {
+                        Button("Save text", systemImage: "bookmark") {
+                            savedID = store.saveText(draft, original: original.isEmpty ? draft : original, id: savedID)
+                            if savedID != nil { notice = "Saved on this device." }
+                        }.accessibilityIdentifier("dictate.save")
+                        Spacer()
+                        Button("Read aloud", systemImage: "speaker.wave.2") { if store.change({ $0.readText = draft }) { reader.stop(); listening = true } }
+                    }.font(.subheadline).frame(minHeight: 44)
+                }
+                if let notice { Text(notice).font(.footnote).foregroundStyle(.secondary).accessibilityIdentifier("dictate.notice") }
+            }.padding(20).frame(maxWidth: 720)
+        }.frame(maxWidth: .infinity).background(Color(uiColor: .systemGroupedBackground))
+            .navigationTitle("Dictate").navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .tabBar)
+            .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("Done") { editing = false } } }
+            .onAppear { draft = store.document.draft; original = store.document.draftOriginal }
+            .task { await speech.refreshAvailability() }
+            .onChange(of: draft) { _, new in
+                if new.count > 50_000 { draft = String(new.prefix(50_000)); return }
+                store.change { $0.draft = new; $0.draftOriginal = original }
+            }
+            .onDisappear { if speech.isRecording || speech.isWorking { speech.cancel() } }
+            .navigationDestination(isPresented: $listening) { MobileReadingView() }
+            .confirmationDialog("Discard this recovery?", isPresented: $discardRecovery, titleVisibility: .visible) {
+                Button("Discard recovery", role: .destructive) { speech.discardRecovery() }
+            } message: { Text("Share the recording first if you need another copy. This clears the pending recovery so you can record again.") }
+            .fileImporter(isPresented: $importing, allowedContentTypes: [.audio], allowsMultipleSelection: false) { result in
+                if case .success(let urls) = result, let url = urls.first {
+                    Task {
+                        reader.stop()
+                        let access = url.startAccessingSecurityScopedResource()
+                        defer { if access { url.stopAccessingSecurityScopedResource() } }
+                        accept(await speech.transcribe(url: url))
+                    }
+                } else if case .failure(let error) = result { notice = error.localizedDescription }
+            }
+    }
+
+    private var captureControls: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label(speech.isRecording ? "Recording" : "On-device dictation", systemImage: speech.isRecording ? "mic.fill" : "iphone")
+                    .font(.headline).foregroundStyle(speech.isRecording ? Color.red : Color.primary)
+                Spacer()
+                if speech.isRecording { Text(Duration.seconds(speech.elapsed), format: .time(pattern: .minuteSecond)).monospacedDigit().accessibilityLabel("Recording duration") }
+            }
+            Text(speech.phase).font(.subheadline).foregroundStyle(.secondary)
+            if speech.isWorking {
+                if let progress = speech.downloadProgress { ProgressView(value: progress) } else { ProgressView().frame(maxWidth: .infinity) }
+                Button("Cancel") { speech.cancel() }.buttonStyle(.bordered)
+            } else if speech.isRecording {
+                HStack {
+                    Button("Finish recording", systemImage: "stop.fill") { Task { accept(await speech.finish()) } }.buttonStyle(.borderedProminent).tint(.red).frame(minHeight: 44)
+                    Button("Cancel") { speech.cancel() }.frame(minHeight: 44)
+                }
+            } else if speech.isReady {
+                HStack {
+                    Button("Record", systemImage: "mic.fill") { guard preserveDraft() else { return }; editing = false; reader.stop(); Task { await speech.start() } }
+                        .buttonStyle(.borderedProminent).controlSize(.large).accessibilityIdentifier("dictate.record").disabled(speech.hasRecovery)
+                    Button("Import audio", systemImage: "waveform") { if preserveDraft() { importing = true } }.buttonStyle(.bordered).frame(minHeight: 44).disabled(speech.hasRecovery)
+                }
+                Toggle("Light cleanup", isOn: $cleanup).font(.subheadline)
+                Text("Removes fillers and formats explicit lists. Original wording stays available.").font(.caption).foregroundStyle(.secondary)
+            } else {
+                Button("Prepare on-device speech", systemImage: "arrow.down.circle") { Task { reader.stop(); await speech.prepare() } }.buttonStyle(.borderedProminent).controlSize(.large)
+                Text("May download Apple’s speech assets for \(speech.languageName). Typing and pasting are available without a model.").font(.caption).foregroundStyle(.secondary)
+            }
+        }.padding(18).background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 24))
+    }
+
+    private func setDraft(_ text: String, original: String) {
+        self.original = String(original.prefix(50_000)); draft = String(text.prefix(50_000)); savedID = nil
+        store.change { $0.draft = draft; $0.draftOriginal = self.original }
+    }
+    private func preserveDraft() -> Bool {
+        guard !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return true }
+        savedID = store.saveText(draft, original: original.isEmpty ? draft : original, id: savedID)
+        return savedID != nil
+    }
+    private func accept(_ result: MobileSpeechResult?) {
+        guard let result else { return }
+        setDraft(TextRules.apply(cleanup ? DictationCleanup.light(result.original) : result.original, replacements: store.document.replacements), original: result.original)
+        savedID = store.saveText(draft, original: original, audioURL: result.audioURL)
+        if savedID != nil { speech.markSaved(audioURL: result.audioURL) }
+        notice = savedID == nil ? "Your text is ready. Saving failed; copy or share it before leaving." : "Saved with your original recording."
+    }
+}
+
+struct MobileReadingView: View {
+    @EnvironmentObject private var store: MobileStore
+    @EnvironmentObject private var speech: SpeechService
+    @EnvironmentObject private var reader: ReadingService
+    @State private var text = ""
+    @State private var showVoices = false
+    @State private var notice: String?
+    @FocusState private var editing: Bool
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    Text("Make room to listen.").font(.title3).foregroundStyle(.secondary); Spacer()
+                    PasteButton(payloadType: String.self) { values in
+                        if let value = values.first {
+                            guard value.count <= 50_000 else { notice = "Choose a passage under 50,000 characters. The current text is unchanged."; return }
+                            text = value
+                        }
+                    }.labelStyle(.iconOnly).disabled(reader.isSpeaking || reader.isPaused)
+                }
+                TextEditor(text: $text).frame(minHeight: 260).padding(10).scrollContentBackground(.hidden).focused($editing)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
+                    .accessibilityLabel("Text to read").accessibilityIdentifier("reading.text")
+                    .disabled(reader.isSpeaking || reader.isPaused)
+                HStack(spacing: 14) {
+                    Button { editing = false; speech.cancel(); if reader.isSpeaking || reader.isPaused { reader.pauseResume() } else { reader.read(text) } } label: {
+                        Label(reader.isPaused ? "Resume" : reader.isSpeaking ? "Pause" : "Read aloud", systemImage: reader.isSpeaking && !reader.isPaused ? "pause.fill" : "play.fill").frame(maxWidth: .infinity, minHeight: 36)
+                    }.buttonStyle(.borderedProminent).disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).accessibilityIdentifier("reading.play")
+                    if reader.isSpeaking || reader.isPaused { Button("Stop", systemImage: "stop.fill") { reader.stop() }.buttonStyle(.bordered).frame(minHeight: 44).accessibilityIdentifier("reading.stop") }
+                }
+                Button { showVoices = true } label: {
+                    HStack { Label("Voice", systemImage: "person.wave.2"); Spacer(); Text(reader.voices.first { $0.identifier == reader.selectedVoiceID }?.name ?? "System voice").foregroundStyle(.secondary); Image(systemName: "chevron.right").font(.caption) }
+                }.frame(minHeight: 44)
+                VStack(alignment: .leading) {
+                    HStack { Text("Pace"); Spacer(); Text(reader.rate < 0.45 ? "Slower" : reader.rate > 0.55 ? "Faster" : "Natural").foregroundStyle(.secondary) }
+                    Slider(value: $reader.rate, in: 0.3...0.65, step: 0.05).accessibilityLabel("Reading pace")
+                    Text("Voice and pace changes apply to the next reading.").font(.caption).foregroundStyle(.secondary)
+                }.disabled(reader.isSpeaking || reader.isPaused)
+                Button("Save text", systemImage: "bookmark") { if store.saveText(text, original: text) != nil { notice = "Saved on this device." } }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty).frame(minHeight: 44)
+                if let error = reader.error { Text(error).font(.subheadline).foregroundStyle(.secondary) }
+                if let notice { Text(notice).font(.footnote).foregroundStyle(.secondary) }
+                Text("Apple voices. Your text stays on this device.").font(.footnote).foregroundStyle(.secondary)
+            }.padding(20).frame(maxWidth: 720)
+        }.frame(maxWidth: .infinity).background(Color(uiColor: .systemGroupedBackground)).navigationTitle("Read aloud").navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .tabBar)
+            .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("Done") { editing = false } } }
+            .onAppear { text = store.document.readText; reader.selectedVoiceID = store.document.voiceID; reader.rate = store.document.readingRate }
+            .onChange(of: text) { _, value in if value.count > 50_000 { text = String(value.prefix(50_000)) } else { store.change { $0.readText = value } } }
+            .onChange(of: reader.selectedVoiceID) { _, value in store.change { $0.voiceID = value } }
+            .onChange(of: reader.rate) { _, value in store.change { $0.readingRate = value } }
+            .sheet(isPresented: $showVoices) {
+                NavigationStack {
+                    List {
+                        Button("System voice") { reader.selectedVoiceID = ""; showVoices = false }
+                        ForEach(reader.voices, id: \.identifier) { voice in
+                            Button { reader.selectedVoiceID = voice.identifier; showVoices = false } label: {
+                                HStack { VStack(alignment: .leading) { Text(voice.name); Text(Locale.current.localizedString(forIdentifier: voice.language) ?? voice.language).font(.caption).foregroundStyle(.secondary) }; Spacer(); if reader.selectedVoiceID == voice.identifier { Image(systemName: "checkmark") } }
+                            }
+                        }
+                    }.navigationTitle("Installed voices").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showVoices = false } } }
+                }
+            }
+    }
+}

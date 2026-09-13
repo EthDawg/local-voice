@@ -10,6 +10,25 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  mobile:
+    name: iOS Preview · ${{ matrix.family }}
+    runs-on: macos-26
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [iPhone, iPad]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Run isolated native tests
+        env:
+          MOBILE_DEVICE_FAMILY: ${{ matrix.family }}
+        run: bash scripts/test-mobile.sh
+      - name: Verify the committed Xcode project matches its generator
+        run: git diff --exit-code -- Mobile/Workbench.xcodeproj
   build-and-test:
     name: Build and test
     runs-on: macos-26

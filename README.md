@@ -11,6 +11,8 @@ Workbench brings Voice and StageMark into **one native app, one home window and 
 
 **This branch contains the Workbench 2.0 consolidation.** Feature descriptions below describe its implementation, not proof of a published release or successful testing on every supported Mac. The [acceptance record](docs/unification.md) tracks the remaining verification. Older Voice/StageMark releases and their validation records describe those separate apps.
 
+An **iPhone and iPad Preview for iOS/iPadOS 26+** is also in development as a separate native SwiftUI target. It offers foreground dictation, installed-voice reading, PencilKit image markup, independent wallpaper crop/export and simple presentation backdrops. The Mac capabilities below retain their own platform boundaries. See the [mobile scope, build instructions and test record](docs/ios-preview.md) and [mobile research](docs/mobile-research.md); no mobile App Store or TestFlight release is claimed.
+
 ## What is in the app?
 
 | Capability | What it does |
@@ -58,7 +60,7 @@ Model settings apply to the next request; the active request keeps its original 
 
 ## Build and install Preview
 
-Source development requires an Apple Silicon Mac, macOS 14+, Swift 6.2+ and the macOS 26 SDK. Run `bash scripts/doctor.sh` to check prerequisites. Full Xcode is required for distributable Apple Shortcuts metadata. The macOS 14 deployment target is not evidence of testing on every older OS or device.
+These commands build the **Mac Preview**. Source development requires an Apple Silicon Mac, macOS 14+, Swift 6.2+ and the macOS 26 SDK. Run `bash scripts/doctor.sh` to check prerequisites. Full Xcode is required for distributable Apple Shortcuts metadata. The macOS 14 deployment target is not evidence of testing on every older OS or device. For the separate mobile target, generate `Mobile/Workbench.xcodeproj` with `python3 scripts/mobile-project.py` and follow the [Xcode and Simulator instructions](docs/ios-preview.md#build-and-test).
 
 Quit Workbench, Workbench Preview and legacy Voice/StageMark apps before running the test suite. Its exclusive shortcut-registration checks will conflict with a running copy, including in CI test mode.
 

@@ -4,6 +4,8 @@ A small, useful improvement is a good first contribution. Bug reports, documenta
 
 This branch combines Voice and StageMark into one app. Workbench's purpose is dependable everyday Mac utilities for speaking, annotating and presenting. Improve a concrete workflow and compare against what macOS already offers before adding another feature.
 
+The separate [iOS/iPadOS 26+ Preview](docs/ios-preview.md) uses native phone/tablet workflows for the same useful jobs. Contributions should name the affected platform and preserve its own input, storage and lifecycle boundaries.
+
 ## Choose a first step
 
 1. Check the [open issues](https://github.com/EthDawg/local-voice/issues). An unassigned [good first issue](https://github.com/EthDawg/local-voice/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22) is a useful starting point. Comment that you want to take it so others can coordinate; no repository write access is needed.
@@ -12,7 +14,7 @@ This branch combines Voice and StageMark into one app. Workbench's purpose is de
 
 **No Mac or no Swift experience?** Edit documentation through GitHub's pencil and fork/PR workflow. Say “documentation only” in the PR; native checks are unnecessary for that change. Hardware findings can be an issue comment with the Mac/device/OS versions and steps tried.
 
-## Build and check
+## Build and check the Mac app
 
 Use an Apple Silicon Mac, macOS 14+, Swift 6.2+ and the macOS 26 SDK. The deployment target and build SDK are different: optional newer Apple features need the newer SDK to compile. Full Xcode is required for App Intents metadata; Command Line Tools support source development.
 
@@ -38,6 +40,22 @@ For persistent native testing, use the [signed Preview build/install commands](R
 
 CI runs automated checks and packaging on a macOS runner. A maintainer may need to approve a fork's first workflow run. For a behavioural change, add or run focused checks for the actual risk. Record relevant manual evidence: microphone permission/cancellation, cross-app paste, device disconnect/reconnect, keyboard conflicts, light/dark layout or other affected behaviour. Use synthetic content in public screenshots and recordings. If something cannot be tested, say why.
 
+## Build and check the mobile Preview
+
+Use full Xcode 26+ with the iOS 26 SDK and an installed iOS 26 Simulator runtime. From the same checkout:
+
+```sh
+python3 scripts/mobile-project.py
+open Mobile/Workbench.xcodeproj
+bash scripts/test-mobile.sh
+```
+
+Choose the **WorkbenchMobile** scheme in Xcode. The script selects an available iPhone Simulator; set `MOBILE_SIMULATOR_UDID` to an available iPad UUID for tablet coverage. It disables signing, runs the unit/UI targets and prints a fresh `Results.xcresult` path. UI tests use a fresh temporary library. The Mac suite's global-shortcut conflicts and requirement to quit Mac apps do not apply to this test path.
+
+The generator owns project entries and the shared scheme: update `scripts/mobile-project.py` for project configuration, and regenerate after adding files. Keep only proven portable text logic shared with the Mac. A mobile change must not import StageKit/AppKit or silently couple either app's saved state.
+
+Record simulator model/OS and actual test results in the PR. Physical speech availability, microphone/interruption recovery, background reading, Pencil/VoiceOver and meeting receivers need separate device evidence. An unsigned archive is not an installable app; iOS development provisioning is separate from Mac Developer ID signing. See the [mobile build and acceptance record](docs/ios-preview.md#build-and-test) for current limitations. No upload or App Store submission follows automatically from these commands.
+
 ## Find the code
 
 | Area | Start here |
@@ -54,10 +72,16 @@ CI runs automated checks and packaging on a macOS runner. A maintainer may need 
 | Device capture and Apple alternatives | `Sources/StageKit/DemoCapture.swift`, `NativePresentationApps.swift` |
 | Identity, appearance and legacy-data import | `Sources/LocalVoice/Workbench.swift`, `Sources/StageKit/Workbench.swift` |
 | Packaging and Preview install | `scripts/build.sh`, `scripts/release/preview.py`, `scripts/release/config.json` |
+| Mobile navigation, text and local state | `Mobile/Workbench/WorkbenchApp.swift`, `TextWorkspaces.swift`, `MobileDocument.swift`, `MobileStore.swift` |
+| Mobile speech and reading | `Mobile/Workbench/SpeechService.swift`, `ReadingService.swift` |
+| Mobile image editing and export | `Mobile/Workbench/ImageWorkspace.swift`, `ImageCanvas.swift`, `ImageRendering.swift` |
+| Mobile project and native tests | `scripts/mobile-project.py`, `scripts/test-mobile.sh`, `Mobile/WorkbenchTests`, `Mobile/WorkbenchUITests` |
 
 [The product contract](docs/workbench.md) owns app-wide behaviour; [the implementation map](docs/design.md) describes boundaries. Voice currently lives in the `LocalVoice` executable target; `StageKit` is a separate Swift library within the same process. Neither module should grow its own app lifecycle or another menu-bar icon. The original checkouts are provenance, not a requirement to maintain matching implementation PRs in two repos.
 
 The [jobs and interaction specification](docs/product-spec.md) defines input ownership, surfaces, placement and closure. The [public guide](https://workbench-mac.vercel.app/guide/) explains them to users. Update that specification and `site/guide/index.html` alongside behavior changes.
+
+For mobile behaviour, update [the mobile contract and evidence](docs/ios-preview.md); [mobile research](docs/mobile-research.md) records the native baselines and platform constraints. Keep mobile results separate from the Mac acceptance record.
 
 ## Send your change
 
