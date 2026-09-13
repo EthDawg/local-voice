@@ -1,6 +1,6 @@
 # Workbench product contract
 
-Workbench is one native Mac app for speaking, explaining and presenting. It establishes a useful free baseline: dependable primitives, optional better models and a few thoughtful combinations. A feature earns its place by removing recurring friction beyond the Mac's existing tools.
+Workbench is one native Mac app for speaking, explaining, presenting and shaping a useful desktop. It establishes a useful free baseline: dependable primitives, optional better models and a few thoughtful combinations. A feature earns its place by removing recurring friction beyond the Mac's existing tools.
 
 This contract describes the direction and current consolidation structure. [The acceptance record](unification.md) distinguishes implementation from tested and released behaviour.
 
@@ -12,6 +12,7 @@ This contract describes the direction and current consolidation structure. [The 
 | Text → speech | Mac reading voices, playback/export and optional online reading | Keep provider setup explicit; do not turn the utility into a general agent platform. |
 | Explain a screen | Live drawing, pointer emphasis, boards and a clear return to the demo | A meeting app owns distribution to the audience. |
 | Present a device | USB video preview in a saved scene, branding, readable controls and a break timer | QuickTime and iPhone Mirroring remain separate Apple apps. |
+| Enjoy a desktop | A distinct wallpaper journey: still-image baseline, independent settings and optional future motion | Direct wallpaper management is proposed; current Preview applies a rendered scene as a still. Use native OS support and preserve later manual changes. |
 | Reuse an item | Searchable prompts, links and file references already supported by the library | No tenant management, browser-profile rotation or team knowledge system. |
 
 Screenshot capture/markup, Services and Share extensions are possible later improvements. Their native equivalents are the starting comparison. Broad demo orchestration, a generic plugin framework and a Windows rewrite are not prerequisites for this version.
@@ -47,7 +48,7 @@ Normal application menus, buttons and editable shortcuts remain available togeth
 - Keyboard practice pauses Workbench global actions, consumes practice key presses, counts complete press/release repetitions and restores actions when it ends or the window loses focus. It does not claim a complete inventory of other apps' shortcuts.
 - Capture the original app and field before dictation. Paste only when they remain valid; otherwise copy. Never press Return or submit a message. Restore the previous clipboard only after confirmed insertion while Workbench still owns the clipboard change.
 - Preserve originals and saved work. Cleanup is optional and reversible. A generated rewrite is not evidence of factual or semantic correctness.
-- Ending a scene releases the device and restores presentation changes that Workbench owns. It must not close unrelated apps or silently change the user's system policies.
+- Ending a scene releases its device capture, presentation window, controls and keep-awake activity. It does not restore desktop wallpaper, close unrelated apps or change system policies. Quit stops app-owned work; a still picture set through macOS and its recovery records persist. Restore desktop is a separate explicit action with an ownership check.
 
 ## Models stay replaceable
 
@@ -81,4 +82,26 @@ The short implementation map is [design.md](design.md). The earlier suite model 
 
 The [category comparison](utility-comparison.md) ranks three useful steps per existing job. The [architecture decision](commodity-strategy.md) records stable jobs, replaceable engines and storage boundaries. Use the [model evaluation template](model-evaluation.md) before changing a default engine. GitHub issues remain the canonical contribution queue.
 
-Backdrop selection and crop are part of scene preparation. [Background management](background-management.md) records the competitor comparison, reversible replacement contract and deferred motion/stock work. They do not add a wallpaper daemon or a sixth utility.
+Scene preparation and persistent wallpaper are distinct, independently useful jobs. The user may adopt either without the other. Share original pictures by choice, with separate crop, layout and playback state. A direct Wallpaper entry is an accepted direction to prototype; current Preview still routes desktop apply through a rendered scene. Home placement remains a usability decision, not a reason to force both jobs into a common mode selector.
+
+[Background management](background-management.md) remains the implemented scene-backdrop specification. The [visual-experience contract](../site/handbook/contract.json) is the canonical structured record for the broader lifecycle, capability status and acceptance scenarios. The [public handbook](https://workbench-mac.vercel.app/handbook/) generates its capability and lifecycle records from that same file. The existing guide explains use; neither creates a second work queue.
+
+Native still wallpaper, time-of-day Dynamic Wallpapers, aerial transitions and continuously animated desktop rendering are different capabilities. Do not infer general video, arbitrary Space control or complete wallpaper-configuration recovery from the image-file setter. Motion follows a useful independent still experience and measured focus, energy, accessibility and failure behavior.
+
+The first independent wallpaper increment is choose → preview on a named display → apply → return to work, with explicit restoration that preserves later manual choices. A future app-rendered animation must stop on Quit and leave a chosen still. There is no motion control or wallpaper automation endpoint in the current app.
+
+## Visual state ownership
+
+```mermaid
+flowchart TD
+    Original[Reusable original image]
+    Original -->|explicit choice| Wallpaper[Wallpaper preference — proposed]
+    Original -->|explicit choice| Scene[Saved scene — implemented]
+    Wallpaper --> Still[Native still output and recovery]
+    Scene -->|Present| Session[Capture + scene window + controls]
+    Scene -->|Use as desktop: whole scene today| Still
+    Session -->|End or Quit| Stop[Release session resources]
+    Still -->|Explicit Restore and ownership match| Restore[Previous image and supported options]
+```
+
+The current desktop output/recovery mechanism exists inside scene preparation. A separate wallpaper preference and direct entry are proposed. There is no automatic link between the two choices; ending a presentation does not restore a desktop picture. The structured contract provides the exact current behavior and remaining evidence gates.

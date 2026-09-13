@@ -1,7 +1,16 @@
-import { mkdir, copyFile, cp, rm } from 'node:fs/promises';
+import { mkdir, copyFile, cp, rm, readFile, writeFile } from 'node:fs/promises';
+import { renderHandbook, validateContract, agentBrief } from './handbook/render.mjs';
 // Explicit allowlist: source tests, host configuration and local files never ship.
 await rm(new URL('./public/',import.meta.url),{recursive:true,force:true});
 await mkdir(new URL('./public/guide/',import.meta.url),{recursive:true});
+await mkdir(new URL('./public/handbook/',import.meta.url),{recursive:true});
 for (const name of ['index.html','privacy.html','style.css','app.mjs','report.mjs','guide/index.html','guide/guide.css']) await copyFile(new URL(name,import.meta.url),new URL(`public/${name}`,import.meta.url));
 await cp(new URL('assets/',import.meta.url),new URL('public/assets/',import.meta.url),{recursive:true});
+const contract = validateContract(JSON.parse(await readFile(new URL('./handbook/contract.json', import.meta.url), 'utf8')));
+const template = await readFile(new URL('./handbook/index.html', import.meta.url), 'utf8');
+await writeFile(new URL('./public/handbook/index.html', import.meta.url), renderHandbook(template, contract));
+await writeFile(new URL('./public/handbook/contract.json', import.meta.url), JSON.stringify(contract, null, 2) + '\n');
+await writeFile(new URL('./public/handbook/contract.mjs', import.meta.url), `export default ${JSON.stringify(contract)};\n`);
+await writeFile(new URL('./public/handbook/agent-brief.txt', import.meta.url), agentBrief(contract));
+for (const name of ['handbook.css', 'handbook.mjs']) await copyFile(new URL(`handbook/${name}`, import.meta.url), new URL(`public/handbook/${name}`, import.meta.url));
 console.log('Built static Workbench site in site/public');

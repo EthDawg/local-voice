@@ -4,7 +4,9 @@ Public site: https://workbench-mac.vercel.app
 
 A small static website for downloading Workbench, learning its jobs and controls, trying a real workflow, and preparing a user-experience report or coding-agent handoff. Voice and StageMark are modules in one native app. GitHub Releases own binaries and issues own feedback. No browser reimplementation, backend, analytics, or stored feedback.
 
-The durable product guide is `guide/index.html`. Its interaction contract lives in `../docs/product-spec.md`; update both in a behavior-changing pull request. `assets/guide/` contains labelled design studies, not app screenshots. The build uses an explicit file allowlist and publishes no source tests or local deployment state.
+The working guide is `guide/index.html`. The product handbook is `handbook/index.html`: two independent visual journeys, lifecycle exploration, native boundaries and contributor entry points. `handbook/contract.json` is the single structured source for its capability records, lifecycle rules, acceptance scenarios and generated agent brief. Edit that source rather than separately updating human and agent copies. The repository-wide product contract remains `../docs/workbench.md`.
+
+`assets/guide/` contains explicitly labelled generated studies and separate actual native screenshots. Generation prompts and critique live in `../docs/design-images.md`. The build uses an explicit file allowlist; it publishes no source tests, rendering helper, environment files or local deployment state. No backend, agent endpoint or wallpaper automation is added by the handbook.
 
 ## Local development
 
@@ -17,7 +19,7 @@ node build.mjs
 python3 -m http.server 4173 --directory public --bind 127.0.0.1
 ```
 
-Open http://127.0.0.1:4173. Check desktop/mobile layout, keyboard tab switching, trial checkboxes, report validation, per-app issue routing, and copy actions. Use synthetic feedback and do not submit QA issues to GitHub. Edit `index.html`, `style.css`, `app.mjs`, or `report.mjs`, then rebuild.
+Open http://127.0.0.1:4173. Check desktop/mobile layout, keyboard tab switching, trial checkboxes, report validation, per-app issue routing, and copy actions. For the handbook, check every lifecycle event, keyboard activation, expanded capability records and the matching JSON/agent brief. Read the fallback lifecycle table with JavaScript unavailable. Use synthetic feedback and do not submit QA issues to GitHub. Edit source files, then rebuild; do not edit `public/` output.
 
 ## Publish
 

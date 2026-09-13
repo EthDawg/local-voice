@@ -18,7 +18,7 @@ A phone's live screen travels **to the Mac scene**. Workbench does not send Mac 
 
 ## What is worth copying, and what to develop next
 
-A competitor could reproduce individual controls quickly. The stronger investment is a complete, dependable job, portable originals and fewer surprising transitions. These are differentiation hypotheses, not claims that competitors lack these features. Five pillars are sufficient; the engine layer is a shared foundation. [The background review](background-management.md) deepens Present without adding another pillar.
+A competitor could reproduce individual controls quickly. The stronger investment is a complete, dependable job, portable originals and fewer surprising transitions. These are differentiation hypotheses, not claims that competitors lack these features. These five pillars describe the implemented baseline; the engine layer is a shared foundation. The subsequent [visual-experience contract](../site/handbook/contract.json) recognises persistent wallpaper as its own user job alongside presentation. Keep its entry and lifecycle independent; the number of sidebar groups is not a product constraint.
 
 | Pillar | Strongest current behaviour worth copying | One recommendation to distinguish the experience | Proof that would justify it |
 | --- | --- | --- | --- |

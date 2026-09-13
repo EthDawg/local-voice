@@ -1,6 +1,6 @@
 # Backgrounds that preserve the scene
 
-Decision and specification · 13 September 2026. This is **scene preparation**, within Present a device. macOS remains the everyday wallpaper manager. The useful Workbench promise is to prepare a composition once, then change its setting without rebuilding it.
+Decision and specification · 13 September 2026. This record covers **scene preparation**, within Present a device. The broader product now also recognises persistent wallpaper as a separate job: see the [visual-experience contract](../site/handbook/contract.json). macOS provides its native baseline; a dedicated Workbench wallpaper experience is proposed. The useful Workbench promise is to prepare a composition once, then change its setting without rebuilding it.
 
 ## What the comparison changed
 
@@ -27,7 +27,7 @@ These findings do not establish that everyone can replace a specialist wallpaper
 4. **Reusable curated backdrops with provenance — park.** Start with existing local images. Add names/favourites/source credit only when finding reused images becomes difficult. Stock discovery needs attribution and download handling, not Google Images scraping; see the [Unsplash API requirements](https://unsplash.com/documentation).
 5. **Quiet local motion with a chosen still — later.** A bounded local video, explicit playback, mute, reduced-motion/battery behaviour and a stable still export. No autoplaying web pages, media downloads or scheduling engine. Require smooth device capture and an actual meeting receiver test before adoption.
 
-Cut a new wallpaper daemon, weather widgets, arbitrary HTML/CSS scripting, theme marketplaces, automated generation, and a second top-level library. These add maintenance without improving the current demo job. Existing desktop apply/restore ownership checks remain valuable and stay in place.
+This scene-backdrop increment excluded a wallpaper daemon, weather widgets, arbitrary HTML/CSS scripting, theme marketplaces, automated generation and a second library. That scope decision does not reject the independent wallpaper job. Prototype its still-image entry first; choose any motion runtime only after measured evidence. Existing desktop apply/restore ownership checks remain valuable and stay in place.
 
 ## Selected interaction
 
