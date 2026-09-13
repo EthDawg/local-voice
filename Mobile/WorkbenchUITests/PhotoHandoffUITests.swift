@@ -38,7 +38,13 @@ final class PhotoHandoffUITests: XCTestCase {
         reveal(sample, in: app); sample.tap()
         let name = app.textFields["handoff.name"]
         XCTAssertTrue(name.waitForExistence(timeout: 5))
-        reveal(name, in: app); name.tap(); name.typeText("Fixture whiteboard")
+        reveal(name, in: app); name.tap()
+        // A hittable field does not prove that the tap has finished opening
+        // the native keyboard. Wait for that visible editing state before
+        // typing; do not inject text or force focus through an app test hook.
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), "Tapping the photo name must open the keyboard")
+        name.typeText("Fixture whiteboard")
+        XCTAssertEqual(name.value as? String, "Fixture whiteboard")
         let done = app.buttons["Done"]
         if done.exists && done.isHittable { done.tap() }
         XCTAssertFalse(app.buttons["handoff.send"].isEnabled)
