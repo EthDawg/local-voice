@@ -110,7 +110,7 @@ The current desktop output/recovery mechanism exists inside scene preparation. A
 
 ## Selected-photo handoff
 
-The optional iPhone-to-Mac photo route is governed by [photo-handoff.md](photo-handoff.md). It joins a selected photo to existing Saved resources and backdrop replacement, without synchronising whole libraries or changing a scene on arrival. Its private cloud adapter requires a separately verified signed Preview; the public Mac download is unchanged.
+The optional iPhone-to-Mac photo route is governed by [photo-handoff.md](photo-handoff.md). It joins a selected photo to existing Saved resources and backdrop replacement, without synchronising whole libraries or changing a scene on arrival. The public Preview 3 Mac download preserves the verified Production iCloud capability and is signed and notarized. Enabling sync remains a separate user choice; publishing a capable package does not establish paired scene reception or a public iOS release.
 
 ## Personal scene preparation
 

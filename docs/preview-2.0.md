@@ -1,8 +1,8 @@
 # Workbench 2 Preview: current evidence
 
-Updated 13 September 2026. Voice and StageMark share one app. The final signed local
-package and full regression run passed, and the Preview was installed. The evaluation prerelease is published; the hardware limits below remain.
-Publication does not mean all acceptance checks pass.
+Updated 14 September 2026. Voice and StageMark share one app. [Preview 3](https://github.com/EthDawg/local-voice/releases/tag/v2.0.0-preview.3) from `48bc7c0` is Developer ID signed, notarized, stapled and published. The downloaded ZIP passed checksum and Gatekeeper verification, then installed while retaining existing scenes and the saved photo. The earlier publication hold is superseded. iOS 2.1.0 (1) completed Apple processing and is awaiting remaining store preparation and physical acceptance; see [the iOS guide](ios-preview.md#release-preparation--14-september-2026).
+
+The exact release source passed Mac, iPhone and iPad [CI](https://github.com/EthDawg/local-voice/actions/runs/34761974846). The final Mac regression run included **91 StageKit checks / 2,165 assertions / 0 failures**, native global-input checks, speech/audio round trips, required cloud capabilities and Shortcuts metadata. Installed smoke checks covered opening the retained scene, presentation controls, the stale-frame message with a locked phone, and ending the presentation. A fresh live feed and audience receiver were not established. Publication does not mean all acceptance checks pass; earlier increments below are dated evidence.
 
 ## Current implementation
 
@@ -31,7 +31,7 @@ Publication does not mean all acceptance checks pass.
 See the [interaction specification](product-spec.md), [persona guide](personas.md)
 and [privacy page](../site/privacy.html) for behavior and data boundaries.
 
-## Latest native checks
+## Earlier native checks — 13 September 2026
 
 These checks exercised the local signed Preview. Public-download verification is recorded separately in the release notes:
 
@@ -109,7 +109,7 @@ The archive, checksum and machine-readable `release.json` are release assets.
 The [public guide](https://workbench-mac.vercel.app/guide/) is maintained with the
 site source; subsequent guide-only commits do not change this app archive.
 
-App Store submission and notarization upload remain on hold. This evaluation
+At publication, App Store submission and notarization upload were on hold. This evaluation
 archive is Developer ID signed with hardened runtime and a secure timestamp,
 but **not notarized**. It is outside the normal notarized release pipeline and
 may be blocked by Gatekeeper on a fresh download. No human co-maintainer approval
@@ -119,7 +119,7 @@ is claimed; the implementation pull request remains a draft.
 
 This increment adds **Remember correction…** to transcript review, with explicit heard/preferred spelling, exact draft preview, reuse of the local dictionary and Undo that preserves newer edits. Earlier captures and recognizer originals stay unchanged; saving does not paste again. See the [comparison, decision and checks](dictation-comparison.md).
 
-The complete local regression suite passed again, including 43 correction-rule and 43 transaction checks. Native interface checks used production UI and methods with synthetic, in-memory state. Signed packaging and native Shortcuts metadata validation passed. Apple submission and notarization remain on hold. The release asset manifest records the final source and archive identity; earlier Preview evidence above remains dated historical evidence.
+The complete local regression suite passed again, including 43 correction-rule and 43 transaction checks. Native interface checks used production UI and methods with synthetic, in-memory state. Signed packaging and native Shortcuts metadata validation passed. Apple submission and notarization were on hold at that stage. The release asset manifest records the source and archive identity; this Preview 2 evidence is historical.
 
 ## Everyday utilities increment: 2.0.0-preview.3
 
@@ -127,4 +127,4 @@ Read aloud now seeks/skips in existing audio; boards copy/save PNG images; prese
 
 Focused checks added 32 production playback-method checks, 8 real AVAudioPlayer checks and 29 saved-resource/model/view checks. Stage coverage is now 66 tests and 1,613 assertions. Native fixtures exercised playback reuse, keyboard resource recall/failure/editing, Save cancellation/export and window/fullscreen transitions. Fixtures use synthetic content and isolated stores/effects. No live draft or library was replaced. The release manifest identifies the exact signed source and archive.
 
-The first full build exposed an actor-isolation error in the new test seam; fixed in production and mirrored in its fixture. A sandboxed run could not use the native audio encoder; normal approved execution passed that integration. Stage shortcut checks initially conflicted with the running Preview and passed after it released the keys. These are retained as validation history. Physical-device, meeting-receiver, VoiceOver and fresh-Mac checks remain separate; Apple submission and notarization remain on hold.
+The first full build exposed an actor-isolation error in the new test seam; fixed in production and mirrored in its fixture. A sandboxed run could not use the native audio encoder; normal approved execution passed that integration. Stage shortcut checks initially conflicted with the running Preview and passed after it released the keys. These are retained as validation history. The final Preview 3 publication and notarization are recorded at the top of this page. Physical-device, meeting-receiver, VoiceOver and fresh-Mac checks remain separate.

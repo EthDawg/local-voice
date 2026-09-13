@@ -80,4 +80,4 @@ Claude challenged the generic architecture proposal without repository source or
 
 Read aloud gains seeking in existing audio; annotation boards gain copy/PNG export; device scenes gain a normal resizable presentation option; saved resources gain a contextual Return action with truthful copy feedback. Backdrop replacement now preserves a prepared scene and repairs missing images through an explicit preview/apply operation. These use existing playback, renderer, window and library ownership. No new model, persisted user format, network service or application framework is introduced.
 
-Apple submission and notarization upload remain on hold. See the release record for exact build, signature, checksum and remaining native/hardware checks.
+The earlier publication hold was superseded on 14 September 2026. [Preview 3](https://github.com/EthDawg/local-voice/releases/tag/v2.0.0-preview.3) is signed, notarized and published; iOS 2.1.0 (1) has completed Apple processing but is not released. See the [release record](preview-2.0.md) and [iOS preparation](ios-preview.md#release-preparation--14-september-2026) for verified results and remaining acceptance.
