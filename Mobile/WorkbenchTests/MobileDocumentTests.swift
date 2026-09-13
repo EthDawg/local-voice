@@ -12,6 +12,12 @@ private final class SpeechAssetFixture: MobileSpeechAssetProviding {
     var failure: Error?
     var suspendInstallation = false
     var onInstall: (() -> Void)?
+    var onCancel: (() -> Void)?
+    var statusSequence: [MobileSpeechAssetStatus] = []
+    var installedLocaleOverride: Bool?
+    var installsImmediately = true
+    var outcome = MobileSpeechInstallationOutcome.downloadAttemptFinished
+    var snapshotCalls = 0
     private var installed = Set<String>()
     private var continuation: CheckedContinuation<Void, Never>?
     private var progress: (@MainActor (Double) -> Void)?
@@ -20,8 +26,15 @@ private final class SpeechAssetFixture: MobileSpeechAssetProviding {
     func supportedLocale(equivalentTo locale: Locale) async -> Locale? {
         await supportedLocales().first { $0.identifier(.bcp47) == locale.identifier(.bcp47) }
     }
-    func status(for locale: Locale) async -> MobileSpeechAssetStatus { installed.contains(locale.identifier(.bcp47)) ? .installed : .supported }
-    func install(for locale: Locale, progress: @escaping @MainActor (Double) -> Void) async throws {
+    func snapshot(for locale: Locale) async -> MobileSpeechAssetSnapshot {
+        snapshotCalls += 1
+        let identifier = locale.identifier(.bcp47)
+        let status = statusSequence.isEmpty ? (installed.contains(identifier) ? MobileSpeechAssetStatus.installed : .supported) : statusSequence.removeFirst()
+        return MobileSpeechAssetSnapshot(status: status, localeIdentifier: identifier,
+            localeIsInstalled: installedLocaleOverride ?? installed.contains(identifier),
+            reservedLocaleIdentifiers: installed.contains(identifier) ? [identifier] : [])
+    }
+    func install(for locale: Locale, progress: @escaping @MainActor (Double) -> Void) async throws -> MobileSpeechInstallationOutcome {
         let identifier = locale.identifier(.bcp47)
         installCalls.append(identifier)
         self.progress = progress
@@ -31,9 +44,10 @@ private final class SpeechAssetFixture: MobileSpeechAssetProviding {
         } else { onInstall?() }
         // Deliberately noncooperative after cancellation: the service must reject
         // this late completion using its invocation generation.
-        installed.insert(identifier)
+        if installsImmediately { installed.insert(identifier) }
+        return outcome
     }
-    func cancelInstallation() { cancelCount += 1 }
+    func cancelInstallation() { cancelCount += 1; onCancel?() }
     func publishProgress(_ value: Double) { progress?(value) }
     func finishSuspendedInstallation() { continuation?.resume(); continuation = nil }
 }
@@ -168,6 +182,153 @@ final class MobileDocumentTests: XCTestCase {
         XCTAssertEqual(service.phase, phase)
         XCTAssertFalse(service.isReady)
         XCTAssertNil(service.downloadProgress)
+        XCTAssertNil(service.error)
+    }
+
+    @MainActor
+    func testInstalledLocaleCannotOverrideUnsupportedOrUnreadyConfiguredModule() async throws {
+        let assets = SpeechAssetFixture()
+        assets.installedLocaleOverride = true
+        var waits = 0
+        let service = SpeechService(locale: Locale(identifier: "en_AU"), assets: assets,
+            recoveryDirectory: try temporaryDirectory(), preferences: nil, observesInterruptions: false,
+            assetRecheckDelay: { waits += 1 })
+        await service.refreshAvailability()
+        XCTAssertFalse(service.isReady, "The locale list does not establish readiness for this exact preset")
+        XCTAssertEqual(waits, 4)
+        XCTAssertEqual(assets.snapshotCalls, 5)
+        XCTAssertTrue(service.error?.contains("speech module is not ready") == true)
+        XCTAssertTrue(service.diagnosticDetail?.contains("status=supported; installedLocales contains exact locale=true") == true)
+        XCTAssertEqual(assets.installCalls, [], "Corroboration never silently requests a download")
+
+        assets.statusSequence = [.unsupported]
+        await service.refreshAvailability()
+        XCTAssertEqual(service.readiness, .unavailable)
+        XCTAssertFalse(service.isReady)
+        XCTAssertEqual(waits, 4, "Unsupported modules do not enter a readiness retry loop")
+        XCTAssertNil(service.error)
+    }
+
+    @MainActor
+    func testNilInstallationOutcomeWaitsForConfiguredModuleConvergence() async throws {
+        let assets = SpeechAssetFixture()
+        assets.outcome = .alreadyInstalled
+        assets.installsImmediately = false
+        assets.installedLocaleOverride = true
+        assets.statusSequence = [.supported, .supported, .installed]
+        var waits = 0
+        let service = SpeechService(locale: Locale(identifier: "en_AU"), assets: assets,
+            recoveryDirectory: try temporaryDirectory(), preferences: nil, observesInterruptions: false,
+            assetRecheckDelay: { waits += 1 })
+        await service.prepare()
+        XCTAssertEqual(assets.installCalls, ["en-AU"])
+        XCTAssertEqual(waits, 1)
+        XCTAssertTrue(service.isReady)
+        XCTAssertEqual(service.readiness, .ready)
+        XCTAssertNil(service.error)
+        XCTAssertFalse(service.isRecording)
+    }
+
+    @MainActor
+    func testReturnedInstallationAttemptWithUnreadyModuleStopsAfterBoundedChecks() async throws {
+        let directory = try temporaryDirectory()
+        let marker = directory.appendingPathComponent("recovery.json")
+        let original = Data("{ unreadable recovery".utf8)
+        try original.write(to: marker)
+        let assets = SpeechAssetFixture()
+        assets.installsImmediately = false
+        var waits = 0
+        let service = SpeechService(locale: Locale(identifier: "en_AU"), assets: assets,
+            recoveryDirectory: directory, preferences: nil, observesInterruptions: false,
+            assetRecheckDelay: { waits += 1 })
+        await service.prepare()
+        XCTAssertEqual(waits, 4)
+        XCTAssertEqual(assets.snapshotCalls, 6, "One initial and five post-completion snapshots")
+        XCTAssertEqual(assets.installCalls, ["en-AU"], "Rechecks never repeat the installation request")
+        XCTAssertFalse(service.isReady)
+        XCTAssertFalse(service.isWorking)
+        XCTAssertTrue(service.error?.contains("finished the first installation attempt") == true)
+        XCTAssertFalse(service.error?.contains("internet connection") == true)
+        XCTAssertTrue(service.diagnosticDetail?.contains("Installation outcome: downloadAttemptFinished") == true)
+        XCTAssertTrue(service.diagnosticDetail?.contains("status=supported; installedLocales contains exact locale=false") == true)
+        XCTAssertEqual(try Data(contentsOf: marker), original)
+    }
+
+    @MainActor
+    func testNilInstallationWithoutConvergenceDoesNotPretendReady() async throws {
+        let assets = SpeechAssetFixture()
+        assets.outcome = .alreadyInstalled
+        assets.installsImmediately = false
+        assets.installedLocaleOverride = true
+        var waits = 0
+        let service = SpeechService(locale: Locale(identifier: "en_AU"), assets: assets,
+            recoveryDirectory: try temporaryDirectory(), preferences: nil, observesInterruptions: false,
+            assetRecheckDelay: { waits += 1 })
+        await service.prepare()
+        XCTAssertFalse(service.isReady)
+        XCTAssertEqual(waits, 4)
+        XCTAssertTrue(service.diagnosticDetail?.contains("Installation outcome: alreadyInstalled") == true)
+        XCTAssertTrue(service.error?.contains("reported the language already installed") == true)
+        XCTAssertTrue(service.diagnosticDetail?.contains("Module: SpeechTranscriber.transcription; locale=en-AU") == true)
+        XCTAssertEqual(assets.installCalls.count, 1)
+    }
+
+    @MainActor
+    func testBackgroundDuringAssetRecheckRejectsLateReadinessThenRefreshes() async throws {
+        let assets = SpeechAssetFixture()
+        assets.outcome = .alreadyInstalled
+        assets.installsImmediately = false
+        assets.statusSequence = [.supported, .supported]
+        let waiting = expectation(description: "Waiting for inventory convergence")
+        let cancelled = expectation(description: "Background cancels preparation")
+        var continuation: CheckedContinuation<Void, Never>?
+        assets.onCancel = { cancelled.fulfill() }
+        let service = SpeechService(locale: Locale(identifier: "en_AU"), assets: assets,
+            recoveryDirectory: try temporaryDirectory(), preferences: nil, observesInterruptions: true,
+            assetRecheckDelay: {
+                // Deliberately ignore cancellation until released, to verify the
+                // service's generation guard rather than the fake clock's behavior.
+                await withCheckedContinuation { continuation = $0; waiting.fulfill() }
+            })
+        let task = Task { await service.prepare() }
+        await fulfillment(of: [waiting], timeout: 5)
+        XCTAssertTrue(service.isWorking)
+        NotificationCenter.default.post(name: UIApplication.didEnterBackgroundNotification, object: nil)
+        await fulfillment(of: [cancelled], timeout: 5)
+        XCTAssertFalse(service.isWorking)
+        XCTAssertFalse(service.isReady)
+        let snapshotCount = assets.snapshotCalls
+        assets.statusSequence = [.installed]
+        continuation?.resume(); continuation = nil
+        await task.value
+        XCTAssertEqual(assets.snapshotCalls, snapshotCount, "No late inventory read or readiness commit")
+        XCTAssertFalse(service.isReady)
+        XCTAssertNil(service.error)
+        XCTAssertNil(service.diagnosticDetail)
+        await service.refreshAvailability()
+        XCTAssertTrue(service.isReady)
+        XCTAssertEqual(assets.installCalls, ["en-AU"], "Later foreground checks do not download")
+        assets.onCancel = nil
+    }
+
+    @MainActor
+    func testPreviouslyReadyReentryRechecksWithoutPersistingReadiness() async throws {
+        let assets = SpeechAssetFixture()
+        assets.statusSequence = [.installed, .supported, .installed]
+        var waits = 0
+        let service = SpeechService(locale: Locale(identifier: "en_AU"), assets: assets,
+            recoveryDirectory: try temporaryDirectory(), preferences: nil, observesInterruptions: false,
+            assetRecheckDelay: { waits += 1 })
+        await service.refreshAvailability()
+        XCTAssertTrue(service.isReady)
+        await service.refreshAvailability()
+        XCTAssertTrue(service.isReady)
+        XCTAssertEqual(waits, 1)
+        await service.refreshAvailability()
+        XCTAssertFalse(service.isReady, "Genuinely absent assets cannot inherit cached ready state")
+        XCTAssertEqual(service.readiness, .needsDownload)
+        XCTAssertEqual(waits, 5)
+        XCTAssertEqual(assets.installCalls, [])
         XCTAssertNil(service.error)
     }
 
