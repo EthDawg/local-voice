@@ -116,3 +116,7 @@ A useful first contribution can be a confusing instruction, an accessibility imp
 - Matt ([@mattywhitenz](https://github.com/mattywhitenz)) proposed Apple Shortcuts dictation and optional Speko reading in [#10](https://github.com/EthDawg/local-voice/issues/10) and [#11](https://github.com/EthDawg/local-voice/issues/11).
 
 The app code is [MIT licensed](LICENSE). Third-party components retain their own licenses. Contribution credit does not imply a GitHub permission level or approval of this branch.
+
+### Photo for Mac · source Preview
+
+Take or choose a photo on iPhone, keep the original locally and deliberately send an optimised copy through private iCloud. Mac Saved resources → From iPhone opens an existing scene’s backdrop preview or saves an independent copy. The [photo handoff guide](https://workbench-mac.vercel.app/handoff/) and [canonical specification](docs/photo-handoff.md) record the research, limits and signing route. Real paired transfer is not yet verified; this feature is not in the public Preview 2 download.

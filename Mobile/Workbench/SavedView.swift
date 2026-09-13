@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MobileSavedView: View {
     @EnvironmentObject private var store: MobileStore
+    @EnvironmentObject private var handoff: PhotoHandoffModel
     @State private var query = ""
     @State private var filter = "All"
     @State private var deleting: UUID?
@@ -11,6 +12,9 @@ struct MobileSavedView: View {
     }
     private var images: [MobileImageProject] {
         store.document.images.filter { query.isEmpty || ($0.title + $0.kind.title + $0.caption).localizedStandardContains(query) }.sorted { $0.modified > $1.modified }
+    }
+    private var handoffPhotos: [HandoffPhoto] {
+        handoff.photos.filter { query.isEmpty || ($0.title + " " + $0.sourceDevice).localizedStandardContains(query) }
     }
     var body: some View {
         List {
@@ -40,9 +44,22 @@ struct MobileSavedView: View {
                     }
                 }
             }
+            if filter != "Text", !handoffPhotos.isEmpty {
+                Section("Photo handoff") {
+                    ForEach(handoffPhotos) { photo in
+                        NavigationLink { PhotoHandoffDetailView(photoID: photo.id) } label: { PhotoHandoffRow(photo: photo) }
+                    }
+                }
+            }
         }.navigationTitle("Saved").searchable(text: $query, prompt: "Find your words and pictures")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink { PhotoHandoffView() } label: { Label("Photo handoff", systemImage: "camera") }
+                        .accessibilityIdentifier("saved.photoHandoff")
+                }
+            }
             .overlay {
-                if (filter == "Pictures" || texts.isEmpty) && (filter == "Text" || images.isEmpty) {
+                if (filter == "Pictures" || texts.isEmpty) && (filter == "Text" || (images.isEmpty && handoffPhotos.isEmpty)) {
                     ContentUnavailableView(query.isEmpty ? "Your useful things, kept." : "Nothing found", systemImage: query.isEmpty ? "folder" : "magnifyingglass", description: Text(query.isEmpty ? "Save a text, marked screenshot, backdrop or wallpaper. It will be here when you need it." : "Try a different word." )).padding(.top, 70).allowsHitTesting(false)
                 }
             }

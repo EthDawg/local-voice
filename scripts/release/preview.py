@@ -62,10 +62,16 @@ def validate_bundle(app, config, allow_ad_hoc=False):
     return signature
 
 
-def build(config, identity=None, ad_hoc=False, native=False):
+def build(config, identity=None, ad_hoc=False, native=False, photo_cloud_profile=None):
     if ad_hoc and identity:
         raise RuntimeError("Choose Developer ID signing or --ad-hoc, not both")
     selected, team = (None, None) if ad_hoc else developer_identity(identity)
+    if photo_cloud_profile:
+        if ad_hoc or config["identifier"] != "com.ethdawg.workbench.preview":
+            raise RuntimeError("Photo handoff requires the signed Workbench Preview identity")
+        photo_cloud_profile = Path(photo_cloud_profile).resolve()
+        run(sys.executable, ROOT / "scripts/check-photo-cloud.py", "--platform", "macos",
+            "--team", team, "--environment", "Production", "--profile", photo_cloud_profile)
     command = config["build"][:]
     # StageMark has no architecture-specific dependency. Voice's FluidAudio
     # backend remains Apple Silicon until its Intel path is independently tested.
@@ -90,17 +96,30 @@ def build(config, identity=None, ad_hoc=False, native=False):
                     CFBundleName=config["bundle"].removesuffix(".app"),
                     CFBundleDisplayName=config["bundle"].removesuffix(".app"),
                     CFBundleVersion=datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"), WorkbenchChannel="preview")
+        photo_entitlements = None
+        if photo_cloud_profile:
+            photo_entitlements = staging / "photo-cloud.entitlements"
+            run(sys.executable, ROOT / "scripts/check-photo-cloud.py", "--platform", "macos",
+                "--team", team, "--environment", "Production", "--profile", photo_cloud_profile,
+                "--entitlements-out", photo_entitlements)
+            shutil.copyfile(photo_cloud_profile, app / "Contents/embedded.provisionprofile")
+            info.update(WorkbenchPhotoCloudProvisioned=True,
+                        WorkbenchPhotoCloudContainer="iCloud.com.ethdawg.workbench.preview",
+                        WorkbenchPhotoCloudEnvironment="Production")
         info_path.write_bytes(plistlib.dumps(info))
         for path in release.signing_targets(app):
             command = ["codesign", "--force", "--sign", selected or "-"]
             if selected:
                 command += ["--timestamp", "--options", "runtime"]
-                if path == app and config.get("entitlements"):
-                    command += ["--entitlements", str(ROOT / config["entitlements"])]
+                if path == app and (photo_entitlements or config.get("entitlements")):
+                    command += ["--entitlements", str(photo_entitlements or ROOT / config["entitlements"])]
             run(*command, path)
         validate_bundle(app, config, ad_hoc)
         if team:
             release.check_signature(app, team)
+        if photo_cloud_profile:
+            run(sys.executable, ROOT / "scripts/check-photo-cloud.py", "--platform", "macos",
+                "--team", team, "--environment", "Production", "--app", app)
         temporary_archive = staging / archive.name
         run("ditto", "-c", "-k", "--sequesterRsrc", "--keepParent", app, temporary_archive)
         # Keep the last good package if this build fails before validation.
@@ -166,6 +185,7 @@ def main():
     parser.add_argument("command", choices=["build", "install"])
     parser.add_argument("--identity", help="Developer ID certificate SHA-1 fingerprint; auto-selects when exactly one exists")
     parser.add_argument("--ad-hoc", action="store_true", help="Disposable developer build; permissions may need reapproval")
+    parser.add_argument("--photo-cloud-profile", type=Path, help="Verified Developer ID CloudKit profile for the private paired Preview; no service is created")
     parser.add_argument("--native", action="store_true", help="StageMark: build only this Mac's architecture")
     parser.add_argument("--no-open", action="store_true", help="Install without opening the app")
     parser.add_argument("--archive", type=Path, help="Install an already built signed ZIP without rebuilding")
@@ -175,9 +195,11 @@ def main():
         parser.error("--archive is only supported for install")
     if args.production and (args.command != "install" or not args.archive or args.ad_hoc):
         parser.error("Production updates require install --production --archive PATH_TO_NOTARIZED_ZIP")
+    if args.photo_cloud_profile and (args.ad_hoc or args.production or args.archive):
+        parser.error("--photo-cloud-profile is only for building a signed Workbench Preview")
     os.chdir(ROOT)
     config = configuration(production=args.production)
-    archive = args.archive.resolve() if args.archive else build(config, args.identity, args.ad_hoc, args.native)
+    archive = args.archive.resolve() if args.archive else build(config, args.identity, args.ad_hoc, args.native, args.photo_cloud_profile)
     if args.command == "install":
         install(config, archive, args.ad_hoc, not args.no_open)
 

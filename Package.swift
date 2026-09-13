@@ -16,8 +16,10 @@ let package = Package(
     products: [.executable(name: "LocalVoice", targets: ["LocalVoice"])],
     dependencies: [.package(url: "https://github.com/FluidInference/FluidAudio.git", exact: "0.15.6")],
     targets: [
+        .target(name: "PhotoHandoffKit"),
+        .testTarget(name: "PhotoHandoffKitTests", dependencies: ["PhotoHandoffKit"]),
         .target(name: "StageKit", linkerSettings: [.linkedFramework("Carbon")]),
-        .executableTarget(name: "LocalVoice", dependencies: ["StageKit", .product(name: "FluidAudio", package: "FluidAudio")], swiftSettings: intentSettings, linkerSettings: [.linkedFramework("Carbon")])
+        .executableTarget(name: "LocalVoice", dependencies: ["StageKit", "PhotoHandoffKit", .product(name: "FluidAudio", package: "FluidAudio")], swiftSettings: intentSettings, linkerSettings: [.linkedFramework("Carbon")])
     ],
     swiftLanguageModes: [.v5]
 )

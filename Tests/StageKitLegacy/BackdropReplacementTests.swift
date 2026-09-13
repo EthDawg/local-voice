@@ -103,6 +103,48 @@ final class BackdropReplacementTests {
         XCTAssertFalse(model.hasDesktopSnapshot); XCTAssertFalse(model.isPresenting)
     }
 
+    func testPhotoHandoffPreviewTargetsChosenSceneAndKeepsIndependentCopy() throws {
+        let root = try temporary(), inbox = try temporary()
+        defer { try? FileManager.default.removeItem(at: root); try? FileManager.default.removeItem(at: inbox) }
+        let initial = try makeModel(root)
+        let first = initial.selected!
+        var second = first; second.id = UUID(); second.name = "Chosen scene"; second.phoneX = 0.7
+        second.logo = SceneLogo(image: "logo.png"); second.persona = PersonaPlacement(image: "persona.png")
+        try SceneStorage.save([first, second], to: root.appendingPathComponent("scenes.json"))
+        let model = DemoScenes(root: root, systemIntegrationEnabled: false)
+        model.selectedID = first.id
+        let source = inbox.appendingPathComponent("received.jpg"), bytes = try rotatedJPEG()
+        try bytes.write(to: source)
+        let before = try files(root)
+        let cancelled = try model.makeBackdropReplacement(sceneID: second.id, imageURL: source, title: "Photo from iPhone")
+        XCTAssertEqual(cancelled.sceneID, second.id)
+        XCTAssertEqual(model.selectedID, first.id, "Preparing another scene must not change the library selection")
+        XCTAssertEqual(try files(root), before, "The handoff seam must not copy or save until Apply")
+        cancelled.cancel()
+        XCTAssertEqual(try files(root), before)
+        XCTAssertEqual(try Data(contentsOf: source), bytes)
+
+        let draft = try model.makeBackdropReplacement(sceneID: second.id, imageURL: source, title: "Photo from iPhone")
+        var newer = second; newer.name = "Later name"; newer.phoneX = 0.18
+        newer.persona?.width = 0.25
+        try SceneStorage.save([first, newer], to: root.appendingPathComponent("scenes.json"))
+        try FileManager.default.removeItem(at: source)
+        try model.applyBackdrop(draft)
+        let saved = model.scenes.first { $0.id == second.id }!
+        var expected = newer; expected.background = saved.background
+        expected.backgroundX = 0.5; expected.backgroundY = 0.5; expected.zoom = 1
+        XCTAssertEqual(saved, expected, "Only the chosen scene's backdrop may change, preserving later foreground edits")
+        XCTAssertEqual(model.scenes.first { $0.id == first.id }, first)
+        XCTAssertEqual(model.scenes.count, 2, "A handoff never creates a duplicate scene")
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(saved.background)), bytes,
+                       "The scene owns an independent previewed copy after the inbox source disappears")
+        XCTAssertFalse(model.hasDesktopSnapshot); XCTAssertFalse(model.isPresenting)
+        XCTAssertThrowsError(try model.makeBackdropReplacement(sceneID: UUID(), imageURL: source, title: "Missing"))
+        let blocked = DemoScenes(root: root, readOnlyReason: "Unreadable fixture", systemIntegrationEnabled: false)
+        XCTAssertThrowsError(try blocked.makeBackdropReplacement(sceneID: second.id, imageURL: source, title: "Blocked"))
+        XCTAssertEqual(try SceneStorage.load(root.appendingPathComponent("scenes.json")), model.scenes)
+    }
+
     func testSavedReuseDeduplicationAndMissingBackdropRepair() throws {
         let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }
         let model = try makeModel(root)

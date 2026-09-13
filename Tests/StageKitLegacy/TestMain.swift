@@ -39,6 +39,7 @@ struct TestRunner {
         let presentationLifecycle = PresentationLifecycleTests()
         let backdrop = BackdropReplacementTests()
         let backdropTests: [(String, () throws -> Void)] = [
+            ("photo handoff preview preserves scene and independent image", backdrop.testPhotoHandoffPreviewTargetsChosenSceneAndKeepsIndependentCopy),
             ("backdrop draft choice crop and cancellation", backdrop.testDraftCropChoiceAndCancelNeverWrite),
             ("backdrop commit preserves current foreground and originals", backdrop.testImportedCommitPreservesCurrentForegroundAndOriginals),
             ("backdrop saved reuse deduplication and missing-image repair", backdrop.testSavedReuseDeduplicationAndMissingBackdropRepair),

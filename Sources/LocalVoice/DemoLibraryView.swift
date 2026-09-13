@@ -18,6 +18,22 @@ struct DemoLibraryView: View {
     @State private var removal: DemoResource?
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Picker("Saved resources", selection: $model.showingPhonePhotos) {
+                Text("Resources").tag(false)
+                Text("From iPhone").tag(true)
+            }.pickerStyle(.segmented).frame(maxWidth: 340)
+                .accessibilityIdentifier("saved.collection")
+            if model.showingPhonePhotos {
+                PhotoHandoffView(handoff: model.photoHandoff, onUseAsBackdrop: model.onUsePhotoAsBackdrop)
+            } else {
+                resources
+            }
+        }
+        .onChange(of: model.libraryFocusToken) { _, _ in model.showingPhonePhotos = false }
+    }
+
+    private var resources: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 7) {
@@ -109,7 +125,7 @@ struct DemoLibraryView: View {
         }
     }
     private func performReturnAction(fromSearch: Bool) -> KeyPress.Result {
-        guard model.page == "library", library.draft == nil, removal == nil,
+        guard model.page == "library", !model.showingPhonePhotos, library.draft == nil, removal == nil,
               let window = NSApp.keyWindow, window === NSApp.mainWindow, window.attachedSheet == nil else { return .ignored }
         let editor = window.firstResponder as? NSTextView
         let event = NSApp.currentEvent
@@ -119,12 +135,12 @@ struct DemoLibraryView: View {
         return library.performPrimaryAction() ? .handled : .ignored
     }
     private func focusSearchWhenReady() {
-        guard model.page == "library", library.draft == nil, let window = NSApp.keyWindow, window === NSApp.mainWindow else { return }
+        guard model.page == "library", !model.showingPhonePhotos, library.draft == nil, let window = NSApp.keyWindow, window === NSApp.mainWindow else { return }
         // Recall can reveal a hidden editor before SwiftUI has mounted the search
         // field. Re-arm focus on the next main-loop turn, after the window is key.
         searching = false
         DispatchQueue.main.async {
-            guard model.page == "library", library.draft == nil, window.isVisible, window === NSApp.keyWindow else { return }
+            guard model.page == "library", !model.showingPhonePhotos, library.draft == nil, window.isVisible, window === NSApp.keyWindow else { return }
             searching = true
         }
     }

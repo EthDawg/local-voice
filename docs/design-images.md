@@ -1,5 +1,41 @@
 # Product-guide image experiments
 
+## Selected-photo handoff — 13 September 2026
+
+Two built-in image-generation experiments were shown inline in the task and are retained on the [photo handoff page](../site/handoff/index.html). Both use a synthetic reception, without people, real branding or location claims. They are design hypotheses, not cloud-transfer evidence.
+
+| File | Critical decision |
+| --- | --- |
+| `site/assets/guide/photo-handoff-concept-a.png` | Kept the optional name, recognisable same photo and explicit backdrop action. Rejected any implication that phone upload proves Mac delivery; local and cloud state must remain distinct. |
+| `site/assets/guide/photo-handoff-concept-b.png` | Kept Queued for iCloud / In iCloud / Downloaded as different facts. Rejected invented Projects navigation. Actual mobile keeps Tools/Saved and Mac uses Saved resources → From iPhone. |
+
+The native implementation and account/deletion contract are owned by [photo-handoff.md](photo-handoff.md). Existing backdrop previews remain the reuse surface; the concepts do not authorise a new scene editor.
+
+### Experiment A prompt
+
+```text
+Use case: ui-mockup.
+Asset type: grounded Workbench photo-handoff product exploration, not shipping UI.
+Create one landscape review board with two large, sharply readable native UI mockups side by side, iPhone left and Mac right. Restrained system typography, off-white surfaces, dark slate text, muted mint accents, realistic Apple-native controls. No marketing hero headline or decorative AI sparkles.
+Job: photograph a real office reception away from the desk; deliberately send just that image to private iCloud; later find it in the existing Mac Saved resources. Use the same synthetic, plausible photograph of a warm reception desk, indoor plant and timber wall in both UIs, no people, no real logos, no address. Photo should be the dominant visual.
+iPhone navigation title "Send to Mac". Large image preview. One optional name field "Office reception". A simple primary button "Send photo". Small helper "Only this photo. Your original stays here." Show a small alternate-state inset "Saved on this iPhone" and "Waiting for connection" so uncertainty is visible.
+Mac native app window with a modest sidebar: Home, Dictate, Read aloud, Annotate, Present a device, Saved resources. Saved resources selected. Main heading "From your iPhone". A single photo tile named "Office reception", status "Downloaded on this Mac". An opened detail shows deliberate actions "Use as backdrop" and "Save a copy". Do not show a success status on the phone claiming the Mac received anything. Do not show automatic wallpaper changes, active presentation, account sign-up, folder pairing, many dashboards, badges, gradients, fake controls, or excessive explanatory prose.
+Small board label exactly "PHOTO HANDOFF · CONCEPT A". Footer exactly "Design hypothesis — actual device testing required". Show practical control hierarchy and ample click targets.
+```
+
+### Experiment B prompt
+
+```text
+Use case: ui-mockup. Create a second, more practical Workbench photo-handoff UX review board. Landscape, flat UI study rather than photorealistic hardware product render. Reference the previous image only for the same synthetic office-reception photograph and muted mint/slate styling. Reuse that photo visibly. Keep all UI clean, native, spacious, readable. No marketing slogan, cloud infrastructure diagram, excessive settings or phantom functionality.
+Layout: three equal large rounded iPhone-style application panels across the top, and one slim Mac Saved resources strip across the bottom. Header exactly "PHOTO HANDOFF · CONCEPT B". Small subheading "Clear even when the connection is not."
+Panel 1, title "Send to Mac": medium photo, optional name field "Office reception", primary "Send photo"; small detail "A smaller JPEG is shared. The original stays on this iPhone."
+Panel 2, title "Photo handoff": photo row named "Office reception", a quiet outlined clock symbol, status "Queued for iCloud"; small sentence "Your photo is saved here. Try again when connected." A secondary "Try again" control. This is an alternate offline state, not another step asking to upload again.
+Panel 3, title "Photo handoff": same photo row, status "In iCloud"; short text "Open Workbench on your Mac to download it." Do not say delivered or received on Mac in this phone UI. No confetti, completion hero or celebratory badge.
+Bottom Mac panel: toolbar title "Saved resources" with segmented switch "Resources | From iPhone", From iPhone selected. A single row thumbnail "Office reception" with "Downloaded on this Mac" and explicit "Use as backdrop…" and "Save a copy…". Small footnote "Choosing a backdrop opens a preview. Your current scene stays unchanged until Apply."
+Footer exactly "Design hypothesis — source and device tests decide what ships". Typography at realistic accessible UI sizes. No mock data outside the one synthetic office photo.
+```
+
+
 Generated with the built-in image-generation tool on 12 September 2026. These are design concepts, not shipping screenshots. All selected files are stored in `site/assets/guide/`; the public guide labels their status.
 
 ## Jobs study, first experiment
@@ -135,3 +171,5 @@ Use case: photorealistic-natural. Create a beautiful serene high-resolution land
 Claude reviewed a generic public product brief with no repository source or private records. We accepted the emphasis on foreground recording, explicit reuse, retained originals and a small navigation hierarchy. We retained a bounded backdrop composition because it serves the already established presentation job; arbitrary layers, blend modes and a full design editor remain out of scope. Native tests and parent review, rather than model agreement, establish behavior.
 
 Mobile actual evidence: `mobile-tools-actual.png`, `mobile-wallpaper-actual.png`, `mobile-reading-actual.png` and `mobile-markup-focus-actual.png` are unedited iPhone XCTest attachments. `mobile-ipad-tools-actual.png` is the corresponding iPad attachment. `mobile-ipad-present-actual.png` and `mobile-ipad-paused-actual.png` are native Simulator-window captures from manual testing. All use synthetic content; none proves physical-device model quality or audience visibility.
+
+Actual photo-handoff captures (`photo-handoff-iphone-preview-actual.png`, `photo-handoff-iphone-saved-actual.png`) come from final native Simulator UI tests with cloud access disabled. `photo-handoff-mac-actual.png` and `photo-handoff-offline-actual.png` use the actual Mac view/shared model in a disposable app with an explicitly simulated transport. Its synthetic photo has a fixed fixture timestamp. Neither set proves a physical camera or live CloudKit transfer.

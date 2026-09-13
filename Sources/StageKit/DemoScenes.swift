@@ -335,6 +335,15 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
             try persist(scenes.map { $0.id == scene.id ? checked : $0 })
         } catch { notice = error.localizedDescription }
     }
+    /// A handoff photo enters the same in-memory replacement transaction as a
+    /// chosen file. The scene ID is captured; selection and live output stay put.
+    func makeBackdropReplacement(sceneID: UUID, imageURL: URL, title: String) throws -> BackdropReplacement {
+        guard !storageBlocked else { throw SceneError.storageBlocked }
+        guard let scene = scenes.first(where: { $0.id == sceneID }) else { throw BackdropReplacementError.sceneMissing }
+        let draft = BackdropReplacement(scene: scene, root: root)
+        try draft.chooseImage(imageURL, name: title, source: "From iPhone · Independent copy")
+        return draft
+    }
     func applyBackdrop(_ draft: BackdropReplacement) throws {
         guard !storageBlocked else { throw SceneError.storageBlocked }
         guard draft.root.standardizedFileURL == root.standardizedFileURL else { throw BackdropReplacementError.closed }

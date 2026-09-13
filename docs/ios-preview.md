@@ -19,6 +19,10 @@ Photos and Files are the primary image inputs. A small set of starters provides 
 
 Wallpaper and backdrop are independent journeys. Wallpaper retains its chosen aspect with the project, so an iPad rotation does not silently change its crop. Accessible horizontal, vertical and zoom controls accompany gestures. Backdrops keep a fixed landscape output; their foreground image, logo, persona and caption are optional. Imported artwork is not automatically turned into a labelled persona card.
 
+## Selected-photo handoff
+
+[The photo handoff contract](photo-handoff.md) owns this additional, optional job: native camera or selected Photos input → a durable local copy → explicit private iCloud send → Mac arrival. Tools and Saved remain the two tabs. Whole-library sync is outside this feature. Default builds keep cloud access off; a signed paired Preview and a real transfer test are required before claiming device delivery.
+
 ## State and lifecycle
 
 - `MobileDocument` keeps a versioned manifest and immutable original assets in the app's own container. Validated writes are atomic; an unreadable or unsupported library pauses writes and preserves its bytes.
@@ -32,7 +36,7 @@ Wallpaper and backdrop are independent journeys. Wallpaper retains its chosen as
 
 ## Native architecture and platform limits
 
-The `WorkbenchMobile` target uses SwiftUI with UIKit, PhotosUI, PencilKit, AVFoundation, Speech and MediaPlayer. Its deployment target is iOS/iPadOS 26. It is an iPhone/iPad app, not a Catalyst or Mac overlay target. It shares only three portable text sources with the Mac: `TextPrimitives.swift`, `DictationCleanup.swift` and `CorrectionRule.swift`. It does not link StageKit, Carbon, AppKit, FluidAudio or Mac shell-based reading.
+The `WorkbenchMobile` target uses SwiftUI with UIKit, PhotosUI, PencilKit, AVFoundation, Speech and MediaPlayer. Its deployment target is iOS/iPadOS 26. It is an iPhone/iPad app, not a Catalyst or Mac overlay target. It shares the selected-photo state/store/CloudKit sources in `PhotoHandoffKit` plus three portable text sources with the Mac: `TextPrimitives.swift`, `DictationCleanup.swift` and `CorrectionRule.swift`. It does not link StageKit, Carbon, AppKit, FluidAudio or Mac shell-based reading.
 
 | Source owner | Responsibility |
 | --- | --- |

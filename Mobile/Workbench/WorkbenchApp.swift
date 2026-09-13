@@ -2,23 +2,35 @@ import SwiftUI
 
 @main struct WorkbenchMobileApp: App {
     @StateObject private var store: MobileStore
+    @StateObject private var handoff: PhotoHandoffModel
     @StateObject private var speech = SpeechService()
     @StateObject private var reader = ReadingService()
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         #if DEBUG
-        let testing = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+        let arguments = ProcessInfo.processInfo.arguments
+        let testing = arguments.contains("--ui-testing") || arguments.contains("--ui-testing-handoff")
         let root = testing ? FileManager.default.temporaryDirectory.appendingPathComponent("WorkbenchUITests-" + UUID().uuidString) : nil
         _store = StateObject(wrappedValue: MobileStore(directory: root))
+        let handoffRoot = root ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Workbench", isDirectory: true)
+        _handoff = StateObject(wrappedValue: PhotoHandoffModel(directory: handoffRoot.appendingPathComponent("PhotoHandoff", isDirectory: true),
+                                                            platform: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone", allowsCloudAccess: !testing))
         #else
         _store = StateObject(wrappedValue: MobileStore())
+        let handoffRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Workbench/PhotoHandoff", isDirectory: true)
+        _handoff = StateObject(wrappedValue: PhotoHandoffModel(directory: handoffRoot, platform: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"))
         #endif
     }
 
     var body: some Scene {
         WindowGroup {
-            MobileHome().environmentObject(store).environmentObject(speech).environmentObject(reader)
+            MobileHome().environmentObject(store).environmentObject(speech).environmentObject(reader).environmentObject(handoff)
                 .tint(Color.accentColor)
+                .task { if handoff.isEnabled { await handoff.refresh() } }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active, handoff.isEnabled, !handoff.isBusy { Task { await handoff.refresh() } }
+                }
                 .alert("Could not complete that change", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
                     Button("OK", role: .cancel) { store.error = nil }
                 } message: { Text(store.error ?? "") }
@@ -55,6 +67,9 @@ struct MobileHome: View {
                             NavigationLink { MobileImageWorkspace(kind: .backdrop) } label: { toolRow("Backdrops", detail: "Prepare a picture for presenting", symbol: "rectangle.inset.filled") }
                             Divider().padding(.leading, 64)
                             NavigationLink { MobileImageWorkspace(kind: .wallpaper) } label: { toolRow("Wallpapers", detail: "Make a picture fit your screen", symbol: "photo") }.accessibilityIdentifier("tool.wallpaper")
+                            Divider().padding(.leading, 64)
+                            NavigationLink { PhotoHandoffView() } label: { toolRow("Take a photo for Mac", detail: "Keep a photo or send a private copy", symbol: "camera") }
+                                .accessibilityIdentifier("tool.photoHandoff")
                         }.buttonStyle(.plain).padding(.horizontal, 16)
                             .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24))
                         if !store.document.draft.isEmpty {
@@ -132,15 +147,18 @@ struct MobileAboutView: View {
             List {
                 Section {
                     Label("Workbench Preview", systemImage: "square.grid.2x2.fill").font(.headline)
-                    Text("Native utilities for your own words and pictures. No account is needed.")
+                    Text("Native utilities for your own words and pictures. Everyday tools work without a Workbench account.")
                 }
                 Section("On this device") {
                     Text("Your drafts, saved text and original pictures stay in Workbench’s local storage. Share sends only the item you choose to the destination you select.")
                     Text("Dictation uses Apple’s on-device speech model. Preparing a language can download system assets. Reading uses installed Apple voices.")
                     Text("Pictures are exported as copies. Apple’s Wallpaper settings and meeting apps remain in control of installation and sharing.")
                 }
+                Section("Photo handoff") {
+                    PhotoHandoffSettingsView()
+                }
                 Section("Preview boundaries") {
-                    Text("Saved work does not automatically sync with the Mac. This Preview has no custom keyboard, cross-app overlays or background microphone.")
+                    Text("Saved work does not automatically sync with the Mac. Optional photo handoff sends only the photos you choose, using your private iCloud. This Preview has no custom keyboard, cross-app overlays or background microphone.")
                     Text("Original image assets are retained when you delete a saved project. Deleting the app removes its local library; export important work first.")
                     Link("Mobile guide", destination: URL(string: "https://workbench-mac.vercel.app/mobile/")!)
                     Link("Source and feedback", destination: URL(string: "https://github.com/EthDawg/local-voice")!)

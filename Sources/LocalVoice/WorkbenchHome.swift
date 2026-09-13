@@ -10,6 +10,7 @@ struct WorkbenchHome: View {
     @StateObject private var introduction = FounderIntroductionModel()
     @State private var loginEnabled = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
+    @State private var photoBackdrop: PhotoBackdropRequest?
     private let navItems: [(String, String, String)] = [
         ("home", "Home", "square.grid.2x2"), ("dictate", "Dictate", "mic"),
         ("speak", "Read aloud", "speaker.wave.2"), ("annotate", "Annotate", "pencil.tip"),
@@ -52,6 +53,16 @@ struct WorkbenchHome: View {
                 }
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
         }.frame(minWidth: 1050, minHeight: 730).tint(Workbench.accent).workbenchTheme()
+            .onAppear {
+                model.onUsePhotoAsBackdrop = { url, title in
+                    keyboard.stopInteraction()
+                    photoBackdrop = PhotoBackdropRequest(url: url, title: title)
+                }
+                model.refreshPhotoHandoffIfEnabled()
+            }
+            .sheet(item: $photoBackdrop) { request in
+                stage.backdropReplacementView(imageURL: request.url, title: request.title)
+            }
     }
     private var welcome: some View {
         ScrollView {
@@ -70,6 +81,10 @@ struct WorkbenchHome: View {
                     card("Read aloud", "Hear a draft. Save a reading.", "speaker.wave.2.fill", "Mac voices included") { model.page = "speak" }
                     card("Annotate", "Point, draw and return to your demo.", "pencil.tip.crop.circle", "Live screen tools") { model.page = "annotate" }
                     card("Present a device", "Your phone, ready for an audience.", "iphone", "Saved scenes and branding") { model.page = "present" }
+                }
+                PhotoHandoffArrivalCue(handoff: model.photoHandoff) {
+                    model.showingPhonePhotos = true
+                    model.page = "library"
                 }
                 HStack(spacing: 16) {
                     Image(systemName: "keyboard").font(.system(size: 30)).foregroundStyle(Workbench.accent)
@@ -120,6 +135,8 @@ struct WorkbenchHome: View {
                 catch { loginError = error.localizedDescription }
             }))
             if let loginError { Text(loginError).foregroundStyle(.orange) }
+            Divider()
+            PhotoHandoffSettings(handoff: model.photoHandoff)
             Divider()
             VoiceOptions(model: model, showShortcut: false)
             Button("Your dictionary") { model.page = "dictionary" }

@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import Combine
 import UniformTypeIdentifiers
+import PhotoHandoffKit
 
 @MainActor
 final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudioRecorderDelegate {
@@ -61,6 +62,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     @Published var quickTab = "Dictate"
     @Published var page = "home"
     @Published var libraryFocusToken = UUID()
+    @Published var showingPhonePhotos = false
     @Published var phase: Phase = .idle
     @Published var ready = false
     @Published var preparing = false
@@ -104,6 +106,9 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     let cleanupEngine = CleanupEngine()
     let store = StateStore()
     let library = DemoLibraryModel()
+    let photoHandoff = PhotoHandoffModel(directory: Workbench.supportDirectory(component: "PhotoHandoff"), platform: "Mac")
+    private var photoHandoffRefresh: Task<Void, Never>?
+    private var photoHandoffActivation: AnyCancellable?
     private var loaded = false
     private var draftRevision: UInt64 = 0
     private var recorder: AVAudioRecorder?
@@ -126,6 +131,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     var onShortcutsChanged: (() -> Void)?
     var onEditShortcut: ((UInt32) -> Void)?
     var onShowEditor: ((String) -> Void)?
+    var onUsePhotoAsBackdrop: ((URL, String) -> Void)?
     var onMenuRecording: (() -> Void)?
     var onCloseMenu: (() -> Void)?
     var onPasteLast: (() -> Void)?
@@ -139,6 +145,9 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     override init() {
         super.init()
         Self.intentModel = self
+        photoHandoffActivation = NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in self?.refreshPhotoHandoffIfEnabled() }
+        refreshPhotoHandoffIfEnabled()
         do {
             let state = try store.load()
             transcript = state.draft; speechText = state.speechText; history = state.history
@@ -164,6 +173,15 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         if !voices.contains(voice), let first = voices.first { voice = first }
         loaded = true
         Task { await prepare() }
+    }
+
+    func refreshPhotoHandoffIfEnabled() {
+        guard photoHandoff.isEnabled, photoHandoff.isConfigured, !photoHandoff.isBusy, photoHandoffRefresh == nil else { return }
+        photoHandoffRefresh = Task { [weak self] in
+            guard let self else { return }
+            defer { photoHandoffRefresh = nil }
+            await photoHandoff.refresh()
+        }
     }
 
     func prepare() async {
@@ -595,5 +613,5 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
         do { try store.save(SavedState(draft: transcript, speechText: speechText, history: history, replacements: replacements, voice: voice, rate: rate, rawDraft: rawTranscript)) }
         catch { self.error = "Could not save this session. \(error.localizedDescription)" }
     }
-    func shutdown() { readingTask?.cancel(); shortcutRequest.cancel(); transcriptionTask?.cancel(); transcriptionID = nil; clipboardReceipt.clear(); cancelRecording(); stopPlayback(); saveNow(); AudioRenderer.remove(audioURL); if let recordURL { try? FileManager.default.removeItem(at: recordURL) } }
+    func shutdown() { photoHandoffRefresh?.cancel(); photoHandoffActivation = nil; readingTask?.cancel(); shortcutRequest.cancel(); transcriptionTask?.cancel(); transcriptionID = nil; clipboardReceipt.clear(); cancelRecording(); stopPlayback(); saveNow(); AudioRenderer.remove(audioURL); if let recordURL { try? FileManager.default.removeItem(at: recordURL) } }
 }

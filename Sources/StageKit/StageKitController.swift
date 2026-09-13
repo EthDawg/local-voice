@@ -77,6 +77,11 @@ public final class StageKitController: ObservableObject {
     public var controlsView: AnyView { AnyView(ControlCenter(app: coordinator, settings: coordinator.settings)) }
     public var scenesView: AnyView { AnyView(DemoScenesView(model: coordinator.demoScenes)) }
     public var quickControlsView: AnyView { AnyView(QuickControlsView(app: coordinator, settings: coordinator.settings)) }
+    /// Opens an existing-scene choice followed by the ordinary backdrop preview.
+    /// The caller presents this as a sheet; no scene changes until Use backdrop.
+    public func backdropReplacementView(imageURL: URL, title: String) -> AnyView {
+        AnyView(PhotoBackdropChooser(model: coordinator.demoScenes, imageURL: imageURL, title: title))
+    }
     public var isDrawing: Bool { coordinator.isDrawing }
     public var isPresenting: Bool { coordinator.demoScenes.isPresenting }
     public var timerText: String { coordinator.timerText }
@@ -136,5 +141,79 @@ public final class StageKitController: ObservableObject {
     private static func reservedVoiceShortcut(_ code: UInt32, _ modifiers: UInt32) -> String? {
         guard modifiers == UInt32(controlKey | optionKey), [UInt32(kVK_Space), UInt32(kVK_ANSI_V), UInt32(kVK_ANSI_J)].contains(code) else { return nil }
         return "This combination is reserved for Voice. Choose another combination."
+    }
+}
+
+@MainActor
+private struct PhotoBackdropChooser: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var model: DemoScenes
+    let imageURL: URL
+    let title: String
+    @State private var sceneID: UUID?
+    @State private var draft: BackdropReplacement?
+    @State private var notice: String?
+    @State private var thumbnail: NSImage?
+
+    var body: some View {
+        Group {
+            if let draft {
+                BackdropReplacementView(model: model, draft: draft)
+            } else {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack {
+                        Text("Use photo as backdrop").font(.title2.weight(.semibold))
+                        Spacer()
+                        Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                    }
+                    HStack(spacing: 16) {
+                        Group {
+                            if let thumbnail { Image(nsImage: thumbnail).resizable().scaledToFit() }
+                            else { Image(systemName: "photo").foregroundStyle(.secondary) }
+                        }.frame(width: 120, height: 90).background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(title).font(.headline).lineLimit(2)
+                            Text("Choose a saved scene. Review the crop next, then apply when it looks right.")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if model.storageBlocked {
+                        ContentUnavailableView("Saved scenes need attention", systemImage: "exclamationmark.folder",
+                            description: Text("The scene library could not be read. Its original files are preserved. You can still save a separate copy of this photo."))
+                    } else if model.scenes.isEmpty {
+                        ContentUnavailableView("Prepare a scene first", systemImage: "rectangle.on.rectangle",
+                            description: Text("Create a scene in Present a device, then return to this photo. Choosing a backdrop never creates a duplicate scene."))
+                    } else {
+                        List(selection: $sceneID) {
+                            ForEach(model.scenes) { scene in
+                                Label(scene.name, systemImage: "rectangle.on.rectangle")
+                                    .padding(.vertical, 7).tag(scene.id)
+                            }
+                        }.accessibilityLabel("Choose a saved scene")
+                            .accessibilityIdentifier("handoff.backdrop-scenes")
+                    }
+                    if let notice { Text(notice).font(.caption).foregroundStyle(.orange).textSelection(.enabled) }
+                    Spacer(minLength: 0)
+                    Divider()
+                    HStack {
+                        Text("Only the backdrop changes. Foreground layers and the current presentation stay as they are.")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Preview backdrop") {
+                            guard let sceneID else { return }
+                            do { draft = try model.makeBackdropReplacement(sceneID: sceneID, imageURL: imageURL, title: title) }
+                            catch { notice = error.localizedDescription }
+                        }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                            .disabled(model.storageBlocked || thumbnail == nil || !model.scenes.contains { $0.id == sceneID })
+                            .accessibilityIdentifier("handoff.preview-backdrop")
+                    }
+                }.padding(20).frame(width: 840, height: 660)
+                    .background(Workbench.background).tint(Workbench.accent).workbenchTheme()
+            }
+        }.onAppear {
+            sceneID = model.selected?.id ?? model.scenes.first?.id
+            do { thumbnail = try BackdropImage.thumbnail(imageURL) }
+            catch { notice = "The photo could not be opened. " + error.localizedDescription }
+        }.onDisappear { draft?.cancel() }
     }
 }

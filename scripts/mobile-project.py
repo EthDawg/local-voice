@@ -35,7 +35,9 @@ for name, folder, product_type, extension in [
     ("WorkbenchUITests", "WorkbenchUITests", "com.apple.product-type.bundle.ui-testing", "xctest")
 ]:
     files = sorted((MOBILE / folder).glob("*.swift"))
-    if name == "WorkbenchMobile": files += [ROOT / "Sources/LocalVoice" / f for f in ["TextPrimitives.swift", "DictationCleanup.swift", "CorrectionRule.swift"]]
+    if name == "WorkbenchMobile":
+        files += [ROOT / "Sources/LocalVoice" / f for f in ["TextPrimitives.swift", "DictationCleanup.swift", "CorrectionRule.swift"]]
+        files += sorted((ROOT / "Sources/PhotoHandoffKit").glob("*.swift"))
     children = []; sources = []; resources = []
     if name == "WorkbenchMobile":
         files += [MOBILE / folder / "Info.plist", MOBILE / folder / "PrivacyInfo.xcprivacy"]
@@ -58,7 +60,7 @@ for name, folder, product_type, extension in [
     products.append(product)
     extra = dict(PRODUCT_NAME="$(TARGET_NAME)", PRODUCT_BUNDLE_IDENTIFIER="com.ethdawg.workbench.mobile.preview" + ("" if name == "WorkbenchMobile" else "." + name.lower()))
     dependencies = []
-    if name == "WorkbenchMobile": extra |= dict(INFOPLIST_FILE="Workbench/Info.plist", GENERATE_INFOPLIST_FILE="NO", ASSETCATALOG_COMPILER_APPICON_NAME="AppIcon", ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME="AccentColor", SUPPORTS_MACCATALYST="NO", SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD="NO")
+    if name == "WorkbenchMobile": extra |= dict(INFOPLIST_FILE="Workbench/Info.plist", GENERATE_INFOPLIST_FILE="NO", ASSETCATALOG_COMPILER_APPICON_NAME="AppIcon", ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME="AccentColor", SUPPORTS_MACCATALYST="NO", SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD="NO", WORKBENCH_PHOTO_CLOUD_PROVISIONED="NO", WORKBENCH_PHOTO_CLOUD_CONTAINER="iCloud.com.ethdawg.workbench.preview", WORKBENCH_PHOTO_CLOUD_ENVIRONMENT="Development")
     else:
         extra |= dict(GENERATE_INFOPLIST_FILE="YES")
         if name == "WorkbenchTests": extra |= dict(TEST_HOST="$(BUILT_PRODUCTS_DIR)/WorkbenchMobile.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WorkbenchMobile", BUNDLE_LOADER="$(TEST_HOST)")

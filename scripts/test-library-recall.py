@@ -41,6 +41,17 @@ struct FixturePreferences { func shortcut(_ id: UInt32) -> FixtureShortcut { Fix
     @Published var page = "library"
     @Published var libraryFocusToken = UUID()
     @Published var preferences = FixturePreferences()
+    @Published var showingPhonePhotos = false
+    let photoHandoff = FixturePhotoHandoff()
+    var onUsePhotoAsBackdrop: ((URL, String) -> Void)?
+}
+// Photo arrival is covered by its own shared-module and UI checks. This recall
+// fixture deliberately keeps cloud and handoff dependencies out of its scope.
+final class FixturePhotoHandoff {}
+struct PhotoHandoffView: View {
+    let handoff: FixturePhotoHandoff
+    var onUseAsBackdrop: ((URL, String) -> Void)?
+    var body: some View { Text("Photo handoff is outside this recall fixture.") }
 }
 enum Workbench {
     static let accent = Color.accentColor
