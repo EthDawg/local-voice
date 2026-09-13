@@ -49,7 +49,7 @@ final class WorkbenchUITests: XCTestCase {
     }
 
     private func attachScreenshot(_ name: String, of app: XCUIApplication) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
@@ -155,6 +155,37 @@ final class WorkbenchUITests: XCTestCase {
         XCTAssertFalse(app.textViews["Saved text"].exists)
         selectTab("Tools", in: app)
         XCTAssertTrue(app.buttons["tool.dictate"].waitForExistence(timeout: 5))
+    }
+
+    func testScenePreparedWithStarterStaysEditableInSaved() {
+        let app = launchIsolatedApp()
+        attachScreenshot("Tools home before scene preparation", of: app)
+        let scenes = app.buttons["tool.scenes"]
+        reveal(scenes, in: app); scenes.tap()
+        let start = app.buttons["Start with a picture"]
+        XCTAssertTrue(start.waitForExistence(timeout: 5)); start.tap()
+        let coast = app.buttons["Coast"]
+        XCTAssertTrue(coast.waitForExistence(timeout: 5)); coast.tap()
+        let name = app.textFields["scene.name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10))
+        reveal(name, in: app)
+        name.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 10), "Tapping the scene name must begin native text editing")
+        name.typeText(" — Room preview")
+        XCTAssertEqual(name.value as? String, "Coast — Room preview")
+        // The toolbar Done explicitly flushes pending text before navigation.
+        let done = app.navigationBars["Edit scene"].buttons["Done"]
+        XCTAssertTrue(done.exists); done.tap()
+        XCTAssertTrue(app.navigationBars["Scenes"].waitForExistence(timeout: 5))
+        let saved = app.staticTexts["Coast — Room preview"].firstMatch
+        XCTAssertTrue(saved.waitForExistence(timeout: 5)); saved.tap()
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        XCTAssertEqual(name.value as? String, "Coast — Room preview")
+        attachScreenshot("Editable scene prepared for Mac", of: app)
+        done.tap()
+        app.navigationBars.buttons.firstMatch.tap()
+        selectTab("Saved", in: app)
+        XCTAssertTrue(app.staticTexts["Coast — Room preview"].firstMatch.waitForExistence(timeout: 5))
     }
 
     func testMarkupNameKeepsKeyboardFocusAcrossCanvasUpdatesAndReopens() {

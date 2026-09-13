@@ -33,7 +33,9 @@ struct TestRunner {
         let viewportFit = ViewportFitTests()
         let logoImport = LogoImportTests()
         let personas = PersonaTests()
+        let personaStarters = PersonaStarterTests()
         let floating = FloatingControlGeometryTests()
+        let sceneSync = SceneSyncAdapterTests()
         let workbench = WorkbenchModuleTests()
         let boardExport = BoardExportTests()
         let presentationLifecycle = PresentationLifecycleTests()
@@ -53,6 +55,20 @@ struct TestRunner {
             ("board private clipboard image and failure preservation", boardExport.testPrivateClipboardPNGAndFailurePreservation),
             ("presentation window and fullscreen lifecycle", presentationLifecycle.testModeChangesKeepPresentationAndEndClosesOnce),
             ("presentation transition interruption and failure recovery", presentationLifecycle.testEndDuringNativeTransitionsAndFailureRecovery),
+            ("floating: AllTargetsAreDistinctFiniteAndBounded", floating.testAllTargetsAreDistinctFiniteAndBounded),
+            ("floating: GuideLayoutPreservesTargetsAndFlipsDisplayCoordinates", floating.testGuideLayoutPreservesTargetsAndFlipsDisplayCoordinates),
+            ("floating: GuideStateClearsWhenDragOrDisplayEnds", floating.testGuideStateClearsWhenDragOrDisplayEnds),
+            ("personas: LegacyMigrationKeepsFinishedPixelsAndRequiresExplicitGroup", personas.testLegacyMigrationKeepsFinishedPixelsAndRequiresExplicitGroup),
+            ("personas: OrderedGroupsAndDeletionNeverSelectAnotherCustomer", personas.testOrderedGroupsAndDeletionNeverSelectAnotherCustomer),
+            ("personas: LiveCandidatesRemainScopedAndHUDLabelsExcludePrivateNames", personas.testLiveCandidatesRemainScopedAndHUDLabelsExcludePrivateNames),
+            ("personas: EditableCardRenderingAndSaveFailurePreserveSources", personas.testEditableCardRenderingAndSaveFailurePreserveSources),
+            ("sceneSync: Mac edit keeps original mobile attachments", sceneSync.testMacEditKeepsOriginalMobileAttachmentsInPortablePackage),
+            ("sceneSync: MigrationRetainsEveryLayerAndNeverWritesLegacyAgain", sceneSync.testMigrationRetainsEveryLayerAndNeverWritesLegacyAgain),
+            ("sceneSync: MissingLegacyAssetStaysVisibleAndRetryIsIdempotent", sceneSync.testMissingLegacyAssetStaysVisibleAndRetryIsIdempotent),
+            ("sceneSync: MacEditsPreservePortableFieldsAndRejectStaleRevision", sceneSync.testMacEditsPreservePortableFieldsAndRejectStaleRevision),
+            ("sceneSync: PersonaPlacementCopiesRenderedAndAuthoredValues", sceneSync.testPersonaPlacementCopiesRenderedAndAuthoredValues),
+            ("sceneSync: BackdropUsesCurrentForegroundAndConcurrentStoreFailureKeepsOriginals", sceneSync.testBackdropUsesCurrentForegroundAndConcurrentStoreFailureKeepsOriginals),
+            ("sceneSync: CanvasDragCommitsOnceAndRejectsInterveningRevision", sceneSync.testCanvasDragCommitsOnceAndRejectsInterveningRevision),
             ("floating controls anchors bounds and resize", floating.testAnchorsBoundsAndResize),
             ("floating controls snap and display recovery", floating.testSnapThresholdsAndDisplayRecovery),
             ("full-height frame persistence and edges", viewportFit.testFullHeightSurvivesSavingAndReachesBothEdges),
@@ -61,6 +77,10 @@ struct TestRunner {
             ("logo native WebP decoding and alpha", logoImport.testWebPAndTransparentPadding),
             ("logo image orientation and rejection", logoImport.testOrientationAndInvalidImages),
             ("logo paste image and file persistence", logoImport.testPasteImageAndFilePersistence),
+            ("persona starter: CatalogHasStableUniqueBundleNamesAndEditableLabels", personaStarters.testCatalogHasStableUniqueBundleNamesAndEditableLabels),
+            ("persona starter: MissingCorruptOversizedAndLinkedSourcesDoNotAddBrokenPersonas", personaStarters.testMissingCorruptOversizedAndLinkedSourcesDoNotAddBrokenPersonas),
+            ("persona starter: ChoosingOneStarterUsesActiveGroupAndKeepsSeparateEditableCopies", personaStarters.testChoosingOneStarterUsesActiveGroupAndKeepsSeparateEditableCopies),
+            ("persona starter: BundledPortraitsHaveReadableArtworkAndRealTransparency", personaStarters.testBundledPortraitsHaveReadableArtworkAndRealTransparency),
             ("persona geometry and strict validation", personas.testGeometryBoundsAndValidation),
             ("persona durable image and separate desktop placement", personas.testDurableImportSeparatePlacementAndRemoval),
             ("persona corrupt future and concurrent archive preservation", personas.testCorruptFutureAndConcurrentArchivesStayUntouched),

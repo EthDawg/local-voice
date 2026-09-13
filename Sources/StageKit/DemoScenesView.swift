@@ -5,6 +5,8 @@ struct DemoScenesView: View {
     @ObservedObject var model: DemoScenes
     @State private var rename = ""
     @State private var confirmingRemoval = false
+    @State private var removalCandidate: DemoScene?
+    @State private var renameSnapshot: DemoScene?
     @State private var choosingStarter = false
     @State private var choosingLogo = false
     @State private var creatingTextLogo = false
@@ -31,10 +33,11 @@ struct DemoScenesView: View {
                     .disabled(model.storageBlocked)
                 Button { model.importImage() } label: { Label("Add backdrop…", systemImage: "plus") }
                     .buttonStyle(.borderedProminent).disabled(model.storageBlocked)
+                Button { model.importSceneCopy() } label: { Label("Import scene copy…", systemImage: "square.and.arrow.down") }
+                    .disabled(model.storageBlocked)
                 Button { model.showPersonas() } label: { Label("Personas…", systemImage: "person.crop.rectangle") }
                     .help("Show a persona over your browser without a backdrop")
-                Text("Images and layouts stay on this Mac.")
-                    .font(.caption).foregroundStyle(.secondary)
+                if let adapter = model.sceneSync { MacSceneSyncControls(adapter: adapter) }
             }.padding(18).frame(width: 245)
             Divider()
             GeometryReader { editor in
@@ -45,26 +48,33 @@ struct DemoScenesView: View {
                     HStack {
                         TextField("Scene name", text: $rename, onCommit: commitName)
                             .font(.title2.weight(.semibold)).textFieldStyle(.plain)
-                            .onChange(of: model.selectedID) { _, _ in rename = model.selected?.name ?? "" }
-                            .onAppear { rename = scene.name }
+                            .onChange(of: model.selectedID) { _, _ in renameSnapshot = model.selected; rename = model.selected?.name ?? "" }
+                            .onAppear { renameSnapshot = scene; rename = scene.name }
+                            .onChange(of: scene.libraryRevision) { _, _ in
+                                if rename == renameSnapshot?.name { rename = scene.name; renameSnapshot = scene }
+                            }
                         Button("Rename") { commitName() }.disabled(rename.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || rename == scene.name)
                         Menu {
+                            Button("Save editable copy…") { commitName(); model.exportSceneCopy() }
+                                .disabled(model.isSceneReadOnly(scene))
                             Button("Duplicate scene") { model.duplicate() }
                             Button("Move up") { model.moveScene(scene.id, by: -1) }.disabled(model.scenes.first?.id == scene.id)
                             Button("Move down") { model.moveScene(scene.id, by: 1) }.disabled(model.scenes.last?.id == scene.id)
-                            Button("Remove scene…", role: .destructive) { confirmingRemoval = true }
+                            Button("Remove scene…", role: .destructive) { removalCandidate = scene; confirmingRemoval = true }
                         } label: { Image(systemName: "ellipsis.circle") }.menuStyle(.borderlessButton).fixedSize()
                             .accessibilityLabel("Scene options")
                     }
                     if let image = model.image(for: scene) {
-                        SceneCanvas(scene: scene, image: image, logoImage: model.logoImage(for: scene), handImage: model.handImage(for: scene), personaImage: model.personaImage(for: scene)) { value in model.update(value) }
+                        SceneCanvas(scene: scene, image: image, logoImage: model.logoImage(for: scene), handImage: model.handImage(for: scene), personaImage: model.personaImage(for: scene), editable: !model.isSceneReadOnly(scene)) { value in
+                            model.update(value) ? model.scenes.first(where: { $0.id == value.id }) : nil
+                        }
                             .frame(width: previewSize(in: editor.size).width, height: previewSize(in: editor.size).height)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.primary.opacity(0.12)))
                             .accessibilityLabel("Scene preview. Drag the phone or persona to position it; drag the background to crop it.")
                             .frame(maxWidth: .infinity)
                         HStack {
-                            Text("Drag to position")
+                            Text("Drag to position · saved on release")
                             Spacer()
                             Button("Change backdrop…") { backdropReplacement = BackdropReplacement(scene: model.selected ?? scene, root: model.root) }
                                 .disabled(model.storageBlocked)
@@ -150,7 +160,7 @@ struct DemoScenesView: View {
                 }
                 #endif
             }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
+            }.disabled(model.selected.map { model.isSceneReadOnly($0) } ?? false)
             if let scene = model.selected, model.image(for: scene) != nil {
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
@@ -208,8 +218,8 @@ struct DemoScenesView: View {
         } message: { Text("A simple wordmark you can use now and replace with the real logo later.") }
         .alert("Remove this scene?", isPresented: $confirmingRemoval) {
             Button("Cancel", role: .cancel) {}
-            Button("Remove", role: .destructive) { model.remove() }
-        } message: { Text("The saved layout will be removed. The imported picture stays on this Mac.") }
+            Button("Remove", role: .destructive) { if let captured = removalCandidate { model.remove(captured) }; removalCandidate = nil }
+        } message: { Text("The saved layout will be removed. If scene sync is enabled, removal also syncs to your devices. Original pictures stay on this Mac.") }
     }
     private func previewSize(in editor: CGSize) -> CGSize {
         // Keep the saved scene and everyday controls together at the minimum
@@ -360,22 +370,23 @@ struct DemoScenesView: View {
         }.fixedSize()
     }
     private func logoBinding<T>(_ key: WritableKeyPath<SceneLogo, T>, fallback: T) -> Binding<T> {
-        Binding(get: { model.selected?.logo?[keyPath: key] ?? fallback }, set: { value in
-            guard var scene = model.selected, var logo = scene.logo else { return }
+        let sceneID = model.selectedID
+        return Binding(get: { model.selected?.logo?[keyPath: key] ?? fallback }, set: { value in
+            guard var scene = model.selected, scene.id == sceneID, var logo = scene.logo else { return }
             logo[keyPath: key] = value; scene.logo = logo; model.update(scene)
         })
     }
     private func binding<T>(_ key: WritableKeyPath<DemoScene, T>) -> Binding<T> {
-        let fallback = model.selected![keyPath: key]
+        let fallback = model.selected![keyPath: key], sceneID = model.selectedID
         return Binding(get: { model.selected?[keyPath: key] ?? fallback }, set: { value in
-            guard var scene = model.selected else { return }; scene[keyPath: key] = value; model.update(scene)
+            guard var scene = model.selected, scene.id == sceneID else { return }; scene[keyPath: key] = value; model.update(scene)
         })
     }
     private func position(_ x: Double) {
         guard var scene = model.selected else { return }; scene.phoneX = x; model.update(scene)
     }
     private func commitName() {
-        guard var scene = model.selected else { return }
+        guard var scene = renameSnapshot, scene.id == model.selectedID else { return }
         let trimmed = rename.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { rename = scene.name; return }
         guard trimmed != scene.name else { return }
@@ -383,7 +394,7 @@ struct DemoScenesView: View {
         // A rename can leave the current search. Keep this customer selected so
         // the following Start or Export action cannot act on a different scene.
         if !model.query.isEmpty && !scene.name.localizedCaseInsensitiveContains(model.query) { model.query = "" }
-        model.update(scene)
+        if model.update(scene) { renameSnapshot = model.selected; rename = model.selected?.name ?? rename }
     }
 }
 
@@ -393,29 +404,36 @@ private struct SceneCanvas: NSViewRepresentable {
     let logoImage: NSImage?
     let handImage: NSImage?
     let personaImage: NSImage?
-    let update: (DemoScene) -> Void
+    let editable: Bool
+    let update: (DemoScene) -> DemoScene?
     func makeNSView(context: Context) -> SceneCanvasView { SceneCanvasView() }
     func updateNSView(_ view: SceneCanvasView, context: Context) {
-        view.scene = scene; view.image = image; view.logoImage = logoImage; view.handImage = handImage; view.personaImage = personaImage; view.update = update; view.needsDisplay = true
+        view.receive(scene); view.image = image; view.logoImage = logoImage; view.handImage = handImage; view.personaImage = personaImage; view.update = update; view.editable = editable; view.needsDisplay = true
     }
 }
 
-private final class SceneCanvasView: NSView {
+final class SceneCanvasView: NSView {
     var scene: DemoScene?
     var image: NSImage?
     var logoImage: NSImage?
     var handImage: NSImage?
     var personaImage: NSImage?
-    var update: ((DemoScene) -> Void)?
+    var update: ((DemoScene) -> DemoScene?)?
+    var editable = true
     private var origin = CGPoint.zero
     private var initial: DemoScene?
+    private var dragPreview: DemoScene?
+    func receive(_ value: DemoScene) {
+        if scene?.id != value.id { initial = nil; dragPreview = nil }
+        scene = value
+    }
     private var movingPhone = false
     private var movingPersona = false
     private var resizingWidth = false
     private var resizingSize = false
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func draw(_ dirtyRect: NSRect) {
-        guard let scene, let image else { return }
+        guard let scene = dragPreview ?? scene, let image else { return }
         SceneRenderer.draw(scene, image: image, size: bounds.size, logoImage: logoImage, handImage: handImage, personaImage: personaImage)
         if scene.showsPhone {
             let rect = SceneRenderer.phoneRect(scene, in: bounds.size)
@@ -426,6 +444,7 @@ private final class SceneCanvasView: NSView {
         }
     }
     override func mouseDown(with event: NSEvent) {
+        guard editable else { return }
         origin = convert(event.locationInWindow, from: nil); initial = scene
         movingPersona = false
         if let scene {
@@ -439,7 +458,7 @@ private final class SceneCanvasView: NSView {
         }
     }
     override func mouseDragged(with event: NSEvent) {
-        guard var draft = initial, let image else { return }
+        guard editable, var draft = initial, let image else { return }
         let point = convert(event.locationInWindow, from: nil)
         let delta = CGPoint(x: point.x - origin.x, y: point.y - origin.y)
         if movingPersona, var persona = draft.persona, let personaImage {
@@ -468,6 +487,17 @@ private final class SceneCanvasView: NSView {
             if overflowX > 1 { draft.backgroundX -= delta.x / overflowX }
             if overflowY > 1 { draft.backgroundY -= delta.y / overflowY }
         }
-        if let value = try? draft.validated() { update?(value) }
+        dragPreview = try? draft.validated(); needsDisplay = true
+    }
+    override func mouseUp(with event: NSEvent) {
+        let pending = dragPreview; dragPreview = nil; initial = nil
+        // Commit once per drag. The captured revision rejects an intervening
+        // remote edit, and large immutable pictures are not rehashed per pixel.
+        if let pending, let saved = update?(pending) { scene = saved }
+        needsDisplay = true
+    }
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow == nil { dragPreview = nil; initial = nil }
+        super.viewWillMove(toWindow: newWindow)
     }
 }

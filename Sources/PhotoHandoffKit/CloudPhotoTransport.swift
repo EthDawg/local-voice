@@ -97,8 +97,8 @@ extension PhotoCloudConfiguration {
         guard try await identity() == account, generation == token, !Task.isCancelled else { throw PhotoHandoffError.accountChanged }
     }
     private func zone(_ account: PhotoAccount) -> CKRecordZone.ID {
-        // Never substitute CKCurrentUserDefaultName: pending writes keep their
-        // original owner even if the signed-in Apple Account changes mid-flight.
+        // Outgoing operations retain their captured owner, even if the signed-in
+        // account changes. CloudKit's response alias is handled only on receipt.
         CKRecordZone.ID(zoneName: Self.zoneName, ownerName: account.userRecordName)
     }
     private func recordID(_ id: UUID, account: PhotoAccount) -> CKRecord.ID {
@@ -164,13 +164,13 @@ extension PhotoCloudConfiguration {
                     } catch { batch.update { $0.failure = error } }
                 }
                 operation.recordWithIDWasDeletedBlock = { id, type in
-                    guard type == "PhotoV1", let uuid = UUID(uuidString: id.recordName) else {
-                        batch.update { $0.failure = PhotoHandoffError.invalid("An unsupported iCloud photo record was removed.") }; return
-                    }
-                    batch.update {
-                        if $0.deleted.count < 100 { $0.deleted.append(uuid) }
-                        else { $0.failure = PhotoHandoffError.invalid("iCloud returned too many removals in one batch.") }
-                    }
+                    do {
+                        let uuid = try Self.deletedPhotoID(id, recordType: type, account: account)
+                        batch.update {
+                            if $0.deleted.count < 100 { $0.deleted.append(uuid) }
+                            else { $0.failure = PhotoHandoffError.invalid("iCloud returned too many removals in one batch.") }
+                        }
+                    } catch { batch.update { $0.failure = error } }
                 }
                 operation.recordZoneFetchResultBlock = { _, result in
                     do {
@@ -238,9 +238,24 @@ extension PhotoCloudConfiguration {
               failures.count == 1, let nested = failures[recordID] as? CKError else { return false }
         return nested.code == .unknownItem || nested.code == .zoneNotFound
     }
-    private nonisolated static func decode(_ record: CKRecord, account: PhotoAccount) throws -> RemoteHandoffPhoto {
-        guard record.recordType == "PhotoV1", record.recordID.zoneID.zoneName == "WorkbenchPhotosV1",
-              record.recordID.zoneID.ownerName == account.userRecordName,
+    /// Accept the SDK's current-user alias only for a response from this adapter's
+    /// private database. Callers verify the captured real account before and after
+    /// each operation; the alias never becomes a stored identity or outgoing owner.
+    private nonisolated static func isResponseZone(_ zoneID: CKRecordZone.ID, account: PhotoAccount) -> Bool {
+        zoneID.zoneName == "WorkbenchPhotosV1" &&
+            (zoneID.ownerName == account.userRecordName || zoneID.ownerName == CKCurrentUserDefaultName)
+    }
+    nonisolated static func deletedPhotoID(_ id: CKRecord.ID, recordType: String, account: PhotoAccount) throws -> UUID {
+        try account.validate()
+        guard recordType == "PhotoV1", isResponseZone(id.zoneID, account: account),
+              let uuid = UUID(uuidString: id.recordName) else {
+            throw PhotoHandoffError.invalid("An unsupported iCloud photo record was removed.")
+        }
+        return uuid
+    }
+    nonisolated static func decode(_ record: CKRecord, account: PhotoAccount) throws -> RemoteHandoffPhoto {
+        try account.validate()
+        guard record.recordType == "PhotoV1", isResponseZone(record.recordID.zoneID, account: account),
               let data = record["metadata"] as? Data, data.count <= 16_000 else {
             throw PhotoHandoffError.invalid("An iCloud photo record has an unsupported format or owner.")
         }

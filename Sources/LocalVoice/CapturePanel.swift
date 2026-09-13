@@ -32,7 +32,7 @@ final class CapturePanelController: NSWindowController, NSWindowDelegate {
     private weak var model: AppModel?
     private var positioning = false
     private var dragging = false
-    private var snapGuide: CapturePanel?
+    private let snapGuide = FloatingControlGuideController()
     private var observations = Set<AnyCancellable>()
 
     init(model: AppModel) {
@@ -62,7 +62,7 @@ final class CapturePanelController: NSWindowController, NSWindowDelegate {
             .store(in: &observations)
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.snapGuide?.orderOut(nil); self?.position() }
+            .sink { [weak self] _ in self?.cancelDragging(); self?.position() }
             .store(in: &observations)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -71,7 +71,7 @@ final class CapturePanelController: NSWindowController, NSWindowDelegate {
         guard let window else { return }
         let showsReceipt = model.clipboardReceipt.isHUDVisible && model.clipboardReceipt.receipt != nil
         guard model.previewingPanel || model.phase != .idle || model.captureFailure != nil || showsReceipt else {
-            window.orderOut(nil); snapGuide?.orderOut(nil)
+            window.orderOut(nil); cancelDragging()
             controls.isExpanded = false
             return
         }
@@ -124,48 +124,29 @@ final class CapturePanelController: NSWindowController, NSWindowDelegate {
         savePosition()
     }
 
-    func beginDragging() { dragging = true }
+    func beginDragging() { dragging = true; previewDragging() }
+
+    func cancelDragging() { dragging = false; snapGuide.hide() }
+
+    func windowWillClose(_ notification: Notification) { cancelDragging() }
+
+    override func close() { cancelDragging(); super.close() }
 
     func previewDragging() {
-        guard dragging, let window, let preferred = preferredScreen else { return }
+        guard dragging, let window, let preferred = preferredScreen else { snapGuide.hide(); return }
         let screen = CaptureHUDGeometry.screen(for: window.frame, screens: NSScreen.screens.map(\.visibleFrame), preferred: preferred)
-        guard let anchor = FloatingControlGeometry.nearestAnchor(to: window.frame, in: screen) else {
-            snapGuide?.orderOut(nil); return
-        }
-        if snapGuide == nil {
-            let guide = CapturePanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            guide.isOpaque = false; guide.backgroundColor = .clear; guide.hasShadow = false
-            guide.ignoresMouseEvents = true; guide.level = .floating; guide.hidesOnDeactivate = false
-            guide.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-            guide.contentView = CaptureSnapGuideView()
-            snapGuide = guide
-        }
-        let destination = FloatingControlGeometry.frame(anchor: anchor, size: window.frame.size, visibleFrame: screen)
-        // A small outer ring remains visible even when the dragged panel exactly
-        // covers its destination. It is never an interactive window.
-        snapGuide?.setFrame(destination.insetBy(dx: -5, dy: -5), display: true)
-        snapGuide?.order(.below, relativeTo: window.windowNumber)
+        let anchor = FloatingControlGeometry.nearestAnchor(to: window.frame, in: screen)
+        snapGuide.show(controlFrame: window.frame, visibleFrame: screen, activeAnchor: anchor, below: window)
     }
 
     func finishDragging() {
-        defer { dragging = false; snapGuide?.orderOut(nil) }
-        guard let window, let preferred = preferredScreen else { return }
+        defer { cancelDragging() }
+        guard dragging, let window, let preferred = preferredScreen else { return }
         let screen = CaptureHUDGeometry.screen(for: window.frame, screens: NSScreen.screens.map(\.visibleFrame), preferred: preferred)
         controls.anchor = FloatingControlGeometry.nearestAnchor(to: window.frame, in: screen)
         let frame = controls.anchor.map { FloatingControlGeometry.frame(anchor: $0, size: window.frame.size, visibleFrame: screen) }
             ?? FloatingControlGeometry.clamp(window.frame, to: screen)
         setFrame(frame); savePosition()
-    }
-}
-
-private final class CaptureSnapGuideView: NSView {
-    override func draw(_ dirtyRect: NSRect) {
-        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 2, dy: 2), xRadius: 18, yRadius: 18)
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency { NSColor.windowBackgroundColor.setFill() }
-        else { NSColor.controlAccentColor.withAlphaComponent(0.15).setFill() }
-        path.fill()
-        NSColor.controlAccentColor.setStroke(); path.lineWidth = 3
-        path.setLineDash([6, 4], count: 2, phase: 0); path.stroke()
     }
 }
 
@@ -200,6 +181,13 @@ final class DragHandleView: NSView {
     override func mouseUp(with event: NSEvent) {
         (window?.windowController as? CapturePanelController)?.finishDragging()
         anchor = nil; startingOrigin = nil
+    }
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow == nil {
+            (window?.windowController as? CapturePanelController)?.cancelDragging()
+            anchor = nil; startingOrigin = nil
+        }
+        super.viewWillMove(toWindow: newWindow)
     }
     override func resetCursorRects() { addCursorRect(bounds, cursor: .openHand) }
     override func draw(_ dirtyRect: NSRect) {

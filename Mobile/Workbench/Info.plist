@@ -17,7 +17,23 @@
 <key>NSPhotoLibraryAddUsageDescription</key><string>Save the picture you choose to export as a new image in Photos.</string>
 <key>UILaunchScreen</key><dict/>
 <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
+<key>UIApplicationShortcutItems</key><array>
+<dict><key>UIApplicationShortcutItemType</key><string>com.ethdawg.workbench.capture-scene</string><key>UIApplicationShortcutItemTitle</key><string>Capture for scene</string><key>UIApplicationShortcutItemIconSymbolName</key><string>camera</string></dict>
+<dict><key>UIApplicationShortcutItemType</key><string>com.ethdawg.workbench.dictate</string><key>UIApplicationShortcutItemTitle</key><string>Dictate</string><key>UIApplicationShortcutItemIconSymbolName</key><string>mic</string></dict>
+</array>
 <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
 <key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
 <key>UIBackgroundModes</key><array><string>audio</string></array>
+<key>UTExportedTypeDeclarations</key><array><dict>
+<key>UTTypeIdentifier</key><string>com.ethdawg.workbench.scene</string>
+<key>UTTypeDescription</key><string>Workbench scene</string>
+<key>UTTypeConformsTo</key><array><string>public.data</string></array>
+<key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>workbenchscene</string></array></dict>
+</dict></array>
+<key>CFBundleDocumentTypes</key><array><dict>
+<key>CFBundleTypeName</key><string>Workbench scene</string>
+<key>LSItemContentTypes</key><array><string>com.ethdawg.workbench.scene</string></array>
+<key>CFBundleTypeRole</key><string>Editor</string><key>LSHandlerRank</key><string>Owner</string>
+</dict></array>
+<key>LSSupportsOpeningDocumentsInPlace</key><true/>
 </dict></plist>

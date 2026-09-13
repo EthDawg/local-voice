@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import ImageIO
+import SceneSyncKit
 
 struct DemoScene: Codable, Identifiable, Equatable {
     var id = UUID()
@@ -18,6 +19,19 @@ struct DemoScene: Codable, Identifiable, Equatable {
     var viewport: DeviceViewport? = nil
     var hand: SceneHand? = nil
     var persona: PersonaPlacement? = nil
+    /// Local edit provenance, deliberately absent from portable/legacy JSON.
+    var libraryRevision: UUID? = nil
+    private enum CodingKeys: String, CodingKey {
+        case id, name, background, backgroundX, backgroundY, zoom, showsPhone,
+             phoneX, phoneY, phoneHeight, logo, viewport, hand, persona
+    }
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id && lhs.name == rhs.name && lhs.background == rhs.background &&
+        lhs.backgroundX == rhs.backgroundX && lhs.backgroundY == rhs.backgroundY && lhs.zoom == rhs.zoom &&
+        lhs.showsPhone == rhs.showsPhone && lhs.phoneX == rhs.phoneX && lhs.phoneY == rhs.phoneY &&
+        lhs.phoneHeight == rhs.phoneHeight && lhs.logo == rhs.logo && lhs.viewport == rhs.viewport &&
+        lhs.hand == rhs.hand && lhs.persona == rhs.persona
+    }
 
     func validated() throws -> DemoScene {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -209,6 +223,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     let root: URL
     let systemIntegrationEnabled: Bool
     let personas: PersonaLibrary
+    @Published private(set) var sceneSync: MacSceneSync?
     private var window: NSWindow?
     private var presentation: DemoPresentation?
     var onOpen: (() -> Void)?
@@ -220,6 +235,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     @Published private(set) var starterPreferences = StarterPreferences()
     private var logoLibraryBlocked = false
     private var starterLibraryBlocked = false
+    private var lastMigrationNotice: String?
     var starters: [SceneStarter] { starterPreferences.visible }
     private let imageCache = NSCache<NSString, NSImage>()
     var matches: [DemoScene] { scenes.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) } }
@@ -240,8 +256,12 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
             return
         }
         imageCache.countLimit = 8; imageCache.totalCostLimit = 150 * 1024 * 1024
-        do { scenes = try SceneStorage.load(archiveURL); selectedID = scenes.first?.id }
-        catch { storageBlocked = true; notice = error.localizedDescription }
+        MainActor.assumeIsolated {
+            let adapter = MacSceneSync(root: self.root, systemIntegrationEnabled: systemIntegrationEnabled)
+            sceneSync = adapter
+            adapter.onChange = { [weak self] in self?.adoptCanonicalScenes() }
+            adoptCanonicalScenes(); selectedID = scenes.first?.id
+        }
         do {
             let libraryURL = self.root.appendingPathComponent("saved-logos.json")
             savedLogos = try SceneLibraryStorage.read([SavedSceneLogo].self, from: libraryURL, fallback: []).map { try $0.validated() }
@@ -268,6 +288,18 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
             myDevice = try? JSONDecoder().decode(DeviceViewport.self, from: data).validated()
         }
     }
+    private func adoptCanonicalScenes() {
+        MainActor.assumeIsolated {
+            guard let sceneSync else { return }
+            scenes = sceneSync.scenes; storageBlocked = sceneSync.isBlocked
+            if let message = sceneSync.migrationNotice { notice = message }
+            else if notice == lastMigrationNotice { notice = nil }
+            lastMigrationNotice = sceneSync.migrationNotice
+        }
+    }
+    func isSceneReadOnly(_ scene: DemoScene) -> Bool {
+        MainActor.assumeIsolated { storageBlocked || sceneSync?.isReadOnly(scene.id) != false }
+    }
     func show() {
         if let onOpen { refreshScreen(); onOpen(); return }
         if window == nil {
@@ -282,6 +314,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
         NSApp.activate(ignoringOtherApps: true); window?.makeKeyAndOrderFront(nil)
     }
     func image(for scene: DemoScene) -> NSImage? {
+        guard MainActor.assumeIsolated({ sceneSync?.unavailableAssetIDs.contains(scene.id) != true }) else { return nil }
         if let cached = imageCache.object(forKey: scene.background as NSString) { return cached }
         guard (try? scene.validated()) != nil,
               let image = NSImage(contentsOf: root.appendingPathComponent(scene.background)) else { return nil }
@@ -321,19 +354,36 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     func endPresentation() { presentation?.end() }
     func shutdown() {
         personas.shutdown()
+        MainActor.assumeIsolated { sceneSync?.shutdown() }
         presentation?.onEnd = nil; presentation?.end(); presentation = nil
         window?.orderOut(nil); window?.contentView = nil; window?.delegate = nil; window = nil
         imageCache.removeAllObjects()
     }
     private func persist(_ next: [DemoScene]) throws {
         guard !storageBlocked else { throw SceneError.storageBlocked }
-        try SceneStorage.save(next, to: archiveURL); scenes = next
+        try MainActor.assumeIsolated {
+            guard let adapter = sceneSync else { throw SceneError.storageBlocked }
+            guard Set(next.map(\.id)).count == next.count else { throw SceneError.invalidScene }
+            let removed = scenes.filter { old in !next.contains(where: { $0.id == old.id }) }
+            let added = next.filter { value in !scenes.contains(where: { $0.id == value.id }) }
+            let changed = next.filter { value in scenes.contains(where: { $0.id == value.id && $0 != value }) }
+            guard removed.count + added.count + changed.count <= 1 else { throw SceneDocumentError.concurrentChange }
+            if let value = removed.first { try adapter.remove(value) }
+            else if let value = added.first { try adapter.create(value) }
+            else if let value = changed.first { try adapter.save(value) }
+            else {
+                let ids = next.filter { !adapter.recoveryIDs.contains($0.id) }.map(\.id)
+                if ids != adapter.library.records.filter({ !$0.isDeleted }).map(\.id) { try adapter.reorder(ids) }
+            }
+            adoptCanonicalScenes()
+        }
     }
-    func update(_ scene: DemoScene) {
+    @discardableResult func update(_ scene: DemoScene) -> Bool {
         do {
             let checked = try scene.validated()
-            try persist(scenes.map { $0.id == scene.id ? checked : $0 })
-        } catch { notice = error.localizedDescription }
+            guard scenes.contains(where: { $0.id == scene.id }) else { throw SceneError.noScene }
+            try persist(scenes.map { $0.id == scene.id ? checked : $0 }); return true
+        } catch { notice = error.localizedDescription; return false }
     }
     /// A handoff photo enters the same in-memory replacement transaction as a
     /// chosen file. The scene ID is captured; selection and live output stay put.
@@ -349,9 +399,9 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
         guard draft.root.standardizedFileURL == root.standardizedFileURL else { throw BackdropReplacementError.closed }
         guard draft.active else { throw BackdropReplacementError.closed }
         guard draft.canApply, let candidate = draft.candidate else { throw BackdropReplacementError.noChange }
-        // Re-read at commit so a preview cannot replace newer names, foreground
-        // placements or other scenes, nor overwrite a now-corrupt archive.
-        var latest = try SceneStorage.load(archiveURL)
+        // Use the latest canonical snapshot, preserving newer foreground edits.
+        // The record revision and store compare-and-swap guard the final commit.
+        var latest = scenes
         guard let index = latest.firstIndex(where: { $0.id == draft.sceneID }) else { throw BackdropReplacementError.sceneMissing }
         guard SceneBackdrop(latest[index]) == draft.original else { throw BackdropReplacementError.staleScene }
         var copied: URL?
@@ -428,14 +478,39 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     }
     func personaImage(for scene: DemoScene) -> NSImage? {
         guard let persona = scene.persona, (try? persona.validated()) != nil else { return nil }
-        return personas.image(named: persona.image)
+        // Canonical assets retain their encoded bytes; AppKit detects the image
+        // format even when the compatibility cache uses a .png filename.
+        return NSImage(contentsOf: root.appendingPathComponent(persona.image))
     }
     func usePersona(_ persona: SavedPersona, in sceneID: UUID) {
         guard var scene = scenes.first(where: { $0.id == sceneID }) else { return }
-        var placement = scene.persona ?? PersonaPlacement(image: persona.image)
-        placement.image = persona.image
-        scene.persona = placement
-        update(scene)
+        var created: URL?
+        do {
+            _ = try persona.validated()
+            guard !isSceneReadOnly(scene) else { throw SceneError.storageBlocked }
+            let png = try personas.renderedPNG(for: persona)
+            let filename = "persona-scene-" + UUID().uuidString + ".png"
+            let destination = root.appendingPathComponent(filename)
+            try png.write(to: destination, options: .atomic); created = destination
+            var placement = scene.persona ?? PersonaPlacement(image: filename)
+            placement.image = filename; scene.persona = placement
+            try MainActor.assumeIsolated {
+                guard let adapter = sceneSync else { throw SceneError.storageBlocked }
+                var authored: SceneCardStyle?
+                if let style = persona.card {
+                    guard let source = try PersonaStorage.read(root.appendingPathComponent(persona.image), maximumBytes: SceneAsset.maximumBytes)
+                    else { throw SceneDocumentError.missingAsset }
+                    let portrait = try adapter.library.importAsset(source)
+                    authored = SceneCardStyle(portrait: portrait, label: style.label,
+                        red: style.background.r, green: style.background.g, blue: style.background.b)
+                }
+                try adapter.save(scene, card: authored, replacingCard: true)
+            }
+            notice = "Persona saved as an independent scene copy."
+        } catch {
+            if let created { try? FileManager.default.removeItem(at: created) }
+            notice = error.localizedDescription
+        }
     }
     func handImage(for scene: DemoScene) -> NSImage? {
         guard let hand = scene.hand, (try? hand.validated()) != nil else { return nil }
@@ -545,14 +620,9 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     }
     func makeTextLogo(_ text: String) {
         guard let id = selected?.id else { return }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
-        defer { try? FileManager.default.removeItem(at: url) }
         do {
-            try SceneLibraryStorage.textLogo(text).write(to: url)
-            try addLogo(url, to: id)
-            if let image = selected?.logo?.image, let saved = savedLogos.first(where: { $0.image == image }) {
-                renameSavedLogo(saved.id, name: text)
-            }
+            let image = LogoImport.Image(png: try SceneLibraryStorage.textLogo(text), name: text)
+            try addLogo(image, to: id)
         } catch { notice = error.localizedDescription }
     }
     func moveScene(_ id: UUID, by offset: Int) {
@@ -568,15 +638,23 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
         catch { notice = error.localizedDescription }
     }
     func duplicate() {
-        guard var scene = selected else { return }
-        scene.id = UUID(); scene.name = String(scene.name.prefix(150)) + " copy"
-        do { try persist(scenes + [scene]); query = ""; selectedID = scene.id } catch { notice = error.localizedDescription }
-    }
-    func remove() {
-        guard let id = selectedID else { return }
+        guard let scene = selected else { return }
         do {
-            try persist(scenes.filter { $0.id != id })
-            // Retain imported images: duplicates and an active wallpaper can refer to them.
+            let id = try MainActor.assumeIsolated {
+                guard let sceneSync else { throw SceneError.storageBlocked }
+                return try sceneSync.duplicate(scene)
+            }
+            query = ""; selectedID = id
+        } catch { notice = error.localizedDescription }
+    }
+    func remove(_ captured: DemoScene? = nil) {
+        guard let scene = captured ?? selected else { return }
+        do {
+            try MainActor.assumeIsolated {
+                guard let sceneSync else { throw SceneError.storageBlocked }
+                try sceneSync.remove(scene)
+            }
+            // Originals and immutable assets remain available to active output.
         } catch { notice = error.localizedDescription }
     }
     var targetScreen: NSScreen? { window?.screen ?? NSScreen.main }

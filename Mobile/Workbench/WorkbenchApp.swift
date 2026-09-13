@@ -1,6 +1,8 @@
 import SwiftUI
 
 @main struct WorkbenchMobileApp: App {
+    @UIApplicationDelegateAdaptor(MobileApplicationDelegate.self) private var appDelegate
+    @StateObject private var scenes: SceneLibraryModel
     @StateObject private var store: MobileStore
     @StateObject private var handoff: PhotoHandoffModel
     @StateObject private var speech = SpeechService()
@@ -11,25 +13,34 @@ import SwiftUI
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
         let testing = arguments.contains("--ui-testing") || arguments.contains("--ui-testing-handoff")
-        let root = testing ? FileManager.default.temporaryDirectory.appendingPathComponent("WorkbenchUITests-" + UUID().uuidString) : nil
-        _store = StateObject(wrappedValue: MobileStore(directory: root))
-        let handoffRoot = root ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Workbench", isDirectory: true)
-        _handoff = StateObject(wrappedValue: PhotoHandoffModel(directory: handoffRoot.appendingPathComponent("PhotoHandoff", isDirectory: true),
-                                                            platform: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone", allowsCloudAccess: !testing))
         #else
-        _store = StateObject(wrappedValue: MobileStore())
-        let handoffRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Workbench/PhotoHandoff", isDirectory: true)
-        _handoff = StateObject(wrappedValue: PhotoHandoffModel(directory: handoffRoot, platform: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone"))
+        let testing = false
         #endif
+        let root = testing ? FileManager.default.temporaryDirectory.appendingPathComponent("WorkbenchUITests-" + UUID().uuidString)
+            : FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Workbench", isDirectory: true)
+        _store = StateObject(wrappedValue: MobileStore(directory: root))
+        _handoff = StateObject(wrappedValue: PhotoHandoffModel(directory: root.appendingPathComponent("PhotoHandoff", isDirectory: true),
+            platform: UIDevice.current.userInterfaceIdiom == .pad ? "iPad" : "iPhone", allowsCloudAccess: !testing))
+        let cloud = PhotoCloudConfiguration.current()
+        _scenes = StateObject(wrappedValue: SceneLibraryModel(directory: root.appendingPathComponent("Scenes", isDirectory: true),
+            configuration: SceneCloudConfiguration(container: cloud.container, environment: cloud.environment, isProvisioned: !testing && cloud.isConfigured)))
     }
 
     var body: some Scene {
         WindowGroup {
-            MobileHome().environmentObject(store).environmentObject(speech).environmentObject(reader).environmentObject(handoff)
+            MobileHome().environmentObject(store).environmentObject(speech).environmentObject(reader).environmentObject(handoff).environmentObject(scenes)
                 .tint(Color.accentColor)
-                .task { if handoff.isEnabled { await handoff.refresh() } }
+                .task {
+                    if handoff.isEnabled { await handoff.refresh() }
+                    if scenes.isEnabled { await scenes.refresh() }
+                }
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active, handoff.isEnabled, !handoff.isBusy { Task { await handoff.refresh() } }
+                    if phase == .active {
+                        if handoff.isEnabled, !handoff.isBusy { Task { await handoff.refresh() } }
+                        if scenes.isEnabled, !scenes.isBusy { Task { await scenes.refresh() } }
+                    } else if phase == .background {
+                        scenes.cancelRefresh()
+                    }
                 }
                 .alert("Could not complete that change", isPresented: Binding(get: { store.error != nil }, set: { if !$0 { store.error = nil } })) {
                     Button("OK", role: .cancel) { store.error = nil }
@@ -40,11 +51,20 @@ import SwiftUI
 
 struct MobileHome: View {
     @EnvironmentObject private var store: MobileStore
+    @EnvironmentObject private var scenes: SceneLibraryModel
     @EnvironmentObject private var reader: ReadingService
     @State private var about = false
+    @State private var selectedTab = 0
+    @State private var path: [HomeRoute] = []
+    @State private var sceneFileError: String?
+    @ObservedObject private var quickActions = MobileQuickActionRouter.shared
+    @ObservedObject private var sceneEditing = SceneEditingActivity.shared
+    @Environment(\.scenePhase) private var scenePhase
+    private enum HomeRoute: Hashable { case dictate, captureScene, scene(UUID) }
+
     var body: some View {
-        TabView {
-            NavigationStack {
+        TabView(selection: $selectedTab) {
+            NavigationStack(path: $path) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         Text("Useful, wherever you are.").font(.title3).foregroundStyle(.secondary)
@@ -64,12 +84,9 @@ struct MobileHome: View {
                             VStack(spacing: 14) { readingCard; markupCard }
                         }
                         VStack(spacing: 0) {
-                            NavigationLink { MobileImageWorkspace(kind: .backdrop) } label: { toolRow("Backdrops", detail: "Prepare a picture for presenting", symbol: "rectangle.inset.filled") }
+                            NavigationLink { MobileScenesView() } label: { toolRow("Scenes", detail: "Prepare here. Present on your Mac.", symbol: "rectangle.inset.filled") }.accessibilityIdentifier("tool.scenes")
                             Divider().padding(.leading, 64)
                             NavigationLink { MobileImageWorkspace(kind: .wallpaper) } label: { toolRow("Wallpapers", detail: "Make a picture fit your screen", symbol: "photo") }.accessibilityIdentifier("tool.wallpaper")
-                            Divider().padding(.leading, 64)
-                            NavigationLink { PhotoHandoffView() } label: { toolRow("Take a photo for Mac", detail: "Keep a photo or send a private copy", symbol: "camera") }
-                                .accessibilityIdentifier("tool.photoHandoff")
                         }.buttonStyle(.plain).padding(.horizontal, 16)
                             .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24))
                         if !store.document.draft.isEmpty {
@@ -83,10 +100,44 @@ struct MobileHome: View {
                     }.padding(20).frame(maxWidth: 720)
                 }.frame(maxWidth: .infinity).background(Color(uiColor: .systemGroupedBackground))
                     .navigationTitle("Workbench")
+                    .toolbar(.visible, for: .tabBar)
+                    .navigationDestination(for: HomeRoute.self) { route in
+                        switch route {
+                        case .dictate: MobileDictateView()
+                        case .captureScene: MobileScenesView(captureOnOpen: true)
+                        case .scene(let id): MobileSceneEditor(sceneID: id)
+                        }
+                    }
                     .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("About Workbench", systemImage: "info.circle") { about = true }.labelStyle(.iconOnly) } }
-            }.tabItem { Label("Tools", systemImage: "square.grid.2x2") }
-            NavigationStack { MobileSavedView() }.tabItem { Label("Saved", systemImage: "folder") }
+            }.tabItem { Label("Tools", systemImage: "square.grid.2x2") }.tag(0)
+            NavigationStack { MobileSavedView().toolbar(.visible, for: .tabBar) }.tabItem { Label("Saved", systemImage: "folder") }.tag(1)
         }.modifier(MobileReadingAccessory()).sheet(isPresented: $about) { MobileAboutView() }
+            .onOpenURL { url in
+                guard !sceneEditing.hasUnsavedEdits else {
+                    sceneFileError = "Save your scene first, then open this file again. Your current edits are still here."
+                    return
+                }
+                let access = url.startAccessingSecurityScopedResource()
+                defer { if access { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    let copy = try scenes.importPackage(SceneFile.read(url))
+                    selectedTab = 0; path = [.scene(copy.id)]
+                } catch { sceneFileError = error.localizedDescription }
+            }
+            .alert("Could not open scene", isPresented: Binding(get: { sceneFileError != nil }, set: { if !$0 { sceneFileError = nil } })) {
+                Button("OK", role: .cancel) { sceneFileError = nil }
+            } message: { Text(sceneFileError ?? "") }
+            .onChange(of: quickActions.pending) { _, _ in handleQuickAction() }
+            .onChange(of: sceneEditing.hasUnsavedEdits) { _, hasEdits in if !hasEdits { handleQuickAction() } }
+            .onChange(of: scenePhase) { _, phase in if phase == .active { handleQuickAction() } }
+            .task { handleQuickAction() }
+    }
+
+    private func handleQuickAction() {
+        guard !sceneEditing.hasUnsavedEdits,
+              let action = quickActions.take(isActive: scenePhase == .active) else { return }
+        selectedTab = 0; about = false
+        path = [action == .dictate ? .dictate : .captureScene]
     }
 
     private var readingCard: some View {
@@ -158,7 +209,7 @@ struct MobileAboutView: View {
                     PhotoHandoffSettingsView()
                 }
                 Section("Preview boundaries") {
-                    Text("Saved work does not automatically sync with the Mac. Optional photo handoff sends only the photos you choose, using your private iCloud. This Preview has no custom keyboard, cross-app overlays or background microphone.")
+                    Text("Personal scene sync is optional and uses the same Apple Account on your devices. Drafts, recordings, markup and wallpaper projects stay local. The separate photo inbox sends only photos you choose. This Preview has no custom keyboard, cross-app overlays or background microphone.")
                     Text("Original image assets are retained when you delete a saved project. Deleting the app removes its local library; export important work first.")
                     Link("Mobile guide", destination: URL(string: "https://workbench-mac.vercel.app/mobile/")!)
                     Link("Source and feedback", destination: URL(string: "https://github.com/EthDawg/local-voice")!)

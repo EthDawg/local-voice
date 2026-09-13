@@ -22,11 +22,12 @@ enum DictationCleanup {
         return regex.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: template)
     }
     static func times(_ text: String) -> String {
-        replacing(text, #"\b(\d{1,2})(?::00)?\s*([ap])\s*\.?\s*m\b"#, "$1$2m")
+        let normalized = replacing(text, #"(?<![\p{L}\p{N}:])((?:1[0-2]|0?[1-9])(?::[0-5]\d)?)[ \t]*([ap])[ \t]*\.?[ \t]*m\b"#, "$1$2m")
+        return replacing(normalized, #"\b(\d{1,2}):00([ap]m)\b"#, "$1$2")
     }
     static func light(_ raw: String) -> String {
         var text = times(raw).trimmingCharacters(in: .whitespacesAndNewlines)
-        text = replacing(text, #"\b(\d{1,2}(?::\d{2})?[ap]m)[,;.\s]+(?:actually|sorry|make that|I mean)[,\s]+(\d{1,2}(?::\d{2})?[ap]m)\b"#, "$2")
+        text = resolveAdjacentTimeCorrections(text)
         text = resolveExplicitCorrections(text)
         text = replacing(text, #"\b(?:u+m+|u+h+|e+rm+|hmm+)\b[,\s]*"#, "")
         text = replacing(text, #"^(?:okay|ok)[,\s]+(?:so[,\s]+)?(?:to\s+)?(?=hello\b|I\b|we\b|the\b)"#, "")
@@ -42,6 +43,14 @@ enum DictationCleanup {
         text = formatList(text)
         if let first = text.first { text = String(first).uppercased() + text.dropFirst() }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    static func resolveAdjacentTimeCorrections(_ text: String) -> String {
+        // Only two valid adjacent clock times with an explicit correction cue.
+        // Do not infer a replacement across another clause or a paragraph. A
+        // lookahead retains the corrected time and permits a chain of corrections.
+        let time = #"(?<![\p{L}\p{N}:])(?:1[0-2]|0?[1-9])(?::[0-5]\d)?[ap]m\b"#
+        let cue = #"(?:no[, \t]+)?(?:actually|sorry|make[ \t]+that|I[ \t]+mean)"#
+        return replacing(text, time + #"[,;. \t]+"# + cue + #"[, \t]+(?="# + time + ")", "")
     }
     static func resolveExplicitCorrections(_ source: String) -> String {
         var text = source

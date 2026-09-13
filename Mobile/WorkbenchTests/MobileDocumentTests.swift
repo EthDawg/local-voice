@@ -4,6 +4,40 @@ import PencilKit
 import SwiftUI
 @testable import WorkbenchMobile
 
+@MainActor
+private final class SpeechAssetFixture: MobileSpeechAssetProviding {
+    var isAvailable = true
+    var installCalls: [String] = []
+    var cancelCount = 0
+    var failure: Error?
+    var suspendInstallation = false
+    var onInstall: (() -> Void)?
+    private var installed = Set<String>()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var progress: (@MainActor (Double) -> Void)?
+
+    func supportedLocales() async -> [Locale] { [Locale(identifier: "en_AU"), Locale(identifier: "fr_FR")] }
+    func supportedLocale(equivalentTo locale: Locale) async -> Locale? {
+        await supportedLocales().first { $0.identifier(.bcp47) == locale.identifier(.bcp47) }
+    }
+    func status(for locale: Locale) async -> MobileSpeechAssetStatus { installed.contains(locale.identifier(.bcp47)) ? .installed : .supported }
+    func install(for locale: Locale, progress: @escaping @MainActor (Double) -> Void) async throws {
+        let identifier = locale.identifier(.bcp47)
+        installCalls.append(identifier)
+        self.progress = progress
+        if let failure { throw failure }
+        if suspendInstallation {
+            await withCheckedContinuation { continuation in self.continuation = continuation; onInstall?() }
+        } else { onInstall?() }
+        // Deliberately noncooperative after cancellation: the service must reject
+        // this late completion using its invocation generation.
+        installed.insert(identifier)
+    }
+    func cancelInstallation() { cancelCount += 1 }
+    func publishProgress(_ value: Double) { progress?(value) }
+    func finishSuspendedInstallation() { continuation?.resume(); continuation = nil }
+}
+
 final class MobileDocumentTests: XCTestCase {
     private func temporaryDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("MobileDocumentTests-" + UUID().uuidString)
@@ -32,6 +66,109 @@ final class MobileDocumentTests: XCTestCase {
         XCTAssertEqual(restored.texts.first?.original, original)
         XCTAssertEqual(restored.replacements.first?.id, rule.id)
         XCTAssertEqual(TextRules.apply("Next GIT HUB capture", replacements: restored.replacements), "Next GitHub capture")
+    }
+
+    func testExplicitNoActuallyTimeCorrectionKeepsOriginalAndNegation() throws {
+        let disk = MobileDocumentStore(directory: try temporaryDirectory())
+        let original = "Um, meet at 3pm, no actually 4pm. Don't bring the old notes."
+        let cleaned = DictationCleanup.light(original)
+        XCTAssertEqual(cleaned, "Meet at 4pm. Don't bring the old notes.")
+        var document = MobileDocument()
+        document.texts = [MobileText(title: "Meeting", original: original, text: cleaned)]
+        try disk.save(document)
+        XCTAssertEqual(try disk.load().texts.first?.original, original)
+        XCTAssertEqual(try disk.load().texts.first?.text, cleaned)
+        XCTAssertEqual(DictationCleanup.light("Meet at 3:30 p.m., no, actually 4:15 p.m."), "Meet at 4:15pm.")
+        XCTAssertEqual(DictationCleanup.light("Meet at 3pm. No, actually I leave at 4pm."), "Meet at 3pm. No, actually I leave at 4pm.")
+        XCTAssertEqual(DictationCleanup.light("Meet at 3pm.\n\nActually 4pm is when I leave."), "Meet at 3pm.\n\nActually 4pm is when I leave.")
+    }
+
+    @MainActor
+    func testSpeechPreparationUsesResolvedLocaleAndNeverDownloadsDuringCheck() async throws {
+        let assets = SpeechAssetFixture()
+        let service = SpeechService(locale: Locale(identifier: "en_AU"), assets: assets, recoveryDirectory: try temporaryDirectory(), preferences: nil, observesInterruptions: false)
+        await service.refreshAvailability()
+        XCTAssertFalse(service.isReady)
+        XCTAssertEqual(service.readiness, .needsDownload)
+        XCTAssertEqual(assets.installCalls, [])
+        XCTAssertEqual(service.selectedLanguageID, "en-AU")
+        await service.prepare()
+        XCTAssertEqual(assets.installCalls, ["en-AU"])
+        XCTAssertTrue(service.isReady)
+        XCTAssertFalse(service.isWorking)
+        XCTAssertNil(service.error)
+        await service.prepare()
+        XCTAssertEqual(assets.installCalls, ["en-AU"], "Already-installed assets must not request another download")
+    }
+
+    @MainActor
+    func testUnavailableSpeechOffersSupportedLanguageWithoutSilentFallback() async throws {
+        let assets = SpeechAssetFixture()
+        let service = SpeechService(locale: Locale(identifier: "zz_ZZ"), assets: assets, recoveryDirectory: try temporaryDirectory(), preferences: nil, observesInterruptions: false)
+        await service.refreshAvailability()
+        XCTAssertFalse(service.isReady)
+        XCTAssertEqual(service.readiness, .unavailable)
+        XCTAssertFalse(service.canPrepare)
+        XCTAssertEqual(assets.installCalls, [])
+        XCTAssertTrue(service.languages.contains(where: { $0.id == "en-AU" }))
+        await service.selectLanguage("en-AU")
+        XCTAssertEqual(service.readiness, .needsDownload)
+        XCTAssertNil(service.error)
+        XCTAssertEqual(assets.installCalls, [], "Changing language must not download")
+        assets.isAvailable = false
+        await service.refreshAvailability()
+        XCTAssertEqual(service.readiness, .unavailable)
+        XCTAssertFalse(service.canPrepare)
+    }
+
+    @MainActor
+    func testSpeechDownloadFailureIsActionableAndKeepsRecoveryMarker() async throws {
+        let directory = try temporaryDirectory()
+        let marker = directory.appendingPathComponent("recovery.json")
+        let originalMarker = Data("{ unreadable recovery".utf8)
+        try originalMarker.write(to: marker)
+        let assets = SpeechAssetFixture()
+        assets.failure = NSError(domain: "SpeechAssetFixture", code: 42, userInfo: [NSLocalizedDescriptionKey: "The speech asset could not be downloaded."])
+        let service = SpeechService(locale: Locale(identifier: "en_AU"), assets: assets, recoveryDirectory: directory, preferences: nil, observesInterruptions: false)
+        await service.prepare()
+        XCTAssertFalse(service.isReady)
+        XCTAssertFalse(service.isWorking)
+        XCTAssertTrue(service.canPrepare)
+        XCTAssertEqual(service.readiness, .failed)
+        XCTAssertTrue(service.error?.contains("could not be downloaded") == true)
+        XCTAssertTrue(service.diagnosticDetail?.contains("SpeechAssetFixture (42)") == true)
+        XCTAssertTrue(service.diagnosticDetail?.contains("Language: en-AU") == true)
+        XCTAssertFalse(service.diagnosticDetail?.contains(directory.path) == true)
+        XCTAssertTrue(service.hasRecovery)
+        XCTAssertEqual(try Data(contentsOf: marker), originalMarker)
+    }
+
+    @MainActor
+    func testCancelledSpeechInstallationCannotPublishLateReadinessOrProgress() async throws {
+        let assets = SpeechAssetFixture()
+        assets.suspendInstallation = true
+        let started = expectation(description: "Installation began")
+        assets.onInstall = { started.fulfill() }
+        let service = SpeechService(locale: Locale(identifier: "en_AU"), assets: assets, recoveryDirectory: try temporaryDirectory(), preferences: nil, observesInterruptions: false)
+        let preparation = Task { await service.prepare() }
+        await fulfillment(of: [started], timeout: 5)
+        XCTAssertTrue(service.isWorking)
+        await service.selectLanguage("fr-FR")
+        XCTAssertEqual(service.selectedLanguageID, "en-AU", "A busy invocation freezes its language")
+        service.cancel()
+        XCTAssertFalse(service.isWorking)
+        XCTAssertFalse(service.isReady)
+        XCTAssertEqual(assets.cancelCount, 1)
+        await service.selectLanguage("fr-FR")
+        let phase = service.phase
+        assets.publishProgress(0.9)
+        assets.finishSuspendedInstallation()
+        await preparation.value
+        XCTAssertEqual(service.selectedLanguageID, "fr-FR")
+        XCTAssertEqual(service.phase, phase)
+        XCTAssertFalse(service.isReady)
+        XCTAssertNil(service.downloadProgress)
+        XCTAssertNil(service.error)
     }
 
     func testSharedCorrectionPreviewPreservesWhitespaceAndLiteralPhraseBoundaries() throws {

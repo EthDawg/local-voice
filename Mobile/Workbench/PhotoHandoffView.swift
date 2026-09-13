@@ -282,12 +282,12 @@ struct PhotoHandoffDetailView: View {
     }
 }
 
-private enum PhotoHandoffInputError: LocalizedError {
+enum PhotoHandoffInputError: LocalizedError {
     case unreadable
     var errorDescription: String? { "Choose a readable still photo under 64 MB and 50 megapixels." }
 }
 
-private enum PhotoHandoffPreview {
+enum PhotoHandoffPreview {
     static func selected(_ data: Data) throws -> UIImage {
         guard !data.isEmpty, data.count <= 64_000_000,
               let source = CGImageSourceCreateWithData(data as CFData, nil), CGImageSourceGetCount(source) == 1,
@@ -319,7 +319,7 @@ private enum PhotoHandoffPreview {
     #endif
 }
 
-private struct PhotoHandoffCamera: UIViewControllerRepresentable {
+struct PhotoHandoffCamera: UIViewControllerRepresentable {
     let completion: (Result<Data?, Error>) -> Void
     func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
     func makeUIViewController(context: Context) -> UIImagePickerController {

@@ -45,8 +45,11 @@ final class SceneTests {
         let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }
         let first = DemoScene(name: "Customer A reception", background: "a.png")
         let second = DemoScene(name: "Customer B workshop", background: "b.png")
+        let image = NSImage(size: CGSize(width: 80, height: 45), flipped: false) { rect in NSColor.blue.setFill(); rect.fill(); return true }
+        let bytes = try SceneRenderer.png(DemoScene(background: "fixture.png"), image: image, size: CGSize(width: 80, height: 45))
+        try bytes.write(to: root.appendingPathComponent(first.background)); try bytes.write(to: root.appendingPathComponent(second.background))
         try SceneStorage.save([first, second], to: root.appendingPathComponent("scenes.json"))
-        let model = DemoScenes(root: root)
+        let model = DemoScenes(root: root, systemIntegrationEnabled: false)
         XCTAssertEqual(model.selected?.id, first.id)
         model.query = "workshop"
         XCTAssertEqual(model.selectedID, second.id)
@@ -116,7 +119,7 @@ final class SceneTests {
         let url = root.appendingPathComponent("scenes.json")
         for payload in [Data("broken".utf8), Data("{\"version\":9,\"scenes\":[]}".utf8)] {
             try payload.write(to: url)
-            let model = DemoScenes(root: root)
+            let model = DemoScenes(root: root, systemIntegrationEnabled: false)
             XCTAssertTrue(model.storageBlocked)
             XCTAssertNotNil(model.notice)
             model.update(DemoScene(background: "image.png"))
@@ -152,11 +155,11 @@ final class SceneTests {
         XCTAssertGreaterThan(bitmap.colorAt(x: 5, y: 5)!.redComponent, 0.9)
         let source = root.appendingPathComponent("source.png"); try data.write(to: source)
         let modelRoot = root.appendingPathComponent("store")
-        let model = DemoScenes(root: modelRoot)
+        let model = DemoScenes(root: modelRoot, systemIntegrationEnabled: false)
         try model.addImage(source, name: "Demo reception")
         let imported = model.selected!
         try FileManager.default.removeItem(at: source)
-        let reloaded = DemoScenes(root: modelRoot)
+        let reloaded = DemoScenes(root: modelRoot, systemIntegrationEnabled: false)
         XCTAssertEqual(reloaded.scenes.first?.name, "Demo reception")
         XCTAssertNotNil(reloaded.image(for: imported))
         reloaded.duplicate()

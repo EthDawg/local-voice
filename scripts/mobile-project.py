@@ -38,14 +38,16 @@ for name, folder, product_type, extension in [
     if name == "WorkbenchMobile":
         files += [ROOT / "Sources/LocalVoice" / f for f in ["TextPrimitives.swift", "DictationCleanup.swift", "CorrectionRule.swift"]]
         files += sorted((ROOT / "Sources/PhotoHandoffKit").glob("*.swift"))
+        files += sorted((ROOT / "Sources/SceneSyncKit").glob("*.swift"))
     children = []; sources = []; resources = []
     if name == "WorkbenchMobile":
         files += [MOBILE / folder / "Info.plist", MOBILE / folder / "PrivacyInfo.xcprivacy"]
         files += sorted((MOBILE / folder).glob("*.xcassets"))
+        files += [ROOT / "Resources/PersonaPortraits"]
     for path in files:
         relative = str(path.relative_to(ROOT)) if path.is_relative_to(MOBILE) else "../" + str(path.relative_to(ROOT))
         if relative.startswith("Mobile/"): relative = relative.removeprefix("Mobile/")
-        kind = "sourcecode.swift" if path.suffix == ".swift" else "folder.assetcatalog" if path.suffix == ".xcassets" else "text.plist.xml"
+        kind = "sourcecode.swift" if path.suffix == ".swift" else "folder.assetcatalog" if path.suffix == ".xcassets" else "folder" if path.is_dir() else "text.plist.xml"
         ref = obj(relative + "ref", f"isa = PBXFileReference; lastKnownFileType = {kind}; path = {q(relative)}; sourceTree = SOURCE_ROOT;")
         children.append(ref)
         if path.name == "Info.plist": continue

@@ -1,4 +1,5 @@
 import AppKit
+import SceneSyncKit
 import ImageIO
 import UniformTypeIdentifiers
 
@@ -84,7 +85,7 @@ final class PersonaTests {
         let source = root.appendingPathComponent("persona.png"); try fixture().write(to: source)
         let item = SavedPersona(name: "Saved", image: "persona.png")
         let invalidArchives = [Data("not json".utf8),
-            try JSONEncoder().encode(PersonaArchive(version: 2, items: [], selectedID: nil)),
+            try JSONEncoder().encode(PersonaArchive(version: 999, items: [], selectedID: nil)),
             try JSONEncoder().encode(PersonaArchive(items: [item, item], selectedID: item.id)),
             try JSONEncoder().encode(PersonaArchive(items: [item], selectedID: UUID()))]
         for invalid in invalidArchives {
@@ -122,7 +123,7 @@ final class PersonaTests {
     func testSceneAttachmentTransparencyAndMissingFile() throws {
         let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }
         let source = root.appendingPathComponent("persona.png"); try fixture().write(to: source)
-        let model = DemoScenes(root: root.appendingPathComponent("store"))
+        let model = DemoScenes(root: root.appendingPathComponent("store"), systemIntegrationEnabled: false)
         try model.addImage(source, name: "First scene"); let firstID = model.selected!.id
         try model.addImage(source, name: "Second scene"); let secondID = model.selected!.id
         let persona = try model.personas.addImage(source)
@@ -130,9 +131,9 @@ final class PersonaTests {
         XCTAssertNotNil(model.scenes.first { $0.id == firstID }?.persona)
         XCTAssertTrue(model.scenes.first { $0.id == secondID }?.persona == nil, "A chooser must attach to its captured scene ID")
         var scene = model.scenes.first { $0.id == firstID }!
-        scene.showsPhone = false; scene.persona = PersonaPlacement(image: persona.image, x: 0.5, y: 0.5, width: 0.4)
-        model.update(scene)
-        let roundTrip = DemoScenes(root: model.root)
+        scene.showsPhone = false; scene.persona?.x = 0.5; scene.persona?.y = 0.5; scene.persona?.width = 0.4
+        XCTAssertTrue(model.update(scene)); scene = model.scenes.first { $0.id == firstID }!
+        let roundTrip = DemoScenes(root: model.root, systemIntegrationEnabled: false)
         XCTAssertEqual(roundTrip.scenes.first { $0.id == firstID }?.persona, scene.persona)
         model.personas.remove(persona.id)
         XCTAssertNotNil(model.personaImage(for: scene))
@@ -144,10 +145,124 @@ final class PersonaTests {
         let edge = bitmap.colorAt(x: 130, y: 100)!.usingColorSpace(.deviceRGB)!
         XCTAssertGreaterThan(edge.blueComponent, 0.95, "The saved persona must be included in the exported scene")
         try FileManager.default.removeItem(at: model.root.appendingPathComponent(persona.image))
-        XCTAssertTrue(model.personaImage(for: scene) == nil)
-        XCTAssertThrowsError(try model.renderPNG(scene, image: background, size: CGSize(width: 300, height: 200)))
+        XCTAssertTrue(model.personaImage(for: scene) != nil, "Removing the library source cannot break an independently placed scene")
+        let cache = model.root.appendingPathComponent(scene.persona!.image)
+        try FileManager.default.removeItem(at: cache)
+        let recovered = DemoScenes(root: model.root, systemIntegrationEnabled: false)
+        XCTAssertTrue(recovered.personaImage(for: scene) != nil, "A missing cache is recreated from canonical bytes")
+        let asset = MainActor.assumeIsolated { recovered.sceneSync!.library.records.first { $0.id == firstID }!.scene.persona!.image }
+        let assetURL = try MainActor.assumeIsolated { try recovered.sceneSync!.library.assetURL(asset) }
+        try FileManager.default.removeItem(at: assetURL); try FileManager.default.removeItem(at: cache)
+        let missing = DemoScenes(root: model.root, systemIntegrationEnabled: false)
+        XCTAssertTrue(missing.personaImage(for: scene) == nil)
+        XCTAssertThrowsError(try missing.renderPNG(scene, image: background, size: CGSize(width: 300, height: 200)))
+        XCTAssertTrue(missing.scenes.contains { $0.id == firstID }); XCTAssertNotNil(missing.notice)
         let legacy = try JSONEncoder().encode(DemoScene(background: "old.png"))
         XCTAssertTrue(try JSONDecoder().decode(DemoScene.self, from: legacy).persona == nil)
+    }
+
+    func testLegacyMigrationKeepsFinishedPixelsAndRequiresExplicitGroup() throws {
+        let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }
+        let item = SavedPersona(name: "Private legacy customer", image: "finished.png")
+        let original = try fixture(); try original.write(to: root.appendingPathComponent(item.image))
+        let data = try JSONSerialization.data(withJSONObject: ["version": 1,
+            "items": [["id": item.id.uuidString, "name": item.name, "image": item.image]], "selectedID": item.id.uuidString])
+        let url = root.appendingPathComponent("persona-library.json"); try data.write(to: url)
+        let library = PersonaLibrary(root: root)
+        XCTAssertFalse(library.isReadOnly); XCTAssertTrue(library.groups.isEmpty)
+        XCTAssertTrue(library.activeGroupID == nil); XCTAssertTrue(library.liveSelection == nil)
+        XCTAssertFalse(library.overlayVisible); XCTAssertEqual(library.selectedID, item.id)
+        XCTAssertTrue(library.items[0].card == nil)
+        XCTAssertEqual(try library.renderedPNG(for: library.items[0]), original)
+        XCTAssertEqual(try Data(contentsOf: url), data, "Opening v1 must not write a migration or create an all-library group")
+        library.rename(item.id, name: "Renamed privately")
+        let reopened = PersonaLibrary(root: root)
+        XCTAssertEqual(reopened.items[0].name, "Renamed privately")
+        XCTAssertTrue(reopened.groups.isEmpty); XCTAssertFalse(reopened.overlayVisible)
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(item.image)), original)
+        XCTAssertEqual(try JSONDecoder().decode(PersonaArchive.self, from: Data(contentsOf: url)).version, 2)
+    }
+
+    func testOrderedGroupsAndDeletionNeverSelectAnotherCustomer() throws {
+        let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("portrait.png"); try fixture().write(to: source)
+        let store = root.appendingPathComponent("library"), library = PersonaLibrary(root: root.appendingPathComponent("library"))
+        let a = try library.addImage(source), b = try library.addImage(source), other = try library.addImage(source)
+        let alpha = try library.createGroup(name: "Private Alpha", members: [b.id, a.id])
+        let beta = try library.createGroup(name: "Private Beta", members: [other.id])
+        library.prepareGroup(alpha)
+        XCTAssertEqual(library.visibleItems.map(\.id), [b.id, a.id]); XCTAssertEqual(library.selectedID, b.id)
+        library.moveMember(a.id, by: -1); library.renameGroup(alpha, name: "Renamed Alpha")
+        XCTAssertEqual(library.activeGroup?.personaIDs, [a.id, b.id])
+        XCTAssertEqual(library.activeGroup?.id, alpha)
+        let before = library.groups
+        library.setGroupMembers([a.id, UUID()], in: alpha)
+        XCTAssertEqual(library.groups, before); XCTAssertNotNil(library.notice)
+        library.selectedID = a.id; library.remove(a.id)
+        XCTAssertTrue(library.selectedID == nil, "Deletion must not select the first item in any group")
+        XCTAssertEqual(library.activeGroup?.personaIDs, [b.id])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: store.appendingPathComponent(a.image).path))
+        library.removeGroup(alpha)
+        XCTAssertTrue(library.activeGroupID == nil); XCTAssertTrue(library.selectedID == nil)
+        XCTAssertEqual(library.groups.map(\.id), [beta]); XCTAssertEqual(library.items.map(\.id), [b.id, other.id])
+        let reopened = PersonaLibrary(root: store)
+        XCTAssertEqual(reopened.groups, library.groups); XCTAssertTrue(reopened.activeGroupID == nil)
+        XCTAssertFalse(reopened.overlayVisible)
+    }
+
+    func testLiveCandidatesRemainScopedAndHUDLabelsExcludePrivateNames() throws {
+        let a = UUID(), b = UUID(), other = UUID()
+        var group = PersonaGroup(name: "Secret customer", personaIDs: [a, b])
+        var session = PersonaLiveSelection(group: group, selectedID: a)
+        session.select(other); XCTAssertEqual(session.currentID, a)
+        session.step(1); XCTAssertEqual(session.currentID, b)
+        session.step(1); XCTAssertEqual(session.currentID, a)
+        session.step(-1); XCTAssertEqual(session.currentID, b)
+        group.personaIDs = [b, other, a]
+        session.reconcile(group: group, existingIDs: [a, b, other])
+        XCTAssertEqual(session.candidateIDs, [a, b], "A new or reordered library member must not silently enter a live session")
+        session.select(a); group.personaIDs = [b, other]
+        session.reconcile(group: group, existingIDs: [a, b, other])
+        XCTAssertTrue(session.currentID == nil); XCTAssertEqual(session.candidateIDs, [b])
+        session.step(1); XCTAssertTrue(session.currentID == nil, "No automatic fallback after current removal")
+        session.reconcile(group: nil, existingIDs: [a, b, other]); XCTAssertTrue(session.candidateIDs.isEmpty)
+        let legacy = SavedPersona(name: "DO NOT SHOW Customer A", image: "portrait.png")
+        XCTAssertEqual(PersonaHUDItem.make(persona: legacy, ordinal: 2, image: nil).label, "Persona 2")
+        var editable = legacy; editable.card = PersonaCardStyle(label: "Site manager")
+        XCTAssertEqual(PersonaHUDItem.make(persona: editable, ordinal: 1, image: nil).label, "Site manager")
+    }
+
+    func testEditableCardRenderingAndSaveFailurePreserveSources() throws {
+        let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("portrait.png"), original = try fixture()
+        try original.write(to: source)
+        let store = root.appendingPathComponent("library"), library = PersonaLibrary(root: root.appendingPathComponent("library"))
+        let item = try library.addImage(source, card: PersonaCardStyle(label: "Site manager", background: InkColor(1, 1, 1)))
+        // Existing import normalizes supported images to PNG. Editing must keep
+        // that stored portrait and the caller's source intact, not re-import it.
+        let storedPortrait = try Data(contentsOf: store.appendingPathComponent(item.image))
+        let first = try library.renderedPNG(for: item)
+        XCTAssertEqual(try Data(contentsOf: source), original)
+        let bitmap = NSBitmapImageRep(data: first)!
+        XCTAssertEqual(bitmap.pixelsWide, 480); XCTAssertEqual(bitmap.pixelsHigh, 600)
+        let corner = bitmap.colorAt(x: 0, y: 0)!
+        XCTAssertEqual(corner.alphaComponent, 0, accuracy: 0.01)
+        XCTAssertEqual(PersonaCardRenderer.labelColor(on: InkColor(1, 1, 1)), NSColor.black)
+        XCTAssertEqual(PersonaCardRenderer.labelColor(on: InkColor(0, 0, 0)), NSColor.white)
+        XCTAssertTrue(library.updateCard(item.id, style: PersonaCardStyle(label: "Operations lead", background: InkColor(0.2, 0.1, 0.1))))
+        let changed = library.items[0], second = try library.renderedPNG(for: changed)
+        XCTAssertFalse(first == second); XCTAssertEqual(try Data(contentsOf: source), original)
+        XCTAssertEqual(try Data(contentsOf: store.appendingPathComponent(item.image)), storedPortrait)
+        let reopened = PersonaLibrary(root: store)
+        XCTAssertEqual(reopened.items[0].card, changed.card)
+        let archive = store.appendingPathComponent("persona-library.json"), external = Data("concurrent edit".utf8)
+        try external.write(to: archive)
+        XCTAssertFalse(reopened.updateCard(item.id, style: PersonaCardStyle(label: "Uncommitted")))
+        XCTAssertEqual(reopened.items[0].card, changed.card)
+        XCTAssertEqual(try Data(contentsOf: archive), external)
+        XCTAssertThrowsError(try PersonaCardStyle(label: "two\nlines").validated())
+        XCTAssertThrowsError(try PersonaCardStyle(label: String(repeating: "x", count: 81)).validated())
+        XCTAssertThrowsError(try PersonaCardStyle(background: InkColor(.nan, 0, 0)).validated())
     }
 
     func testNativeOverlayWindowAndDragLifecycle() throws {

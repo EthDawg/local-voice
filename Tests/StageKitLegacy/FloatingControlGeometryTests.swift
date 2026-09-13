@@ -1,6 +1,90 @@
 import AppKit
 
 final class FloatingControlGeometryTests {
+    func testAllTargetsAreDistinctFiniteAndBounded() throws {
+        let size = NSSize(width: 76, height: 40)
+        let displays = [NSRect(x: 0, y: 48, width: 1440, height: 850),
+                        NSRect(x: -1920, y: -900, width: 1920, height: 1080)]
+        for display in displays {
+            let targets = FloatingControlGeometry.targets(size: size, visibleFrame: display)
+            XCTAssertEqual(targets.map(\.anchor), FloatingControlAnchor.allCases)
+            for target in targets {
+                XCTAssertTrue(display.insetBy(dx: 16, dy: 16).contains(target.frame))
+                XCTAssertEqual(targets.filter { $0.frame == target.frame }.count, 1)
+                XCTAssertEqual(FloatingControlGeometry.nearestAnchor(to: target.frame, in: display), target.anchor)
+            }
+        }
+        let tiny = NSRect(x: -20, y: -50, width: 30, height: 20)
+        let targets = FloatingControlGeometry.targets(size: NSSize(width: 304, height: 192), visibleFrame: tiny)
+        XCTAssertEqual(targets.count, 1)
+        XCTAssertEqual(targets.first?.anchor, .topLeft)
+        XCTAssertEqual(targets.first?.frame, tiny)
+        let narrow = NSRect(x: -500, y: 50, width: 100, height: 400)
+        let narrowTargets = FloatingControlGeometry.targets(size: NSSize(width: 304, height: 192), visibleFrame: narrow)
+        XCTAssertEqual(narrowTargets.count, 3)
+        XCTAssertEqual(narrowTargets.map(\.anchor), [.topLeft, .left, .bottomLeft])
+        for target in narrowTargets {
+            XCTAssertTrue(narrow.contains(target.frame))
+            XCTAssertTrue([target.frame.minX, target.frame.minY, target.frame.width, target.frame.height].allSatisfy(\.isFinite))
+        }
+        for invalid in [NSSize.zero, NSSize(width: CGFloat.nan, height: 40), NSSize(width: 76, height: CGFloat.infinity)] {
+            XCTAssertTrue(FloatingControlGeometry.targets(size: invalid, visibleFrame: displays[0]).isEmpty)
+        }
+        XCTAssertTrue(FloatingControlGeometry.targets(size: size, visibleFrame: .zero).isEmpty)
+        XCTAssertTrue(FloatingControlGeometry.targets(size: size, visibleFrame: NSRect(x: CGFloat.nan, y: 0, width: 100, height: 100)).isEmpty)
+    }
+
+    func testGuideLayoutPreservesTargetsAndFlipsDisplayCoordinates() throws {
+        let display = NSRect(x: -1600, y: -180, width: 1600, height: 1000)
+        let drag = NSRect(x: -900, y: 300, width: 76, height: 40)
+        guard let layout = FloatingControlGuideLayout(controlFrame: drag, visibleFrame: display, activeAnchor: .bottomRight) else {
+            XCTAssertTrue(false, "A valid drag must expose all destinations"); return
+        }
+        XCTAssertEqual(layout.targets.count, 8)
+        XCTAssertEqual(layout.activeID, .bottomRight)
+        XCTAssertFalse(layout.usesCompactMarks)
+        for target in layout.targets {
+            let local = layout.localFrame(target.frame)
+            XCTAssertEqual(local.minX, target.frame.minX - display.minX)
+            XCTAssertEqual(local.maxY, display.maxY - target.frame.minY)
+            XCTAssertTrue(NSRect(origin: .zero, size: display.size).contains(local))
+            if target.anchor == .topLeft { XCTAssertEqual(local.origin, NSPoint(x: 16, y: 16)) }
+            if target.anchor == .bottomRight { XCTAssertEqual(local.origin, NSPoint(x: 1508, y: 944)) }
+        }
+        let narrow = NSRect(x: -500, y: 50, width: 100, height: 400)
+        let large = NSRect(x: -500, y: 50, width: 304, height: 192)
+        guard let compact = FloatingControlGuideLayout(controlFrame: large, visibleFrame: narrow, activeAnchor: .topRight) else {
+            XCTAssertTrue(false); return
+        }
+        XCTAssertTrue(compact.usesCompactMarks)
+        XCTAssertEqual(compact.activeID, .topLeft, "Coincident named positions highlight the same deduplicated target")
+        for target in compact.targets {
+            XCTAssertTrue(narrow.contains(compact.markFrame(for: target)))
+            XCTAssertEqual(compact.markFrame(for: target).midX, target.frame.midX)
+            XCTAssertEqual(compact.markFrame(for: target).midY, target.frame.midY)
+            XCTAssertTrue(narrow.contains(compact.activeOutline(for: target)))
+        }
+    }
+
+    func testGuideStateClearsWhenDragOrDisplayEnds() throws {
+        let screen = NSRect(x: -1600, y: -180, width: 1600, height: 1000)
+        let frame = NSRect(x: -900, y: 300, width: 76, height: 40)
+        let freeDrag = FloatingControlGuideLayout(controlFrame: frame, visibleFrame: screen, activeAnchor: nil)
+        XCTAssertEqual(freeDrag?.targets.count, 8, "All destinations stay discoverable away from snapping distance")
+        XCTAssertTrue(freeDrag?.activeID == nil)
+        XCTAssertTrue(FloatingControlGuideLayout(controlFrame: nil, visibleFrame: screen, activeAnchor: .right) == nil,
+                      "No drag means no guides, including when a previous anchor remains selected")
+        XCTAssertTrue(FloatingControlGuideLayout(controlFrame: frame, visibleFrame: .zero, activeAnchor: .right) == nil)
+        XCTAssertTrue(FloatingControlGuideLayout(controlFrame: .zero, visibleFrame: screen, activeAnchor: .right) == nil)
+        XCTAssertTrue(FloatingControlGuideLayout(controlFrame: NSRect(x: CGFloat.nan, y: 0, width: 76, height: 40),
+                                                visibleFrame: screen, activeAnchor: .right) == nil)
+        let replacementScreen = NSRect(x: 0, y: 48, width: 1024, height: 720)
+        let recovered = FloatingControlGeometry.clamp(frame, to: replacementScreen)
+        let nextDrag = FloatingControlGuideLayout(controlFrame: recovered, visibleFrame: replacementScreen, activeAnchor: nil)
+        XCTAssertEqual(nextDrag?.targets.count, 8)
+        XCTAssertTrue(nextDrag?.targets.allSatisfy { replacementScreen.contains($0.frame) } == true)
+    }
+
     func testAnchorsBoundsAndResize() throws {
         let tile = NSSize(width: 76, height: 40), expanded = NSSize(width: 304, height: 192)
         let displays = [NSRect(x: 0, y: 48, width: 1440, height: 850),

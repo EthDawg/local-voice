@@ -10,6 +10,74 @@ struct MobileSpeechResult: Sendable {
     let seconds: Double
 }
 
+enum MobileSpeechAssetStatus: Equatable, Sendable { case unsupported, supported, downloading, installed }
+
+/// One seam for Apple's model inventory. Tests exercise preparation without
+/// downloading assets, opening the microphone, or touching a user's recovery.
+@MainActor
+protocol MobileSpeechAssetProviding {
+    var isAvailable: Bool { get }
+    func supportedLocales() async -> [Locale]
+    func supportedLocale(equivalentTo locale: Locale) async -> Locale?
+    func status(for locale: Locale) async -> MobileSpeechAssetStatus
+    func install(for locale: Locale, progress: @escaping @MainActor (Double) -> Void) async throws
+    func cancelInstallation()
+}
+
+@MainActor
+final class AppleMobileSpeechAssets: MobileSpeechAssetProviding {
+    private var request: AssetInstallationRequest?
+    private var generation = UUID()
+    var isAvailable: Bool { SpeechTranscriber.isAvailable }
+    func supportedLocales() async -> [Locale] { await SpeechTranscriber.supportedLocales }
+    func supportedLocale(equivalentTo locale: Locale) async -> Locale? {
+        await SpeechTranscriber.supportedLocale(equivalentTo: locale)
+    }
+    func status(for locale: Locale) async -> MobileSpeechAssetStatus {
+        let module = SpeechTranscriber(locale: locale, preset: .transcription)
+        switch await AssetInventory.status(forModules: [module]) {
+        case .installed: return .installed
+        case .downloading: return .downloading
+        case .supported: return .supported
+        case .unsupported: return .unsupported
+        @unknown default: return .unsupported
+        }
+    }
+    func install(for locale: Locale, progress: @escaping @MainActor (Double) -> Void) async throws {
+        let token = UUID(); generation = token
+        let module = SpeechTranscriber(locale: locale, preset: .transcription)
+        // This API reserves the required asset locales itself. Do not manually
+        // reserve a guessed variant or evict another language's reservation.
+        guard let download = try await AssetInventory.assetInstallationRequest(supporting: [module]) else { return }
+        try Task.checkCancellation()
+        guard generation == token else { throw CancellationError() }
+        request = download
+        let observer = Task { @MainActor in
+            while !Task.isCancelled {
+                guard self.generation == token else { return }
+                progress(download.progress.fractionCompleted)
+                do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
+            }
+        }
+        defer { observer.cancel(); if generation == token { request = nil } }
+        try await download.downloadAndInstall()
+        try Task.checkCancellation()
+        guard generation == token else { throw CancellationError() }
+    }
+    func cancelInstallation() {
+        generation = UUID()
+        request?.progress.cancel()
+        request = nil
+    }
+}
+
+struct MobileSpeechLanguage: Identifiable, Equatable {
+    let id: String
+    let name: String
+}
+
+enum MobileSpeechReadiness: Equatable { case checking, needsDownload, downloading, ready, unavailable, failed }
+
 /// Owns a foreground capture or file transcription. Apple speech assets are the
 /// only download; starting a capture never silently downloads or changes engines.
 @MainActor
@@ -22,6 +90,12 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
     @Published private(set) var isReady = false
     @Published private(set) var languageName: String
     @Published private(set) var downloadProgress: Double?
+    @Published private(set) var readiness = MobileSpeechReadiness.checking
+    @Published private(set) var languages: [MobileSpeechLanguage] = []
+    @Published private(set) var selectedLanguageID: String
+    @Published private(set) var diagnosticDetail: String?
+    @Published private(set) var microphoneDenied = false
+    @Published private(set) var inputLevel: Double = 0
     @Published private(set) var recoveryAudioURL: URL?
     @Published private(set) var hasRecovery = false
     @Published private(set) var recoveryProblem: String?
@@ -30,24 +104,31 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
     static let maximumImportSeconds: TimeInterval = 30 * 60
     static let maximumImportBytes = 64_000_000
 
-    private let requestedLocale: Locale
+    private var requestedLocale: Locale
+    private let assets: any MobileSpeechAssetProviding
+    private let recoveryDirectory: URL?
+    private let preferences: UserDefaults?
     private var generation = UUID()
     private var recorder: AVAudioRecorder?
     private var recordingTimer: Task<Void, Never>?
     private var operationTask: Task<MobileSpeechResult?, Never>?
     private var resultTask: Task<String, Error>?
     private var watchdog: Task<Void, Never>?
-    private var progressTask: Task<Void, Never>?
-    private var installation: AssetInstallationRequest?
     private var analyzer: SpeechAnalyzer?
     private var ownsAudioSession = false
     private var subscriptions = Set<AnyCancellable>()
 
-    init(locale: Locale = .current) {
-        requestedLocale = locale
-        languageName = locale.localizedString(forIdentifier: locale.identifier) ?? locale.identifier
+    init(locale: Locale = .current, assets: (any MobileSpeechAssetProviding)? = nil, recoveryDirectory: URL? = nil, preferences: UserDefaults? = .standard, observesInterruptions: Bool = true) {
+        let selected = preferences?.string(forKey: "dictation.speechLanguage").map(Locale.init(identifier:)) ?? locale
+        requestedLocale = selected
+        selectedLanguageID = selected.identifier(.bcp47)
+        languageName = Locale.current.localizedString(forIdentifier: selected.identifier) ?? selected.identifier
+        self.assets = assets ?? AppleMobileSpeechAssets()
+        self.recoveryDirectory = recoveryDirectory
+        self.preferences = preferences
         super.init()
         refreshRecovery()
+        guard observesInterruptions else { return }
         NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in self?.interrupt("App moved to the background") }
@@ -78,51 +159,52 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
     func refreshAvailability() async {
         guard !isWorking, !isRecording else { return }
         refreshRecovery()
-        let token = generation
-        do {
-            let module = try await makeTranscriber()
-            let status = await AssetInventory.status(forModules: [module])
-            guard token == generation, !isWorking, !isRecording else { return }
-            isReady = status == .installed
-            error = nil
-            phase = isReady ? "Ready · on this device" : "Download the speech language to begin"
-        } catch {
-            guard token == generation, !isWorking, !isRecording else { return }
-            isReady = false
-            phase = "Speech unavailable"
-            self.error = error.localizedDescription
+        readiness = .checking
+        _ = await perform(phase: "Checking speech availability", timeout: 30) { token in
+            let locale = try await self.resolveLocale(token: token)
+            let status = await self.assets.status(for: locale)
+            try self.check(token)
+            self.apply(status)
+            return nil
         }
+    }
+
+    var canPrepare: Bool { !isWorking && !isRecording && [.needsDownload, .downloading, .failed].contains(readiness) }
+
+    /// Choosing a language never downloads it or starts recording.
+    func selectLanguage(_ identifier: String) async {
+        guard !isWorking, !isRecording, languages.contains(where: { $0.id == identifier }) else { return }
+        generation = UUID()
+        requestedLocale = Locale(identifier: identifier)
+        selectedLanguageID = identifier
+        languageName = languages.first(where: { $0.id == identifier })?.name ?? identifier
+        preferences?.set(identifier, forKey: "dictation.speechLanguage")
+        isReady = false
+        await refreshAvailability()
     }
 
     /// The UI must invoke this only after the user chooses to prepare/download speech.
     func prepare() async {
         guard !isWorking, !isRecording else { return }
         _ = await perform(phase: "Checking speech language", timeout: 15 * 60) { token in
-            let module = try await self.makeTranscriber()
+            let locale = try await self.resolveLocale(token: token)
+            let initial = await self.assets.status(for: locale)
             try self.check(token)
-            guard let locale = module.selectedLocales.first else { throw ServiceError("The speech language is unavailable.") }
-            _ = try await AssetInventory.reserve(locale: locale)
-            try self.check(token)
-            if let request = try await AssetInventory.assetInstallationRequest(supporting: [module]) {
-                try self.check(token)
-                self.installation = request
+            self.apply(initial)
+            guard initial != .unsupported else { throw ServiceError("Apple's speech assets are unavailable for \(self.languageName). Choose another supported language or check again later.") }
+            if initial != .installed {
                 self.phase = "Downloading speech language"
-                self.downloadProgress = request.progress.fractionCompleted
-                self.progressTask = Task { @MainActor [weak self] in
-                    while !Task.isCancelled {
-                        guard let self, self.generation == token else { return }
-                        self.downloadProgress = request.progress.fractionCompleted
-                        try? await Task.sleep(for: .milliseconds(250))
-                    }
+                self.readiness = .downloading
+                try await self.assets.install(for: locale) { [weak self] value in
+                    guard let self, self.generation == token, value.isFinite else { return }
+                    self.downloadProgress = min(1, max(0, value))
                 }
-                try await request.downloadAndInstall()
             }
             try self.check(token)
-            let status = await AssetInventory.status(forModules: [module])
+            let status = await self.assets.status(for: locale)
             try self.check(token)
-            guard status == .installed else { throw ServiceError("Speech assets are not ready. Try preparing the language again.") }
-            self.isReady = true
-            self.phase = "Ready · on this device"
+            self.apply(status)
+            guard status == .installed else { throw ServiceError("Apple has not finished installing \(self.languageName). Keep Workbench open and try the download again with an internet connection and available storage.") }
             return nil
         }
     }
@@ -136,9 +218,12 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
         }
         _ = await perform(phase: "Checking microphone", timeout: nil) { token in
             _ = try await self.readyTranscriber(token: token)
+            self.phase = "Requesting microphone access"
             let granted = await AVAudioApplication.requestRecordPermission()
             try self.check(token)
+            self.microphoneDenied = !granted
             guard granted else { throw ServiceError("Allow microphone access in Settings to record. You can still import audio.") }
+            self.phase = "Starting recording"
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
             try session.setActive(true)
@@ -154,6 +239,7 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
                 AVLinearPCMIsFloatKey: false,
                 AVLinearPCMIsBigEndianKey: false
             ])
+            recorder.isMeteringEnabled = true
             guard recorder.prepareToRecord() else {
                 throw ServiceError("Recording could not start. Check the microphone and try again.")
             }
@@ -166,12 +252,15 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
             }
             self.recorder = recorder
             self.elapsed = 0
+            self.inputLevel = 0
             self.isRecording = true
             self.phase = "Recording · up to 5 minutes"
             self.recordingTimer = Task { @MainActor [weak self] in
                 while !Task.isCancelled {
                     guard let self, self.generation == token, let current = self.recorder, self.isRecording else { return }
                     self.elapsed = min(current.currentTime, Self.maximumRecordingSeconds)
+                    current.updateMeters()
+                    self.inputLevel = min(1, max(0, (Double(current.averagePower(forChannel: 0)) + 50) / 50))
                     try? await Task.sleep(for: .milliseconds(200))
                 }
             }
@@ -274,24 +363,44 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
         }
     }
 
-    private func makeTranscriber() async throws -> SpeechTranscriber {
-        guard SpeechTranscriber.isAvailable else {
+    private func resolveLocale(token: UUID) async throws -> Locale {
+        guard assets.isAvailable else {
+            isReady = false; readiness = .unavailable
             throw ServiceError("Apple's on-device speech model is unavailable on this device. Reading and text editing still work.")
         }
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) else {
-            throw ServiceError("On-device transcription does not support \(languageName) on this device.")
+        let supported = await assets.supportedLocales()
+        try check(token)
+        languages = Dictionary(grouping: supported, by: { $0.identifier(.bcp47) }).keys.map { identifier in
+            MobileSpeechLanguage(id: identifier, name: Locale.current.localizedString(forIdentifier: identifier) ?? identifier)
+        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        let equivalent = await assets.supportedLocale(equivalentTo: requestedLocale)
+        try check(token)
+        guard let locale = equivalent else {
+            isReady = false; readiness = .unavailable
+            throw ServiceError("On-device transcription does not support \(languageName) here. Choose one of Apple's available speech languages. Typing and the system keyboard still work.")
         }
-        return SpeechTranscriber(locale: locale, preset: .transcription)
+        selectedLanguageID = locale.identifier(.bcp47)
+        languageName = Locale.current.localizedString(forIdentifier: locale.identifier) ?? locale.identifier
+        return locale
+    }
+
+    private func apply(_ status: MobileSpeechAssetStatus) {
+        isReady = status == .installed
+        switch status {
+        case .installed: readiness = .ready; phase = "\(languageName) · ready on this device"
+        case .supported: readiness = .needsDownload; phase = "Download \(languageName) once to record offline"
+        case .downloading: readiness = .downloading; phase = "Apple is downloading \(languageName)"
+        case .unsupported: readiness = .unavailable; phase = "Apple's speech assets are unavailable for \(languageName)"
+        }
     }
 
     private func readyTranscriber(token: UUID) async throws -> SpeechTranscriber {
-        let module = try await makeTranscriber()
+        let locale = try await resolveLocale(token: token)
+        let status = await assets.status(for: locale)
         try check(token)
-        let status = await AssetInventory.status(forModules: [module])
-        try check(token)
-        isReady = status == .installed
-        guard isReady else { throw ServiceError("Prepare the speech language first. This downloads Apple model assets; your audio stays on this device.") }
-        return module
+        apply(status)
+        guard isReady else { throw ServiceError("Download the selected speech language first. This downloads Apple's model assets; your audio stays on this device.") }
+        return SpeechTranscriber(locale: locale, preset: .transcription)
     }
 
     private func perform(phase: String, timeout: TimeInterval?, operation: @escaping @MainActor (UUID) async throws -> MobileSpeechResult?) async -> MobileSpeechResult? {
@@ -300,6 +409,7 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
         generation = token
         isWorking = true
         error = nil
+        diagnosticDetail = nil
         self.phase = phase
         let task = Task { @MainActor [weak self] () -> MobileSpeechResult? in
             guard let self else { return nil }
@@ -312,7 +422,10 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
                 return nil
             } catch {
                 guard self.generation == token else { return nil }
+                let failure = error as NSError
+                self.diagnosticDetail = "Stage: \(self.phase)\nLanguage: \(self.selectedLanguageID)\nError: \(failure.domain) (\(failure.code))\niOS: \(UIDevice.current.systemVersion)"
                 self.error = error.localizedDescription
+                if !self.isReady, self.readiness != .unavailable { self.readiness = .failed }
                 self.phase = self.recoveryAudioURL == nil ? "Unable to continue" : "Audio kept · retry when ready"
                 return nil
             }
@@ -324,6 +437,7 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
                 guard let self, self.generation == token, self.isWorking else { return }
                 self.cancelOperation(message: "Operation timed out · try again")
                 self.error = "This operation took too long. Any saved audio is kept for retry."
+                if !self.isReady { self.readiness = .failed }
             }
         }
         return await withTaskCancellationHandler {
@@ -341,10 +455,7 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
         guard generation == token else { return }
         watchdog?.cancel()
         watchdog = nil
-        progressTask?.cancel()
-        progressTask = nil
         downloadProgress = nil
-        installation = nil
         analyzer = nil
         resultTask = nil
         operationTask = nil
@@ -369,10 +480,7 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
         operationTask = nil
         resultTask?.cancel()
         resultTask = nil
-        installation?.progress.cancel()
-        installation = nil
-        progressTask?.cancel()
-        progressTask = nil
+        assets.cancelInstallation()
         watchdog?.cancel()
         watchdog = nil
         if let analyzer { Task { await analyzer.cancelAndFinishNow() } }
@@ -380,6 +488,8 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
         downloadProgress = nil
         isWorking = false
         error = nil
+        diagnosticDetail = nil
+        if !isReady, readiness == .checking || readiness == .downloading { readiness = .needsDownload }
         phase = message
         releaseAudioSession()
     }
@@ -395,6 +505,7 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
         recorder.stop()
         self.recorder = nil
         isRecording = false
+        inputLevel = 0
         recoveryAudioURL = url
         releaseAudioSession()
         return url
@@ -407,8 +518,12 @@ final class SpeechService: NSObject, ObservableObject, AVAudioRecorderDelegate {
     }
 
     private func audioDirectory() throws -> URL {
-        let root = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-        let directory = root.appendingPathComponent("Audio", isDirectory: true)
+        let directory: URL
+        if let recoveryDirectory { directory = recoveryDirectory }
+        else {
+            let root = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+            directory = root.appendingPathComponent("Audio", isDirectory: true)
+        }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let values = try directory.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
         guard values.isDirectory == true, values.isSymbolicLink != true else {

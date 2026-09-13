@@ -1,4 +1,5 @@
 import AppKit
+import SceneSyncKit
 import ImageIO
 import UniformTypeIdentifiers
 
@@ -39,12 +40,27 @@ final class BackdropReplacementTests {
     }
     private func files(_ root: URL) throws -> [String: Data] {
         var result: [String: Data] = [:]
-        for url in try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isRegularFileKey]) {
+        // Foundation expands /var to /private/var when enumerating temporary
+        // directories. Use the same root spelling for stable relative keys.
+        let canonicalRoot = root.standardizedFileURL
+        let enumerator = FileManager.default.enumerator(at: canonicalRoot, includingPropertiesForKeys: [.isRegularFileKey])!
+        for case let url as URL in enumerator {
             if try url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true {
-                result[url.lastPathComponent] = try Data(contentsOf: url)
+                let path = url.standardizedFileURL.path
+                result[String(path.dropFirst(canonicalRoot.path.count + 1))] = try Data(contentsOf: url)
             }
         }
         return result
+    }
+    private func assertFailedCommitPreserves(_ before: [String: Data], in root: URL) throws {
+        let after = try files(root)
+        for (name, bytes) in before { XCTAssertEqual(after[name], bytes, "Failed commit changed " + name) }
+        let added = Set(after.keys).subtracting(before.keys)
+        XCTAssertTrue(added.count <= 1, "Only the candidate's unused canonical asset may remain")
+        for name in added {
+            XCTAssertTrue(name.hasPrefix("Portable/Assets/"), "A failed commit must remove its new renderer/source copy")
+            XCTAssertTrue((try? SceneAsset.validate(after[name]!, named: URL(fileURLWithPath: name).lastPathComponent)) != nil)
+        }
     }
 
     func testDraftCropChoiceAndCancelNeverWrite() throws {
@@ -75,19 +91,22 @@ final class BackdropReplacementTests {
 
     func testImportedCommitPreservesCurrentForegroundAndOriginals() throws {
         let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }
-        let model = try makeModel(root)
-        let original = model.selected!
-        let source = root.appendingPathComponent("download.png"); let replacement = png(.systemBlue)
+        let model = try makeModel(root), original = model.selected!
+        let legacy = try Data(contentsOf: root.appendingPathComponent("scenes.json"))
+        let source = root.appendingPathComponent("download.png"), replacement = png(.systemBlue)
         try replacement.write(to: source)
         let draft = BackdropReplacement(scene: original, root: root)
         try draft.chooseImage(source); draft.x = 0.3; draft.y = 0.9; draft.zoom = 1.2
         try FileManager.default.removeItem(at: source)
+        for (name, colour) in [("logo.png", NSColor.systemGreen), ("persona.png", .systemYellow), ("hand.png", .systemOrange)] {
+            try png(colour).write(to: root.appendingPathComponent(name))
+        }
         var newer = original
         newer.name = "Newer name"; newer.phoneX = 0.12; newer.phoneY = 0.8; newer.phoneHeight = 0.75
         newer.viewport = .tablet; newer.logo = SceneLogo(image: "logo.png")
         newer.persona = PersonaPlacement(image: "persona.png"); newer.hand = SceneHand(image: "hand.png")
-        // Simulate a newer saved edit while this model's preview remains open.
-        try SceneStorage.save([newer], to: root.appendingPathComponent("scenes.json"))
+        XCTAssertTrue(model.update(newer), "A canonical foreground edit happens while its backdrop preview stays open")
+        newer = model.selected!
         let oldBytes = try Data(contentsOf: root.appendingPathComponent(original.background))
         try model.applyBackdrop(draft)
         let applied = model.scenes.first!
@@ -98,7 +117,8 @@ final class BackdropReplacementTests {
         XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(applied.background)), replacement,
                        "Applying uses the previewed bytes even if the download was removed")
         XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(original.background)), oldBytes)
-        XCTAssertEqual(try SceneStorage.load(root.appendingPathComponent("scenes.json")), [expected])
+        XCTAssertEqual(DemoScenes(root: root, systemIntegrationEnabled: false).scenes, [expected])
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("scenes.json")), legacy)
         XCTAssertFalse(draft.active); XCTAssertThrowsError(try model.applyBackdrop(draft))
         XCTAssertFalse(model.hasDesktopSnapshot); XCTAssertFalse(model.isPresenting)
     }
@@ -106,12 +126,15 @@ final class BackdropReplacementTests {
     func testPhotoHandoffPreviewTargetsChosenSceneAndKeepsIndependentCopy() throws {
         let root = try temporary(), inbox = try temporary()
         defer { try? FileManager.default.removeItem(at: root); try? FileManager.default.removeItem(at: inbox) }
-        let initial = try makeModel(root)
-        let first = initial.selected!
-        var second = first; second.id = UUID(); second.name = "Chosen scene"; second.phoneX = 0.7
+        let model = try makeModel(root), first = model.selected!
+        let legacy = try Data(contentsOf: root.appendingPathComponent("scenes.json"))
+        for (name, colour) in [("logo.png", NSColor.systemGreen), ("persona.png", .systemYellow)] {
+            try png(colour).write(to: root.appendingPathComponent(name))
+        }
+        var second = first; second.id = UUID(); second.name = "Chosen scene"; second.phoneX = 0.7; second.libraryRevision = nil
         second.logo = SceneLogo(image: "logo.png"); second.persona = PersonaPlacement(image: "persona.png")
-        try SceneStorage.save([first, second], to: root.appendingPathComponent("scenes.json"))
-        let model = DemoScenes(root: root, systemIntegrationEnabled: false)
+        try MainActor.assumeIsolated { try model.sceneSync!.create(second) }
+        second = model.scenes.first { $0.id == second.id }!
         model.selectedID = first.id
         let source = inbox.appendingPathComponent("received.jpg"), bytes = try rotatedJPEG()
         try bytes.write(to: source)
@@ -120,72 +143,69 @@ final class BackdropReplacementTests {
         XCTAssertEqual(cancelled.sceneID, second.id)
         XCTAssertEqual(model.selectedID, first.id, "Preparing another scene must not change the library selection")
         XCTAssertEqual(try files(root), before, "The handoff seam must not copy or save until Apply")
-        cancelled.cancel()
-        XCTAssertEqual(try files(root), before)
-        XCTAssertEqual(try Data(contentsOf: source), bytes)
-
+        cancelled.cancel(); XCTAssertEqual(try files(root), before); XCTAssertEqual(try Data(contentsOf: source), bytes)
         let draft = try model.makeBackdropReplacement(sceneID: second.id, imageURL: source, title: "Photo from iPhone")
-        var newer = second; newer.name = "Later name"; newer.phoneX = 0.18
-        newer.persona?.width = 0.25
-        try SceneStorage.save([first, newer], to: root.appendingPathComponent("scenes.json"))
-        try FileManager.default.removeItem(at: source)
-        try model.applyBackdrop(draft)
+        var newer = second; newer.name = "Later name"; newer.phoneX = 0.18; newer.persona?.width = 0.25
+        XCTAssertTrue(model.update(newer)); newer = model.scenes.first { $0.id == second.id }!
+        try FileManager.default.removeItem(at: source); try model.applyBackdrop(draft)
         let saved = model.scenes.first { $0.id == second.id }!
         var expected = newer; expected.background = saved.background
         expected.backgroundX = 0.5; expected.backgroundY = 0.5; expected.zoom = 1
         XCTAssertEqual(saved, expected, "Only the chosen scene's backdrop may change, preserving later foreground edits")
-        XCTAssertEqual(model.scenes.first { $0.id == first.id }, first)
-        XCTAssertEqual(model.scenes.count, 2, "A handoff never creates a duplicate scene")
+        XCTAssertEqual(model.scenes.first { $0.id == first.id }, first); XCTAssertEqual(model.scenes.count, 2)
         XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(saved.background)), bytes,
                        "The scene owns an independent previewed copy after the inbox source disappears")
         XCTAssertFalse(model.hasDesktopSnapshot); XCTAssertFalse(model.isPresenting)
         XCTAssertThrowsError(try model.makeBackdropReplacement(sceneID: UUID(), imageURL: source, title: "Missing"))
         let blocked = DemoScenes(root: root, readOnlyReason: "Unreadable fixture", systemIntegrationEnabled: false)
         XCTAssertThrowsError(try blocked.makeBackdropReplacement(sceneID: second.id, imageURL: source, title: "Blocked"))
-        XCTAssertEqual(try SceneStorage.load(root.appendingPathComponent("scenes.json")), model.scenes)
+        XCTAssertEqual(DemoScenes(root: root, systemIntegrationEnabled: false).scenes, model.scenes)
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("scenes.json")), legacy)
     }
 
     func testSavedReuseDeduplicationAndMissingBackdropRepair() throws {
         let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }
-        let model = try makeModel(root)
-        let original = model.selected!
-        try png(.systemBlue).write(to: root.appendingPathComponent("blue.png"))
-        try png(.systemBlue).write(to: root.appendingPathComponent("same-blue.png"))
-        let blue = DemoScene(name: "Blue customer", background: "blue.png")
-        let repeatBlue = DemoScene(name: "Repeat image", background: "same-blue.png")
+        try png(.systemRed).write(to: root.appendingPathComponent("original.png"))
+        try png(.systemBlue).write(to: root.appendingPathComponent("blue.png")); try png(.systemBlue).write(to: root.appendingPathComponent("same-blue.png"))
+        let original = DemoScene(name: "Original", background: "original.png")
+        let blue = DemoScene(name: "Blue customer", background: "blue.png"), repeatBlue = DemoScene(name: "Repeat image", background: "same-blue.png")
         var duplicate = original; duplicate.id = UUID(); duplicate.name = "Original duplicate"
         let missing = DemoScene(name: "Repair this layout", background: "missing.png")
-        try SceneStorage.save([original, duplicate, blue, repeatBlue, missing], to: root.appendingPathComponent("scenes.json"))
-        let current = DemoScenes(root: root, systemIntegrationEnabled: false)
-        let choices = BackdropChoices.saved(scenes: current.scenes, root: root, preferred: original)
-        XCTAssertEqual(choices.count, 3, "Repeated references appear once; different files remain independently reusable")
+        let legacyURL = root.appendingPathComponent("scenes.json")
+        try SceneStorage.save([original, duplicate, blue, repeatBlue, missing], to: legacyURL)
+        let legacy = try Data(contentsOf: legacyURL), current = DemoScenes(root: root, systemIntegrationEnabled: false)
+        let preferred = current.scenes.first { $0.id == original.id }!, keptDuplicate = current.scenes.first { $0.id == duplicate.id }!
+        let choices = BackdropChoices.saved(scenes: current.scenes, root: root, preferred: preferred)
+        XCTAssertEqual(choices.count, 2, "Identical immutable artwork has one saved choice even when imported from different files")
         var cancellationChecks = 0
-        let cancelled = BackdropChoices.saved(scenes: current.scenes, root: root, preferred: original, isCancelled: {
-            cancellationChecks += 1
-            return cancellationChecks >= 3
+        let cancelled = BackdropChoices.saved(scenes: current.scenes, root: root, preferred: preferred, isCancelled: {
+            cancellationChecks += 1; return cancellationChecks >= 3
         })
-        XCTAssertEqual(cancelled.count, 1, "Cancel stops before decoding the remaining gallery")
-        XCTAssertEqual(cancellationChecks, 3)
-        XCTAssertTrue(BackdropChoices.saved(scenes: current.scenes, root: root, preferred: original, isCancelled: { true }).isEmpty)
+        XCTAssertEqual(cancelled.count, 1); XCTAssertEqual(cancellationChecks, 3)
+        XCTAssertTrue(BackdropChoices.saved(scenes: current.scenes, root: root, preferred: preferred, isCancelled: { true }).isEmpty)
         XCTAssertTrue(BackdropChoices.starters(SceneStarters.all, isCancelled: { true }).isEmpty)
-        let chosen = choices.first { $0.existingFilename == "blue.png" }!
-        let draft = BackdropReplacement(scene: missing, root: root)
-        XCTAssertTrue(draft.candidate == nil); XCTAssertFalse(draft.canApply)
-        try draft.choose(chosen)
-        let namesBefore = Set(try files(root).keys)
-        try current.applyBackdrop(draft)
-        XCTAssertEqual(Set(try files(root).keys), namesBefore, "Reusing an existing image must not copy it")
-        XCTAssertEqual(current.scenes.first { $0.id == missing.id }?.background, "blue.png")
-        XCTAssertEqual(current.scenes.first { $0.id == duplicate.id }, duplicate)
-        XCTAssertEqual(current.scenes.count, 5)
-        let noChange = BackdropReplacement(scene: original, root: root)
-        try noChange.chooseImage(root.appendingPathComponent(original.background))
-        XCTAssertFalse(noChange.canApply, "Choosing the original file again is not a change")
-        // A selected original deleted after opening can still be repaired from
-        // an explicitly chosen copy; it must not bind back to the missing path.
-        let backup = root.appendingPathComponent("backup.png")
-        try png(.systemRed).write(to: backup)
-        try FileManager.default.removeItem(at: root.appendingPathComponent(original.background))
+        let blueFile = current.scenes.first { $0.id == blue.id }!.background
+        let chosen = choices.first { $0.existingFilename == blueFile }!
+        let incomplete = BackdropReplacement(scene: missing, root: root)
+        XCTAssertTrue(incomplete.candidate == nil); XCTAssertFalse(incomplete.canApply); try incomplete.choose(chosen)
+        let beforeRecovery = try files(root)
+        // Unmigrated recovery entries cannot be silently rewritten.
+        XCTAssertThrowsError(try current.applyBackdrop(incomplete))
+        XCTAssertEqual(try files(root), beforeRecovery)
+        try png(.systemBlue).write(to: root.appendingPathComponent("missing.png"))
+        MainActor.assumeIsolated { current.sceneSync!.migratePreviousScenes() }
+        XCTAssertEqual(current.scenes.first { $0.id == missing.id }?.background, blueFile)
+        XCTAssertFalse(current.isSceneReadOnly(current.scenes.first { $0.id == missing.id }!))
+        let draft = BackdropReplacement(scene: preferred, root: root); try draft.choose(chosen)
+        let namesBefore = Set(try files(root).keys); try current.applyBackdrop(draft)
+        XCTAssertEqual(Set(try files(root).keys), namesBefore, "Reusing an existing canonical image creates no new image file")
+        XCTAssertEqual(current.scenes.first { $0.id == original.id }?.background, blueFile)
+        XCTAssertEqual(current.scenes.first { $0.id == duplicate.id }, keptDuplicate); XCTAssertEqual(current.scenes.count, 5)
+        XCTAssertEqual(try Data(contentsOf: legacyURL), legacy)
+        let noChange = BackdropReplacement(scene: keptDuplicate, root: root)
+        try noChange.chooseImage(root.appendingPathComponent(keptDuplicate.background)); XCTAssertFalse(noChange.canApply)
+        let backup = root.appendingPathComponent("backup.png"); try png(.systemRed).write(to: backup)
+        try FileManager.default.removeItem(at: root.appendingPathComponent(keptDuplicate.background))
         try noChange.chooseImage(backup)
         XCTAssertTrue(noChange.canApply); XCTAssertTrue(noChange.candidate?.existingFilename == nil)
     }
@@ -194,28 +214,35 @@ final class BackdropReplacementTests {
         let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }
         let model = try makeModel(root), original = model.selected!
         let source = root.appendingPathComponent("candidate.png"); try png(.systemBlue).write(to: source)
-        let archive = root.appendingPathComponent("scenes.json")
         let draft = BackdropReplacement(scene: original, root: root); try draft.chooseImage(source)
-        var changed = original; changed.backgroundX = 0.7
-        try SceneStorage.save([changed], to: archive)
+        var changed = original; changed.backgroundX = 0.7; XCTAssertTrue(model.update(changed))
         var before = try files(root)
         XCTAssertThrowsError(try model.applyBackdrop(draft)); XCTAssertEqual(try files(root), before)
-        try SceneStorage.save([], to: archive); before = try files(root)
+        model.remove(); before = try files(root)
         XCTAssertThrowsError(try model.applyBackdrop(draft)); XCTAssertEqual(try files(root), before)
-        for bytes in [Data("malformed scene archive".utf8), Data("{\"version\":999,\"scenes\":[]}".utf8)] {
-            try bytes.write(to: archive); before = try files(root)
-            XCTAssertThrowsError(try model.applyBackdrop(draft)); XCTAssertEqual(try files(root), before)
+        var future = SceneLibraryArchive(); future.version = 999
+        let futureBytes = try JSONEncoder().encode(future)
+        for bytes in [Data("malformed scene archive".utf8), futureBytes] {
+            let caseRoot = try temporary(); defer { try? FileManager.default.removeItem(at: caseRoot) }
+            let owner = try makeModel(caseRoot), preview = BackdropReplacement(scene: owner.selected!, root: caseRoot)
+            try preview.chooseImage(source)
+            let archive = caseRoot.appendingPathComponent("Portable/scene-library.json")
+            try bytes.write(to: archive); let untouched = try files(caseRoot)
+            XCTAssertThrowsError(try owner.applyBackdrop(preview))
+            try assertFailedCommitPreserves(untouched, in: caseRoot)
+            XCTAssertEqual(try Data(contentsOf: archive), bytes)
+            let blockedByArchive = DemoScenes(root: caseRoot, systemIntegrationEnabled: false)
+            XCTAssertTrue(blockedByArchive.storageBlocked); XCTAssertNotNil(blockedByArchive.notice)
+            if bytes == futureBytes {
+                XCTAssertEqual(MainActor.assumeIsolated { blockedByArchive.sceneSync!.library.error }, SceneDocumentError.futureVersion.localizedDescription)
+            }
         }
-        try SceneStorage.save([original], to: archive)
         let blocked = DemoScenes(root: root, readOnlyReason: "Fixture read-only", systemIntegrationEnabled: false)
-        before = try files(root)
-        XCTAssertThrowsError(try blocked.applyBackdrop(draft)); XCTAssertEqual(try files(root), before)
+        before = try files(root); XCTAssertThrowsError(try blocked.applyBackdrop(draft)); XCTAssertEqual(try files(root), before)
         let invalid = root.appendingPathComponent("invalid.png"); try Data("not an image".utf8).write(to: invalid)
         let previous = draft.candidate?.image.digest
-        XCTAssertThrowsError(try draft.chooseImage(invalid))
-        XCTAssertEqual(draft.candidate?.image.digest, previous)
-        draft.zoom = .nan; XCTAssertFalse(draft.canApply)
-        XCTAssertThrowsError(try model.applyBackdrop(draft))
+        XCTAssertThrowsError(try draft.chooseImage(invalid)); XCTAssertEqual(draft.candidate?.image.digest, previous)
+        draft.zoom = .nan; XCTAssertFalse(draft.canApply); XCTAssertThrowsError(try model.applyBackdrop(draft))
         XCTAssertThrowsError(try BackdropImage.decode(Data(repeating: 0, count: BackdropImage.maximumBytes + 1)))
     }
 
@@ -224,20 +251,24 @@ final class BackdropReplacementTests {
         let model = try makeModel(root), original = model.selected!
         let source = root.appendingPathComponent("candidate.png"); try png(.systemBlue).write(to: source)
         let draft = BackdropReplacement(scene: original, root: root); try draft.chooseImage(source)
-        let archive = root.appendingPathComponent("scenes.json"), before = try files(root)
-        // The folder remains writable for the new image; only replacing the
-        // existing archive fails, exercising rollback after the image copy.
+        let archive = root.appendingPathComponent("Portable/scene-library.json"), before = try files(root)
         try FileManager.default.setAttributes([.immutable: true], ofItemAtPath: archive.path)
         defer { try? FileManager.default.setAttributes([.immutable: false], ofItemAtPath: archive.path) }
         XCTAssertThrowsError(try model.applyBackdrop(draft))
-        XCTAssertEqual(try files(root), before); XCTAssertTrue(draft.active)
+        try assertFailedCommitPreserves(before, in: root); XCTAssertTrue(draft.active)
+        XCTAssertEqual(try Data(contentsOf: archive), before["Portable/scene-library.json"])
         try FileManager.default.setAttributes([.immutable: false], ofItemAtPath: archive.path)
-        let saved = BackdropReplacement(scene: original, root: root); saved.x = 0.4
-        try png(.systemGreen).write(to: root.appendingPathComponent(original.background))
+        // A failed canonical commit pauses that store instance. Reopening loads
+        // its preserved manifest before retrying the same independent preview.
+        let reopened = DemoScenes(root: root, systemIntegrationEnabled: false)
+        let saved = BackdropReplacement(scene: reopened.selected!, root: root); saved.x = 0.4
+        let imageURL = root.appendingPathComponent(original.background), originalBytes = try Data(contentsOf: root.appendingPathComponent(original.background))
+        try png(.systemGreen).write(to: imageURL)
         let changed = try files(root)
-        XCTAssertThrowsError(try model.applyBackdrop(saved)); XCTAssertEqual(try files(root), changed)
-        // The same imported preview can be retried after a failed save.
-        try model.applyBackdrop(draft); XCTAssertEqual(model.scenes.count, 1)
+        XCTAssertThrowsError(try reopened.applyBackdrop(saved)); XCTAssertEqual(try files(root), changed)
+        try originalBytes.write(to: imageURL)
+        try reopened.applyBackdrop(draft); XCTAssertEqual(reopened.scenes.count, 1)
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(reopened.selected!.background)), png(.systemBlue))
     }
 
     func testPreviewAndSavedRenderingAtSameAspectKeepForeground() throws {
@@ -290,7 +321,9 @@ final class BackdropReplacementTests {
             let yellow = rendered.colorAt(x: Int(foregroundPoints[1].x), y: 239 - Int(foregroundPoints[1].y))!.usingColorSpace(.sRGB)!
             XCTAssertGreaterThan(yellow.redComponent, yellow.blueComponent + 0.4)
             XCTAssertGreaterThan(yellow.greenComponent, yellow.blueComponent + 0.4)
-            XCTAssertEqual(applied.logo, original.logo); XCTAssertEqual(applied.persona, original.persona)
+            XCTAssertEqual(applied.logo, current.logo); XCTAssertEqual(applied.persona, current.persona)
+            XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(applied.logo!.image)), try Data(contentsOf: root.appendingPathComponent(original.logo!.image)))
+            XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(applied.persona!.image)), try Data(contentsOf: root.appendingPathComponent(original.persona!.image)))
         }
     }
 }

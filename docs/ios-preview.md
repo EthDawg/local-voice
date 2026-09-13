@@ -1,58 +1,61 @@
 # Workbench on iPhone and iPad
 
-Status: native **iOS/iPadOS 26+ Preview in development**, not a published App Store or TestFlight release. The Mac app remains a separate target with its existing contract. This record owns mobile scope, build instructions and acceptance evidence; [mobile research](mobile-research.md) explains the decisions, and GitHub issues remain the contribution queue.
+Native **iOS/iPadOS 26+ Preview**, not a published App Store or TestFlight release. This document owns mobile scope, build instructions and platform limits. The [personal-scenes contract](research/personal-scenes.md) owns the shared scene architecture and preservation rules; the [public scene evidence](https://workbench-mac.vercel.app/scenes/#evidence) is the current cross-device acceptance view. The Mac remains a separate native target. GitHub issues remain the contribution queue.
 
 ## The useful mobile baseline
 
-Open Workbench for a short, complete job. **Tools** introduces Dictate, Read aloud, Mark up, Backdrops and Wallpapers; **Saved** returns to local work. Dictation has first emphasis. iPad uses the same workflows with adaptive layouts and native Pencil tools, not a separate feature tier.
+**Tools** opens Dictate, Read aloud, Mark up, Scenes and Wallpapers; **Saved** returns to your work. Dictation has first emphasis. iPad uses the same jobs with adaptive layouts and native Pencil tools. Scenes replaces the primary Backdrops and Take a photo for Mac entries; it does not absorb voice, reading, annotation or wallpaper.
 
-| Job | Implemented journey | Boundary |
+| Job | Current journey | Boundary |
 | --- | --- | --- |
-| Speak → text | Prepare Apple's supported speech model explicitly; record in the foreground or choose audio; retain original words and audio; review, apply optional Light cleanup and approved replacements, save, copy, share or read aloud | No custom keyboard, automatic cross-app paste, background microphone or silent cloud fallback. The Mac's Parakeet, server and Natural refinement choices are not mobile providers. |
-| Text → speech | Write, paste or import text; choose an installed Apple voice and rate; read, pause, resume or stop | One reading owner, with controls available across tabs and system media-control integration. No online voice account, document/PDF reader or audio-export promise. Physical background/audio-route behaviour still needs testing. |
-| Explain an image | Choose a screenshot/photo; draw with PencilKit, undo/redo; retain editable ink and export a flattened PNG copy | Workbench's own image canvas, not an overlay over another app. No PDF editor or verified redaction tool. |
-| Prepare a backdrop | Choose a background; optionally add an image, logo, finished persona and caption; replace individual layers; save, show inside Workbench or export a 16:9 PNG | A bounded composition, not a general design editor, live capture host or verified audience-display route. The Mac remains the USB device-presentation host. |
-| Enjoy a wallpaper | Choose a photo or starter; adjust a separate portrait crop; preview and export PNG; finish in Apple's Wallpaper picker | No automatic wallpaper installation, continuous background video or Focus changes. Apple's final wallpaper crop can differ from the exported composition. |
-| Reuse | Search saved text and image projects; reopen or deliberately reuse an image's original for another job | Separate crop, ink and layout per project. No implicit Mac sync, clipboard monitoring or coupled edits. |
+| Speak → text | Explicitly prepare Apple's supported speech assets; record in the foreground or choose audio; keep original words/audio; review, optionally apply Light cleanup and approved replacements, then save, copy, share or read aloud | No custom keyboard, automatic cross-app paste, background microphone or silent cloud fallback. Mac Parakeet, server and Natural refinement settings are not mobile providers. |
+| Text → speech | Write, paste or import text; choose an installed Apple voice and rate; read, pause, resume or stop | One reading owner with system media controls. No online voice account, PDF reader or audio-export promise. Physical background/audio routes remain separate checks. |
+| Explain an image | Choose a screenshot/photo, draw with PencilKit and undo/redo, keep editable ink, share a rendered PNG copy | Workbench's canvas, not an overlay over other apps. No PDF editor or verified redaction tool. |
+| Prepare a scene for Mac | Camera, Photos or starting picture → background/crop, device position, optional logo/persona → save an editable scene; optionally enable personal iCloud sync or share a scene file | Mobile prepares a layout; Mac supplies the live device video and presentation window. The phone outline is a placement preview, not a remote capture feed. |
+| Enjoy a wallpaper | Choose a photo or starter, adjust the saved crop, then **Save to Photos** or Share; finish in Photos → Share → Use as Wallpaper | Independent project/aspect/crop. No automatic wallpaper installation, continuous background video or Focus changes. Apple's final crop can differ. |
+| Reopen or reuse | Open saved texts, scenes, image projects and selected-photo handoffs; deliberately reuse originals | Scene sync is optional and scoped to scenes. Texts, recordings and wallpaper edits do not acquire implicit sync. |
 
-Photos and Files are the primary image inputs. A small set of starters provides a quick first result; Coast is a generated app asset, not a customer image. Still-image imports are bounded to 64 MB and 50 megapixels. Animated images and PDF are outside this path. Exports render the composition, rather than taking a screenshot, and cap the long edge at 3,840 pixels. Each export uses a distinct temporary PNG and the native share sheet.
+Home Screen quick actions are **Capture for scene** and **Dictate**. They route into an active app with unsaved-edit guards. Camera access remains subject to permission; opening Dictate never itself starts recording. Tools and Saved remain the two top-level tabs.
 
-Wallpaper and backdrop are independent journeys. Wallpaper retains its chosen aspect with the project, so an iPad rotation does not silently change its crop. Accessible horizontal, vertical and zoom controls accompany gestures. Backdrops keep a fixed landscape output; their foreground image, logo, persona and caption are optional. Imported artwork is not automatically turned into a labelled persona card.
+Markup and wallpaper use Photos/Files imports, bounded to 64 MB and 50 megapixels. Their PNG exports render the image and edits, cap the long edge at 3,840 pixels and use distinct temporary files. Scene imports use the stricter shared asset/package bounds in the [scene contract](research/personal-scenes.md#current-shared-architecture). Camera and Photos inputs copy selected bytes; no full-library scan is needed. Bundled starter artwork is separate from private customer media.
 
-## Selected-photo handoff
+Wallpaper retains its chosen aspect even when the iPad rotates. Horizontal, vertical and zoom controls accompany gestures. Save to Photos requests add-only access and reports the result; permission or save failures must not claim success. Physical Photos saving remains an acceptance check.
 
-[The photo handoff contract](photo-handoff.md) owns this additional, optional job: native camera or selected Photos input → a durable local copy → explicit private iCloud send → Mac arrival. Tools and Saved remain the two tabs. Whole-library sync is outside this feature. Default builds keep cloud access off; a signed paired Preview and a real transfer test are required before claiming device delivery.
+## Scenes, photos and earlier work
 
-## State and lifecycle
+A saved scene contains an editable background, device geometry and optional artwork, with owned image assets. Mac and mobile compile the same `SceneSyncKit` rules. Personal sync uses one Apple Account across devices; enabling it sends saved scenes and pictures to that person's private iCloud. There is no Workbench account or cross-account team library.
 
-- `MobileDocument` keeps a versioned manifest and immutable original assets in the app's own container. Validated writes are atomic; an unreadable or unsupported library pauses writes and preserves its bytes.
-- A project owns its edits. Reuse shares the original asset by explicit choice and starts independent edits. Removing a project currently retains imported assets for recovery and other references; it is not a storage-cleanup command. Export important work before uninstalling the app.
-- Original transcript text stays separate from editing and deterministic cleanup. Copy and Share are deliberate actions and never submit a message. Save failures remain visible rather than being reported as success.
-- Recording is foreground only, capped at five minutes. Imported audio is capped at 64 MB and 30 minutes. Backgrounding, interruption and cancellation release the microphone. Recoverable audio remains available for retry or explicit discard; stale work cannot publish a cancelled result.
-- `SpeechAnalyzer`/`SpeechTranscriber` check device, locale and installed assets. Preparation may download Apple's model assets through an explicit action; recognition has no fallback to a different service. A successful Simulator build does not establish device model availability or speech quality.
-- Reading uses installed Apple voices through `AVSpeechSynthesizer`. Starting capture stops reading; a new reading supersedes the old one. Media controls and audio interruptions have app-owned state, with physical-device routing and background acceptance still pending.
-- **Present on this device** displays only the composition inside Workbench. **End** restores the controls and previous idle-timer state; leaving the foreground releases the keep-awake request. It does not alter wallpaper or another app.
-- Dynamic Type, VoiceOver traversal, touch targets, light/dark appearance, Pencil behaviour and reduced-motion settings need native acceptance evidence beyond a compiling accessibility label.
+While enabled and active, committed edits coalesce after an 800 ms pause. Foreground refresh checks for remote changes. Backgrounding cancels scheduled and active transfers while retaining waiting work; a failed cycle waits for manual or foreground retry. **In iCloud** confirms the upload, not arrival on another device. This is not a background-delivery or latency promise. Portable `.workbenchscene` import/export remains available independently of cloud.
 
-## Native architecture and platform limits
+[Selected-photo handoff](photo-handoff.md) is a separate feeder with its own queue and private zone. On mobile it remains available from **Saved → Photo handoff** (opens **Photo for Mac**) and saved photo rows. Explicit Send queues a chosen photo; enabling photo handoff does not send all older local pictures. A received picture can enter an existing Mac scene through its ordinary replacement preview. Photo removal does not erase the scene's accepted copy.
 
-The `WorkbenchMobile` target uses SwiftUI with UIKit, PhotosUI, PencilKit, AVFoundation, Speech and MediaPlayer. Its deployment target is iOS/iPadOS 26. It is an iPhone/iPad app, not a Catalyst or Mac overlay target. It shares the selected-photo state/store/CloudKit sources in `PhotoHandoffKit` plus three portable text sources with the Mac: `TextPrimitives.swift`, `DictationCleanup.swift` and `CorrectionRule.swift`. It does not link StageKit, Carbon, AppKit, FluidAudio or Mac shell-based reading.
+Earlier Backdrops compositions remain editable from Saved. **Create scene for Mac** creates a new scene and retains the original project plus its pictures, caption, ink and editable values. **Recover mobile original** creates another mobile project from that attachment. Conversion does not flatten or delete the original; the new landscape preview may differ from the earlier collage or wallpaper. Older in-app presentation is not the primary Scenes journey. See [recovery details](research/personal-scenes.md#earlier-work-and-recovery).
+
+## State, lifecycle and platform boundaries
+
+- `MobileStore` owns the versioned local text/image-project manifest and immutable original assets. `SceneLibraryModel` owns the separate portable scene library. Validated writes are atomic; unreadable or unsupported libraries pause writes and preserve their bytes.
+- A project owns its edits. Reuse starts independent edits. Removing an item currently retains source assets needed by recovery or other references; it is not storage cleanup. Export important work before uninstalling.
+- Original transcript text stays separate from editing and cleanup. Copy and Share are explicit and never submit a message. Save failures remain visible.
+- Recording is foreground only, capped at five minutes. Imported audio is capped at 64 MB and 30 minutes. Backgrounding, interruption and cancellation release the microphone; recoverable audio remains available for retry or discard. Cancelled work cannot publish a stale result.
+- `SpeechAnalyzer`/`SpeechTranscriber` check device, locale and assets. Explicit preparation may download Apple model assets; recognition does not fall back to another service. Compilation does not establish physical model readiness or speech quality.
+- `AVSpeechSynthesizer` supplies installed voices. Starting capture stops reading; a new reading supersedes the old one. Lock Screen, Bluetooth/AirPlay and interruption handling still need physical route checks.
+- No arbitrary overlay, global shortcut, custom keyboard, Share extension, App Group exchange, ReplayKit broadcast extension, external-display scene or custom AirPlay receiver is implemented. A meeting app owns its sharing session. Receiving-participant visibility requires a real route test.
+- Dynamic Type, VoiceOver traversal, Pencil behaviour, light/dark appearance and reduced-motion settings require native acceptance beyond compiling accessibility labels.
+
+The target uses SwiftUI, UIKit, PhotosUI, Photos, PencilKit, AVFoundation, Speech and MediaPlayer. It compiles shared `SceneSyncKit` and `PhotoHandoffKit` sources plus `TextPrimitives.swift`, `DictationCleanup.swift` and `CorrectionRule.swift`. It does not link StageKit, AppKit, Carbon, FluidAudio or Mac shell-based reading.
 
 | Source owner | Responsibility |
 | --- | --- |
-| `Mobile/Workbench/WorkbenchApp.swift`, `SavedView.swift` | Tools/Saved navigation, shared operation ownership and reopening local work |
-| `MobileDocument.swift`, `MobileStore.swift` | Validated local records, atomic persistence, original assets and independent reuse |
-| `SpeechService.swift`, `ReadingService.swift`, `TextWorkspaces.swift` | Explicit speech readiness, recoverable capture, text editing/delivery and installed-voice playback |
-| `ImageWorkspace.swift`, `ImageCanvas.swift`, `ImageRendering.swift` | Image imports, PencilKit editing, per-job composition and bounded PNG rendering |
-| `Mobile/WorkbenchTests`, `Mobile/WorkbenchUITests` | Storage/rendering checks and native navigation/persistence tests |
-
-The app window is the entry point; Photos/Files import selected items and the system share sheet exports results. No Share extension, App Group sync, custom keyboard, global shortcut, cross-app paste or arbitrary overlay is included. Adding an extension requires its own process-safe import and recovery design.
-
-No ReplayKit broadcast extension, ScreenCaptureKit stream, external-display scene or custom AirPlay receiver is implemented. **Present on this device** does not establish an audience-only control surface. A native meeting app owns its sharing session; receiver visibility requires a real sender/receiver test. Mobile Teams/Zoom browser limitations are documented in [the research record](mobile-research.md#platform-constraints-that-shape-the-ui).
+| `WorkbenchApp.swift`, `SavedView.swift`, `MobileQuickActions.swift` | Tools/Saved navigation, reopening work, file/quick-action routing and operation guards |
+| `MobileDocument.swift`, `MobileStore.swift` | Local text/image records, original assets and independent reuse |
+| `MobileScenesView.swift`, `MobileSceneEditor.swift`, `MobileSceneImport.swift` | Scene preparation, personal-sync settings, portable exchange and older-project recovery |
+| `SpeechService.swift`, `ReadingService.swift`, `TextWorkspaces.swift` | Speech readiness, recoverable capture, text delivery and installed-voice playback |
+| `ImageWorkspace.swift`, `ImageCanvas.swift`, `ImageRendering.swift`, `WallpaperPhotoSaver.swift` | Markup/wallpaper, older compositions, rendering and explicit Photos save |
+| `Mobile/WorkbenchTests`, `Mobile/WorkbenchUITests` | Storage/rendering checks and native navigation/persistence tests with disposable data |
 
 ## Build and test
 
-Use full **Xcode 26.1+** with the iOS 26.1+ SDK and an installed iOS 26 Simulator runtime. The Mac SwiftPM build and Developer ID/notarization scripts do not build or distribute this target.
+Use full **Xcode 26.1+**, an iOS 26.1+ SDK and an installed iOS 26 Simulator runtime. The Mac SwiftPM and Developer ID/notarization scripts do not build or distribute this target.
 
 ```sh
 python3 scripts/mobile-project.py
@@ -60,48 +63,35 @@ open Mobile/Workbench.xcodeproj
 bash scripts/test-mobile.sh
 ```
 
-The generator owns the Xcode project and shared **WorkbenchMobile** scheme. Regenerate after adding source or test files; edit `scripts/mobile-project.py`, rather than hand-maintaining generated project entries. The test script regenerates first, selects an available iOS 26 iPhone Simulator by default, disables signing and parallel testing, and writes a fresh `Results.xcresult` with its path printed on completion. CI selects each device family with `MOBILE_DEVICE_FAMILY=iPhone` or `iPad`. To select a specific simulator:
+The generator owns the project and shared **WorkbenchMobile** scheme. Regenerate after adding files; edit `scripts/mobile-project.py` instead of generated project entries. The test script regenerates first, selects an available iOS 26 iPhone Simulator by default, disables signing/parallel testing and prints its fresh `Results.xcresult` path. CI selects a family with `MOBILE_DEVICE_FAMILY=iPhone` or `iPad`. For a specific simulator:
 
 ```sh
 xcrun simctl list devices available
 MOBILE_SIMULATOR_UDID=YOUR-SIMULATOR-UUID bash scripts/test-mobile.sh
 ```
 
-UI tests launch with a fresh temporary library through the Debug-only `--ui-testing` argument. They do not use an existing Workbench library. Mac global-shortcut tests and their requirement to quit running Mac copies are a separate workflow.
+Debug UI tests use fresh temporary libraries through `--ui-testing`; photo fixtures additionally use `--ui-testing-handoff`. Cloud access is disabled. Tests must never reset a live library. Coordinate simulator/native tests and shared builds with other work; Mac global-shortcut tests are a separate workflow.
 
-In Xcode, select **WorkbenchMobile**, a simulator and Run for manual inspection. A generic iOS archive with signing disabled checks compilation and packaging; it is not installable distribution evidence. A physical device needs an available, trusted device, Developer Mode and valid development signing/provisioning through an authorised Apple developer team. Mac Developer ID certificates and notarization do not satisfy iOS provisioning.
+A generic unsigned iOS archive checks compilation and packaging only. Installation needs an available trusted device, Developer Mode and authorised iOS signing/provisioning. Mac Developer ID signing and notarization do not satisfy that requirement. Follow the [paired Preview signing commands](photo-handoff.md#signing-and-configuration-gate) for the shared Production container; ordinary mobile builds keep cloud access off. Install and inspect the exact exported app, since export can re-sign it and a Debug Run can replace it.
 
-TestFlight requires a separate archive, signing and App Store Connect workflow. Neither a TestFlight upload nor an App Store submission has been performed by this work.
+TestFlight/App Store distribution is a separate workflow. Neither has been performed. A signed local install is not a public release or Apple approval.
 
-## Acceptance record
+## Verification: current versus historical
 
-**Verified 13 September 2026 with Xcode 26.6 / iOS 26.5 Simulator.** Counts describe actual completed runs, not a device-quality claim.
+Use the [canonical scene record](research/personal-scenes.md#evidence-and-remaining-acceptance) and [public evidence table](https://workbench-mac.vercel.app/scenes/#evidence) for cross-device status rather than maintaining another current-results table here.
 
-| Evidence | Result | What it establishes |
-| --- | --- | --- |
-| iPhone 17 Pro Simulator | 18 unit tests + 5 UI tests passed; all 5 UI journeys passed again after the playback-strip fix | Storage, original preservation, image rendering, repair/replacement, focus and native navigation/reopening |
-| iPad Pro 13-inch (M5) Simulator | 18 unit tests + 5 UI tests passed; all 5 UI journeys passed again after the playback-strip fix | The same contract on iPad, including its native floating tabs |
-| Manual iPad Simulator | Starter backdrop, portrait/landscape presentation, End back to editor, PNG share-sheet handoff; reading Pause/Resume and Stop through the persistent control observed | In-app interactions with synthetic content; no external receiver or physical audio-route claim |
-| Shared Mac behavior | Mac debug build passed; 43 correction transaction checks and 13 draft cleanup checks passed | Extracting the three shared sources preserves the affected Mac contracts |
-| Generic iOS Release archive | Final source archived successfully with signing disabled | Release compilation and packaging; not installable until signed |
-| Signed iOS Release Testing export | Archive and exported app passed signature, profile, bundle, container and Production-environment checks; the exported signer and intended phone are authorized by the embedded profile. Physical installation succeeded. | Normal launch and a real paired photo transfer remain unverified; no App Store or TestFlight upload |
-| Photo-name focus regression | Three consecutive local iOS 26.5 runs passed after waiting for the native keyboard and checking entered text | Addresses the iPhone CI focus failure at `2b571e4`; a new iOS 26.4 CI result remains separate evidence |
-| Connected iPhone | Physical iPhone 16 Pro Max connected, Developer Mode enabled and exact device included in its Preview profile | No physical camera, microphone/model or playback acceptance result yet |
+As of this update, the physical iPhone Preview has installed and **launched normally**; its Scenes and personal-sync settings were visibly inspected through iPhone Mirroring. The Mac has retained a real received iPhone photo and acknowledged uploads for eight scenes with matching revision receipts. Phone-side personal scene-sync opt-in and reception are still pending, so **paired scene delivery remains unverified**. Successful upload is not a receiver result.
 
-Actual screenshots are retained in `site/assets/guide/mobile-*-actual.png` and shown in the [mobile guide](https://workbench-mac.vercel.app/mobile/). iPhone images are unedited XCTest attachments from isolated libraries; iPad presentation/paused-reading images were captured through native computer controls. The generated concepts remain separately labelled. Visual review found and fixed an empty playback accessory overlapping Share, a blank app icon and drawing focus stealing; functional tests alone did not establish those visual outcomes.
+The final mobile suite contains **57 unit and 8 UI cases**. All final cases passed across completed runs: the full iPhone run passed 62/65, followed by the remaining three passing; iPad passed 64/65, followed by its remaining scene case passing. The final iPhone scene journey passed again after the native starting-picture menu hit-area fix. This is **not a claim of one clean final full-suite run**. The scene preview and menu hit regions were corrected without removing the persistence, original-data or no-cloud assertions.
 
-Local evidence directories for this session:
+The physical phone has the earlier updated Release Testing export installed. A further archive containing the final native menu fix is in progress under the same build identity; do not infer its installation from the version alone. Export, signature and installation receipts identify which artifact was checked. No public binary has been issued.
 
-- `/private/tmp/workbench-ios/Final-iPhone/Results.xcresult` and `Final-iPad/Results.xcresult`: complete 23-test runs.
-- `/private/tmp/workbench-ios/Final-iPhone-UI.xcresult` and `Final-iPad-UI.xcresult`: final five-journey reruns and screenshot attachments.
-- `/private/tmp/workbench-ios/WorkbenchMobile-final-unsigned.xcarchive`: local unsigned Release archive.
+Earlier 18-unit/5- or 7-UI results, initial unsigned archives and pre-Scenes screenshots are historical evidence. New source checks supersede those product claims without turning the older captures into current UI. Actual screenshots in `site/assets/guide/` use synthetic content and must retain their source/run provenance; generated concepts are labelled separately. Tests and captures do not establish physical microphone/model readiness, wallpaper Save to Photos or paired scene arrival.
 
-Temporary paths are session evidence, not durable download links. The committed test script and generated Xcode project reproduce the build/test route. CI now runs both iPhone and iPad jobs; report its actual result separately after the source is pushed.
+Still pending: physical Dictate preparation and recognition, permission denial, interruption/force-quit recovery, wallpaper Photos save, Lock Screen audio, Bluetooth/AirPlay, Pencil accuracy, memory/energy, VoiceOver, large Dynamic Type and meeting recipients. The iOS 26.0 fallback playback inset compiles but was not exercised by the iOS 26.5 Simulator runs.
 
-Still pending on a physical device: real microphone permission/denial, model preparation and recognition quality, interruption/force-quit recovery, Lock Screen audio, Bluetooth/AirPlay, Pencil accuracy, memory/energy, VoiceOver traversal, large Dynamic Type, reduced-motion behavior and native meeting recipients. Apple may apply a different final wallpaper crop. iOS 26.0's fallback playback inset compiles but was not exercised by the 26.5 Simulator runs. Simulator success does not satisfy these checks.
-
-The privacy manifest describes app-owned and user-selected file metadata access (`C617.1`, `3B52.1`), with no collected-data or tracking declarations. See [Apple's API categories and approved reasons](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitype). App Store Connect validation remains separate and has not run.
+The privacy manifest describes app-owned/user-selected file metadata access (`C617.1`, `3B52.1`), with no collected-data or tracking declarations. [Apple's API categories and approved reasons](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitype) govern that declaration. App Store Connect validation remains separate and has not run.
 
 ## Platform references
 
-Checked 13 September 2026. Apple documents [running on devices](https://developer.apple.com/documentation/xcode/building-and-running-an-app), [Developer Mode](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device), [custom keyboard restrictions](https://developer.apple.com/documentation/uikit/configuring-open-access-for-a-custom-keyboard) and [extension storage coordination](https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/ExtensionScenarios.html). [Mobile research](mobile-research.md) links the native baselines and competitor evidence with its review/sample limits.
+Research checked 13 September 2026: [running on devices](https://developer.apple.com/documentation/xcode/building-and-running-an-app), [Developer Mode](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device), [custom keyboard restrictions](https://developer.apple.com/documentation/uikit/configuring-open-access-for-a-custom-keyboard) and [extension storage coordination](https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/ExtensionScenarios.html). [Mobile research](mobile-research.md) retains native and competitor references with their review limits.

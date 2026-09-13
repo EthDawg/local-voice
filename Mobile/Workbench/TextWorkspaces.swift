@@ -5,6 +5,7 @@ struct MobileDictateView: View {
     @EnvironmentObject private var store: MobileStore
     @EnvironmentObject private var speech: SpeechService
     @EnvironmentObject private var reader: ReadingService
+    @Environment(\.openURL) private var openURL
     @State private var draft = ""
     @State private var original = ""
     @State private var savedID: UUID?
@@ -36,7 +37,17 @@ struct MobileDictateView: View {
                     Text(problem).font(.subheadline).foregroundStyle(.secondary)
                     Button("Discard recovery", role: .destructive) { discardRecovery = true }
                 }
-                if let error = speech.error { Label(error, systemImage: "exclamationmark.circle").font(.subheadline).foregroundStyle(.secondary) }
+                if let error = speech.error {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(error, systemImage: "exclamationmark.circle").font(.subheadline)
+                        if let detail = speech.diagnosticDetail {
+                            DisclosureGroup("Troubleshooting details") {
+                                Text(detail).font(.caption.monospaced()).textSelection(.enabled)
+                                Button("Copy details", systemImage: "doc.on.doc") { UIPasteboard.general.string = detail; notice = "Copied troubleshooting details. No recording or transcript is included." }.font(.subheadline)
+                            }.font(.subheadline)
+                        }
+                    }.foregroundStyle(.secondary)
+                }
                 HStack {
                     Text("Your words").font(.title2.bold())
                     Spacer()
@@ -116,32 +127,48 @@ struct MobileDictateView: View {
                 Spacer()
                 if speech.isRecording { Text(Duration.seconds(speech.elapsed), format: .time(pattern: .minuteSecond)).monospacedDigit().accessibilityLabel("Recording duration") }
             }
-            Text(speech.phase).font(.subheadline).foregroundStyle(.secondary)
+            Text(speech.phase).font(.subheadline).foregroundStyle(.secondary).accessibilityIdentifier("dictate.phase")
+            if !speech.languages.isEmpty, !speech.isRecording {
+                Picker("Speech language", selection: Binding(get: { speech.selectedLanguageID }, set: { value in Task { await speech.selectLanguage(value) } })) {
+                    if !speech.languages.contains(where: { $0.id == speech.selectedLanguageID }) { Text(speech.languageName).tag(speech.selectedLanguageID) }
+                    ForEach(speech.languages) { language in Text(language.name).tag(language.id) }
+                }.disabled(speech.isWorking).accessibilityIdentifier("dictate.language")
+            }
             if speech.isWorking {
-                if let progress = speech.downloadProgress { ProgressView(value: progress) } else { ProgressView().frame(maxWidth: .infinity) }
-                Button("Cancel") { speech.cancel() }.buttonStyle(.bordered)
+                if let progress = speech.downloadProgress { ProgressView(value: progress).accessibilityLabel("Speech language download") } else { ProgressView().frame(maxWidth: .infinity) }
+                Button(speech.hasRecovery ? "Cancel · keep audio" : "Cancel") { speech.cancel() }.buttonStyle(.bordered).frame(minHeight: 44)
             } else if speech.isRecording {
+                ProgressView(value: speech.inputLevel).tint(.red).accessibilityLabel("Microphone level")
+                Text("Listening. Finish when you’re ready; your original audio is kept.").font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Button("Finish recording", systemImage: "stop.fill") { Task { accept(await speech.finish()) } }.buttonStyle(.borderedProminent).tint(.red).frame(minHeight: 44)
-                    Button("Cancel") { speech.cancel() }.frame(minHeight: 44)
+                    Button("Finish & transcribe", systemImage: "stop.fill") { Task { accept(await speech.finish()) } }.buttonStyle(.borderedProminent).tint(.red).frame(minHeight: 44)
+                    Button("Cancel · keep audio") { speech.cancel() }.frame(minHeight: 44)
                 }
             } else if speech.isReady {
                 HStack {
-                    Button("Record", systemImage: "mic.fill") { guard preserveDraft() else { return }; editing = false; reader.stop(); Task { await speech.start() } }
+                    Button { guard preserveDraft() else { return }; editing = false; reader.stop(); Task { await speech.start() } } label: { Label("Record", systemImage: "mic.fill").frame(maxWidth: .infinity, minHeight: 36) }
                         .buttonStyle(.borderedProminent).controlSize(.large).accessibilityIdentifier("dictate.record").disabled(speech.hasRecovery)
                     Button("Import audio", systemImage: "waveform") { if preserveDraft() { importing = true } }.buttonStyle(.bordered).frame(minHeight: 44).disabled(speech.hasRecovery)
                 }
                 Toggle("Light cleanup", isOn: $cleanup).font(.subheadline)
-                Text("Removes fillers and formats explicit lists. Original wording stays available.").font(.caption).foregroundStyle(.secondary)
+                Text("Removes fillers, resolves clear time corrections and formats explicit lists. Original wording stays available.").font(.caption).foregroundStyle(.secondary)
             } else {
-                Button("Prepare on-device speech", systemImage: "arrow.down.circle") { Task { reader.stop(); await speech.prepare() } }.buttonStyle(.borderedProminent).controlSize(.large)
-                Text("May download Apple’s speech assets for \(speech.languageName). Typing and pasting are available without a model.").font(.caption).foregroundStyle(.secondary)
+                if speech.canPrepare {
+                    Button(speech.readiness == .downloading ? "Continue language download" : speech.readiness == .failed ? "Retry language download" : "Download speech language", systemImage: "arrow.down.circle") { editing = false; Task { reader.stop(); await speech.prepare() } }
+                        .buttonStyle(.borderedProminent).controlSize(.large).accessibilityIdentifier("dictate.prepare")
+                    Text("Apple’s \(speech.languageName) model downloads once, using an internet connection. Keep Workbench open until it is ready. Recording starts only when you tap Record.").font(.caption).foregroundStyle(.secondary)
+                }
+                Button("Check availability again", systemImage: "arrow.clockwise") { Task { await speech.refreshAvailability() } }.frame(minHeight: 44)
+                Text("You can also type, paste, or use the microphone on Apple’s keyboard in Your words.").font(.caption).foregroundStyle(.secondary)
+            }
+            if speech.microphoneDenied {
+                Button("Open microphone settings", systemImage: "gearshape") { if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) } }.frame(minHeight: 44)
             }
         }.padding(18).background(Color.accentColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 24))
     }
 
     private func setDraft(_ text: String, original: String) {
-        self.original = String(original.prefix(50_000)); draft = String(text.prefix(50_000)); savedID = nil
+        self.original = String(original.prefix(50_000)); draft = String(text.prefix(50_000)); savedID = nil; previousDraft = nil
         store.change { $0.draft = draft; $0.draftOriginal = self.original }
     }
     private func preserveDraft() -> Bool {

@@ -1,4 +1,5 @@
 import AppKit
+import SceneSyncKit
 
 final class SceneAssetTests {
     private func temporary() throws -> URL {
@@ -30,9 +31,15 @@ final class SceneAssetTests {
         let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }
         let original = DemoScene(name: "BaptistCare custom", background: "customer.png")
         let archive = root.appendingPathComponent("scenes.json")
+        var picture = DemoScene(background: "fixture.png"); picture.showsPhone = false
+        try SceneRenderer.png(picture, image: swatch(.green, size: CGSize(width: 80, height: 45)), size: CGSize(width: 80, height: 45))
+            .write(to: root.appendingPathComponent(original.background))
         try SceneStorage.save([original], to: archive)
         let before = try Data(contentsOf: archive)
-        let model = DemoScenes(root: root)
+        let model = DemoScenes(root: root, systemIntegrationEnabled: false)
+        let adopted = model.scenes.first!
+        XCTAssertEqual(adopted.id, original.id); XCTAssertEqual(adopted.name, original.name)
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(adopted.background)), try Data(contentsOf: root.appendingPathComponent(original.background)))
         XCTAssertEqual(try Data(contentsOf: archive), before, "Opening a new app version must not seed or rewrite user data")
         XCTAssertEqual(SceneStarters.all.count, 8)
         XCTAssertFalse(SceneStarters.all.contains { $0.id == "operations-field" })
@@ -46,40 +53,52 @@ final class SceneAssetTests {
         var customized = model.selected!; customized.phoneX = 0.12; customized.name = "Customer mining demo"
         model.update(customized)
         try model.useStarter(SceneStarters.all.last!, directory: resources)
-        XCTAssertEqual(model.scenes.first, original)
+        XCTAssertEqual(model.scenes.first, adopted)
         XCTAssertEqual(model.scenes.first { $0.id == customized.id }, customized)
         XCTAssertEqual(model.selected?.phoneX, 0.5, "A fresh starter keeps its original layout")
         model.remove()
         let count = model.scenes.count
-        let reopened = DemoScenes(root: root)
+        let reopened = DemoScenes(root: root, systemIntegrationEnabled: false)
         XCTAssertEqual(reopened.scenes.count, count, "Deleted scenes must not reappear on update or launch")
-        XCTAssertEqual(reopened.scenes.first, original)
+        XCTAssertEqual(reopened.scenes.first, adopted)
+        XCTAssertEqual(try Data(contentsOf: archive), before, "Later edits still leave the legacy archive unchanged")
     }
     func testLogoImportReplacementAndRecovery() throws {
         let root = try temporary(); defer { try? FileManager.default.removeItem(at: root) }
-        let model = DemoScenes(root: root.appendingPathComponent("store"))
+        let model = DemoScenes(root: root.appendingPathComponent("store"), systemIntegrationEnabled: false)
         try model.useStarter(SceneStarters.all[0], directory: resources)
         let source = root.appendingPathComponent("logo.png")
         var fixture = DemoScene(background: "fixture.png"); fixture.showsPhone = false
-        try SceneRenderer.png(fixture, image: swatch(.blue, size: CGSize(width: 300, height: 100)),
-                              size: CGSize(width: 300, height: 100)).write(to: source)
-        try model.addLogo(source, to: model.selected!.id)
+        func writeLogo(_ colour: NSColor) throws {
+            try SceneRenderer.png(fixture, image: swatch(colour, size: CGSize(width: 300, height: 100)),
+                                  size: CGSize(width: 300, height: 100)).write(to: source)
+        }
+        try writeLogo(.blue); try model.addLogo(source, to: model.selected!.id)
         var scene = model.selected!; scene.logo!.corner = .bottomLeft; scene.logo!.backing = .dark
-        model.update(scene); model.duplicate()
+        XCTAssertTrue(model.update(scene)); model.duplicate()
         let sharedLogo = model.selected!.logo!.image
         try model.addLogo(source, to: model.selected!.id)
-        XCTAssertEqual(model.selected?.logo?.corner, .bottomLeft)
-        XCTAssertEqual(model.selected?.logo?.backing, .dark)
-        XCTAssertTrue(model.selected?.logo?.image != sharedLogo)
+        XCTAssertEqual(model.selected?.logo?.image, sharedLogo, "Identical immutable artwork is deduplicated")
+        try writeLogo(.red); try model.addLogo(source, to: model.selected!.id)
+        XCTAssertEqual(model.selected?.logo?.corner, .bottomLeft); XCTAssertEqual(model.selected?.logo?.backing, .dark)
+        XCTAssertTrue(model.selected?.logo?.image != sharedLogo, "Replacing artwork owns different bytes without changing the other scene")
         try FileManager.default.removeItem(at: source)
-        let reopened = DemoScenes(root: model.root)
-        XCTAssertNotNil(reopened.logoImage(for: reopened.scenes[0]))
-        XCTAssertNotNil(reopened.logoImage(for: reopened.scenes[1]))
+        let reopened = DemoScenes(root: model.root, systemIntegrationEnabled: false)
+        XCTAssertNotNil(reopened.logoImage(for: reopened.scenes[0])); XCTAssertNotNil(reopened.logoImage(for: reopened.scenes[1]))
         let logoFile = model.root.appendingPathComponent(sharedLogo)
         try FileManager.default.removeItem(at: logoFile)
-        let missing = DemoScenes(root: model.root)
-        XCTAssertThrowsError(try missing.renderPNG(missing.scenes[0], image: missing.image(for: missing.scenes[0])!, size: CGSize(width: 800, height: 450)))
+        let repaired = DemoScenes(root: model.root, systemIntegrationEnabled: false)
+        XCTAssertTrue(repaired.logoImage(for: repaired.scenes[0]) != nil, "A missing renderer cache is recreated from the canonical asset")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: logoFile.path))
+        let firstAsset = MainActor.assumeIsolated { repaired.sceneSync!.library.records[0].scene.logo!.image }
+        let assetURL = try MainActor.assumeIsolated { try repaired.sceneSync!.library.assetURL(firstAsset) }
+        try FileManager.default.removeItem(at: assetURL); try FileManager.default.removeItem(at: logoFile)
+        let missing = DemoScenes(root: model.root, systemIntegrationEnabled: false)
+        XCTAssertEqual(missing.scenes.count, 2, "Missing canonical artwork must not discard a saved scene")
+        XCTAssertTrue(missing.image(for: missing.scenes[0]) == nil, "An incomplete scene cannot be presented as complete")
+        XCTAssertThrowsError(try missing.renderPNG(missing.scenes[0], image: swatch(.green, size: CGSize(width: 800, height: 450)), size: CGSize(width: 800, height: 450)))
         XCTAssertTrue(missing.logoImage(for: missing.scenes[1]) != nil, "Replacing a duplicate's logo must not affect the earlier scene")
+        XCTAssertNotNil(missing.notice)
     }
     func testLogoPixelsCornersAndSceneCompositions() throws {
         let backdrop = swatch(.red, size: CGSize(width: 160, height: 90))

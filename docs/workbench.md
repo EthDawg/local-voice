@@ -4,7 +4,7 @@ Workbench is one native Mac app for speaking, explaining, presenting and shaping
 
 This contract describes the direction and current consolidation structure. [The acceptance record](unification.md) distinguishes implementation from tested and released behaviour.
 
-The separate native **iOS/iPadOS 26+ Preview** carries these useful jobs into phone/tablet workflows. [Its own contract and test record](ios-preview.md) govern foreground speech, reading, image markup, independent wallpaper export and backdrop preparation. Mobile uses an app window, chosen imports and explicit sharing; the Mac menu bar, global shortcuts, cross-app overlays, USB capture and desktop restoration below are not mobile capabilities. The two targets do not silently sync libraries or edits.
+The separate native **iOS/iPadOS 26+ Preview** carries these useful jobs into phone/tablet workflows. [Its own contract and test record](ios-preview.md) govern foreground speech, reading, image markup, independent wallpaper export and editable scene preparation. Mobile uses an app window, chosen imports and explicit sharing; the Mac menu bar, global shortcuts, cross-app overlays, USB capture and desktop restoration below are not mobile capabilities. The two targets do not silently sync libraries or edits.
 
 ## Scope
 
@@ -111,3 +111,9 @@ The current desktop output/recovery mechanism exists inside scene preparation. A
 ## Selected-photo handoff
 
 The optional iPhone-to-Mac photo route is governed by [photo-handoff.md](photo-handoff.md). It joins a selected photo to existing Saved resources and backdrop replacement, without synchronising whole libraries or changing a scene on arrival. Its private cloud adapter requires a separately verified signed Preview; the public Mac download is unchanged.
+
+## Personal scene preparation
+
+[Personal scenes](research/personal-scenes.md) connects iPhone preparation to Mac presentation through an optional same-Apple-Account CloudKit transport around portable local files. It adds no Workbench login, team workspace or whole-library sync. Scene files can be explicitly shared as editable copies. Prepared Mac persona groups restrict live choices; changing a library card never silently changes its placed copy.
+
+Optional group defaults for a scene, logo and persona are deferred. A saved scene already keeps the chosen combination together; adding automatic cross-library inheritance before validating that workflow would create more hidden coupling. Any future default should copy a suggestion on request and tolerate rename, deletion or missing source assets.

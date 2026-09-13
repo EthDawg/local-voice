@@ -3,6 +3,7 @@ import SwiftUI
 struct MobileSavedView: View {
     @EnvironmentObject private var store: MobileStore
     @EnvironmentObject private var handoff: PhotoHandoffModel
+    @EnvironmentObject private var sceneLibrary: SceneLibraryModel
     @State private var query = ""
     @State private var filter = "All"
     @State private var deleting: UUID?
@@ -16,9 +17,28 @@ struct MobileSavedView: View {
     private var handoffPhotos: [HandoffPhoto] {
         handoff.photos.filter { query.isEmpty || ($0.title + " " + $0.sourceDevice).localizedStandardContains(query) }
     }
+    private var scenes: [SavedSceneRecord] {
+        sceneLibrary.records.filter { !$0.isDeleted && (query.isEmpty || $0.scene.name.localizedStandardContains(query)) }
+    }
     var body: some View {
         List {
             Picker("Show", selection: $filter) { ForEach(["All", "Text", "Pictures"], id: \.self) { Text($0) } }.pickerStyle(.segmented).listRowBackground(Color.clear).listRowInsets(EdgeInsets())
+            if filter != "Text", !scenes.isEmpty {
+                Section("Scenes") {
+                    ForEach(scenes) { record in
+                        NavigationLink { MobileSceneEditor(sceneID: record.id) } label: {
+                            HStack(spacing: 14) {
+                                SceneThumbnail(scene: record.scene, store: sceneLibrary).frame(width: 86, height: 56).clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(record.scene.name).font(.headline)
+                                    Text(sceneStatus(record)).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }.padding(.vertical, 4)
+                        }
+                    }
+                }
+            }
             if filter != "Pictures", !texts.isEmpty {
                 Section("Text") {
                     ForEach(texts) { record in
@@ -59,8 +79,8 @@ struct MobileSavedView: View {
                 }
             }
             .overlay {
-                if (filter == "Pictures" || texts.isEmpty) && (filter == "Text" || (images.isEmpty && handoffPhotos.isEmpty)) {
-                    ContentUnavailableView(query.isEmpty ? "Your useful things, kept." : "Nothing found", systemImage: query.isEmpty ? "folder" : "magnifyingglass", description: Text(query.isEmpty ? "Save a text, marked screenshot, backdrop or wallpaper. It will be here when you need it." : "Try a different word." )).padding(.top, 70).allowsHitTesting(false)
+                if (filter == "Pictures" || texts.isEmpty) && (filter == "Text" || (images.isEmpty && handoffPhotos.isEmpty && scenes.isEmpty)) {
+                    ContentUnavailableView(query.isEmpty ? "Your useful things, kept." : "Nothing found", systemImage: query.isEmpty ? "folder" : "magnifyingglass", description: Text(query.isEmpty ? "Save text, a scene, marked screenshot or wallpaper. It will be here when you need it." : "Try a different word." )).padding(.top, 70).allowsHitTesting(false)
                 }
             }
             .confirmationDialog("Delete this saved item?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {

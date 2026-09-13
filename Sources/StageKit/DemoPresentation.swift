@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 import AVFoundation
 
@@ -248,15 +249,9 @@ private struct DemoStageContent: View {
                         .foregroundStyle(.white)
                         .position(x: viewport.midX, y: geometry.size.height - viewport.midY)
                 }
-                if controls.dragFrame != nil, let anchor = controls.snapAnchor {
-                    let destination = FloatingControlGeometry.frame(anchor: anchor, size: controls.controlSize,
-                                                                     visibleFrame: CGRect(origin: .zero, size: geometry.size))
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.accentColor.opacity(0.16))
-                        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [5, 4])))
-                        .frame(width: destination.width, height: destination.height)
-                        .position(x: destination.midX, y: geometry.size.height - destination.midY)
-                        .allowsHitTesting(false).accessibilityHidden(true)
+                if let dragFrame = controls.dragFrame {
+                    FloatingControlGuides(controlFrame: dragFrame,
+                        visibleFrame: CGRect(origin: .zero, size: geometry.size), activeAnchor: controls.snapAnchor)
                 }
                 let frame = controls.frame(in: geometry.size)
                 Group {
@@ -277,6 +272,10 @@ private struct DemoStageContent: View {
             }.background(.black).coordinateSpace(name: "presentation-controls")
                 .onAppear { controls.start() }
                 .onDisappear { controls.stop() }
+                .onChange(of: geometry.size) { _, _ in controls.stop() }
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
+                    controls.stop()
+                }
                 .onChange(of: controls.focusRequest) { _, _ in
                     focusedControl = controls.policy.isExpanded ? (scene.showsPhone ? .source : .close) : .tile
                 }

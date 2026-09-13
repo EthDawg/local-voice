@@ -9,11 +9,29 @@ final class PhotoHandoffUITests: XCTestCase {
         // model receives allowsCloudAccess: false even in a provisioned build.
         app.launchArguments = ["--ui-testing", "--ui-testing-handoff"]
         app.launch()
-        let entry = app.buttons["tool.photoHandoff"]
+        selectTab("Saved", in: app)
+        let entry = app.buttons["saved.photoHandoff"]
         XCTAssertTrue(entry.waitForExistence(timeout: 10))
         reveal(entry, in: app); entry.tap()
         XCTAssertTrue(app.navigationBars["Photo for Mac"].waitForExistence(timeout: 5))
         return app
+    }
+
+    private func selectTab(_ label: String, in app: XCUIApplication) {
+        let exactLabel = NSPredicate(format: "label == %@", label)
+        let matches = app.descendants(matching: .any).matching(exactLabel)
+        XCTAssertTrue(matches.firstMatch.waitForExistence(timeout: 5), "The \(label) tab must be available")
+        // Native iPad floating tabs can be cells/other elements rather than
+        // iPhone tab buttons. Keep the same visible label on both devices.
+        let queries = [app.buttons.matching(exactLabel), app.cells.matching(exactLabel), app.otherElements.matching(exactLabel)]
+        for query in queries {
+            if let target = query.allElementsBoundByIndex.first(where: { $0.isHittable }) {
+                target.tap()
+                XCTAssertTrue(app.navigationBars[label].waitForExistence(timeout: 5))
+                return
+            }
+        }
+        XCTFail("No actionable tab has the exact label \(label)")
     }
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
@@ -56,10 +74,6 @@ final class PhotoHandoffUITests: XCTestCase {
         XCTAssertEqual(notice.label, "Original kept on this device.")
         app.navigationBars.buttons.firstMatch.tap()
 
-        let label = NSPredicate(format: "label == %@", "Saved")
-        let queries = [app.buttons.matching(label), app.cells.matching(label), app.otherElements.matching(label)]
-        let savedTab = queries.flatMap { $0.allElementsBoundByIndex }.first { $0.isHittable }
-        XCTAssertNotNil(savedTab); savedTab?.tap()
         XCTAssertTrue(app.navigationBars["Saved"].waitForExistence(timeout: 5))
         let row = app.descendants(matching: .any).matching(identifier: "handoff.photoRow").firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 5)); row.tap()
@@ -80,8 +94,8 @@ final class PhotoHandoffUITests: XCTestCase {
         // A stable action identifier also works in the iPad confirmation popover.
         let discard = app.buttons.matching(identifier: "handoff.discardAndLeave").firstMatch
         XCTAssertTrue(discard.waitForExistence(timeout: 5)); discard.tap()
-        XCTAssertTrue(app.navigationBars["Workbench"].waitForExistence(timeout: 5))
-        let entry = app.buttons["tool.photoHandoff"]
+        XCTAssertTrue(app.navigationBars["Saved"].waitForExistence(timeout: 5))
+        let entry = app.buttons["saved.photoHandoff"]
         reveal(entry, in: app); entry.tap()
         XCTAssertFalse(app.textFields["handoff.name"].exists)
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "handoff.photoRow").firstMatch.exists)

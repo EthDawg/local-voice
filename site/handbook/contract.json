@@ -210,6 +210,11 @@
   },
   "sources": [
     {
+      "title": "Workbench: personal scenes",
+      "url": "https://workbench-mac.vercel.app/scenes/",
+      "supports": "Mobile preparation, optional personal sync, persona snapshots and current evidence; wallpaper and voice remain independent."
+    },
+    {
       "title": "Apple: customise wallpaper",
       "url": "https://support.apple.com/en-ie/guide/mac-help/-mchlp3013/mac",
       "supports": "Still pictures, time-of-day Dynamic Wallpapers and aerial transitions are distinct."

@@ -18,7 +18,9 @@ let package = Package(
     targets: [
         .target(name: "PhotoHandoffKit"),
         .testTarget(name: "PhotoHandoffKitTests", dependencies: ["PhotoHandoffKit"]),
-        .target(name: "StageKit", linkerSettings: [.linkedFramework("Carbon")]),
+        .target(name: "SceneSyncKit"),
+        .testTarget(name: "SceneSyncKitTests", dependencies: ["SceneSyncKit"]),
+        .target(name: "StageKit", dependencies: ["SceneSyncKit", "PhotoHandoffKit"], linkerSettings: [.linkedFramework("Carbon")]),
         .executableTarget(name: "LocalVoice", dependencies: ["StageKit", "PhotoHandoffKit", .product(name: "FluidAudio", package: "FluidAudio")], swiftSettings: intentSettings, linkerSettings: [.linkedFramework("Carbon")])
     ],
     swiftLanguageModes: [.v5]

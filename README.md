@@ -11,7 +11,7 @@ Workbench brings Voice and StageMark into **one native app, one home window and 
 
 **This branch contains the Workbench 2.0 consolidation.** Feature descriptions below describe its implementation, not proof of a published release or successful testing on every supported Mac. The [acceptance record](docs/unification.md) tracks the remaining verification. Older Voice/StageMark releases and their validation records describe those separate apps.
 
-An **iPhone and iPad Preview for iOS/iPadOS 26+** is also in development as a separate native SwiftUI target. It offers foreground dictation, installed-voice reading, PencilKit image markup, independent wallpaper crop/export and simple presentation backdrops. The Mac capabilities below retain their own platform boundaries. See the [mobile scope, build instructions and test record](docs/ios-preview.md) and [mobile research](docs/mobile-research.md); no mobile App Store or TestFlight release is claimed.
+An **iPhone and iPad Preview for iOS/iPadOS 26+** is also in development as a separate native SwiftUI target. It offers foreground dictation, installed-voice reading, PencilKit image markup, independent wallpaper crop/export and editable scenes prepared for Mac. The Mac capabilities below retain their own platform boundaries. See the [mobile scope, build instructions and test record](docs/ios-preview.md) and [mobile research](docs/mobile-research.md); no mobile App Store or TestFlight release is claimed.
 
 ## What is in the app?
 
@@ -88,6 +88,18 @@ The Swift target/module retains its internal `LocalVoice` name for compatibility
 
 Keep a consistent Preview identity and path between updates. Preview has its own macOS permissions. Quit older Voice/StageMark copies when testing global shortcuts; they may compete for the same combinations. Do not clear permissions or erase saved data as an update step. [Release tooling](scripts/release/README.md) describes the separate production workflow.
 
+## Cross-device preparation
+
+### Photo for Mac · source Preview
+
+Take or choose a photo on iPhone, keep the original locally and deliberately send an optimised copy through private iCloud. Mac Saved resources → From iPhone opens an existing scene’s backdrop preview or saves an independent copy. The [photo handoff guide](https://workbench-mac.vercel.app/handoff/) and [canonical specification](docs/photo-handoff.md) record the research, limits and signing route. A real existing iPhone photo has now downloaded on Mac after a retry. Repeated deferred delivery remains an acceptance task; this feature is not in the public Preview 2 download.
+
+### Personal scenes — source Preview
+
+Prepare an editable scene on iPhone or iPad and present it on Mac. New scenes keep their original pictures, device placement and optional logo/persona. Personal iCloud sync is opt-in and tied to the same Apple Account; an editable `.workbenchscene` copy also works without cloud. Existing mobile compositions remain recoverable. The Mac has eight starter portraits, editable role/colour cards and floating controls limited to a prepared persona group.
+
+The [visual scene guide](https://workbench-mac.vercel.app/scenes/) includes generated design studies and actual native screenshots. The [scene contract](docs/research/personal-scenes.md) owns persistence, migration, conflict rules and current evidence. Mac upload has succeeded; a complete paired scene round trip remains unverified. Public downloads, TestFlight and App Store submission are unchanged.
+
 ## Data, privacy and recovery
 
 - **Transcripts:** originals, drafts, dictionary, reading preferences and the last 100 captures are stored locally. Cleanup is optional: Original, deterministic Light, or guarded Natural editing using available Apple Intelligence or a configured local Ollama model. Saved dictionary replacements apply to delivered text in every cleanup mode; the recogniser's original remains available. Cleanup checks cannot prove meaning is unchanged.
@@ -116,7 +128,3 @@ A useful first contribution can be a confusing instruction, an accessibility imp
 - Matt ([@mattywhitenz](https://github.com/mattywhitenz)) proposed Apple Shortcuts dictation and optional Speko reading in [#10](https://github.com/EthDawg/local-voice/issues/10) and [#11](https://github.com/EthDawg/local-voice/issues/11).
 
 The app code is [MIT licensed](LICENSE). Third-party components retain their own licenses. Contribution credit does not imply a GitHub permission level or approval of this branch.
-
-### Photo for Mac · source Preview
-
-Take or choose a photo on iPhone, keep the original locally and deliberately send an optimised copy through private iCloud. Mac Saved resources → From iPhone opens an existing scene’s backdrop preview or saves an independent copy. The [photo handoff guide](https://workbench-mac.vercel.app/handoff/) and [canonical specification](docs/photo-handoff.md) record the research, limits and signing route. Real paired transfer is not yet verified; this feature is not in the public Preview 2 download.

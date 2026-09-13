@@ -37,5 +37,11 @@
 	<string>Workbench records your microphone when you start dictation. Your chosen speech engine processes the recording.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+<key>UTExportedTypeDeclarations</key><array><dict>
+<key>UTTypeIdentifier</key><string>com.ethdawg.workbench.scene</string>
+<key>UTTypeDescription</key><string>Workbench scene</string>
+<key>UTTypeConformsTo</key><array><string>public.data</string></array>
+<key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>workbenchscene</string></array></dict>
+</dict></array>
 </dict>
 </plist>

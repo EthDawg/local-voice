@@ -217,6 +217,39 @@ import CloudKit
         XCTAssertNotNil(model.fileURL(for: model.photos[0]))
     }
 
+    func testSDKOwnerAliasReplayRecoversWithoutResettingFilesOrAccountCheckpoint() async throws {
+        let root = try directory(), fake = FakePhotoTransport()
+        let entry = try remote(image())
+        fake.records[fake.account] = [entry.0.id: entry]
+        fake.responseOwnerName = "wrong-owner"
+        let model = PhotoHandoffModel(directory: root, platform: "Mac", transport: fake)
+        let localID = try await add(model, gray: 0.8)
+        let localURL = try XCTUnwrap(model.fileURL(for: model.photos[0]))
+        let localBytes = try Data(contentsOf: localURL)
+        await model.enable()
+        XCTAssertNotNil(model.error)
+        XCTAssertEqual(model.photos.map(\.id), [localID])
+        XCTAssertNil(try PhotoHandoffStore(directory: root).load().accounts[0].checkpoint)
+
+        fake.responseOwnerName = CKCurrentUserDefaultName
+        await model.refresh()
+        XCTAssertNil(model.error)
+        let received = try XCTUnwrap(model.photos.first { $0.id == entry.0.id })
+        XCTAssertEqual(received.account, FakePhotoTransport.ownerA)
+        XCTAssertEqual(received.statusLabel, "Downloaded on this device")
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(model.fileURL(for: received))), entry.1)
+        XCTAssertEqual(try Data(contentsOf: localURL), localBytes)
+        let saved = try PhotoHandoffStore(directory: root).load()
+        XCTAssertEqual(saved.account, FakePhotoTransport.ownerA)
+        XCTAssertEqual(saved.accounts[0].checkpoint, Data([1]))
+        XCTAssertEqual(saved.photos.count, 2)
+
+        let reopened = PhotoHandoffModel(directory: root, platform: "Mac", transport: fake)
+        await reopened.refresh()
+        XCTAssertNil(reopened.error); XCTAssertEqual(reopened.photos.count, 2)
+        XCTAssertEqual(fake.downloads, 1)
+    }
+
     func testConflictingUUIDDoesNotOverwritePreviouslyDownloadedBytesOrAdvanceCheckpoint() async throws {
         let root = try directory(), fake = FakePhotoTransport()
         let first = try remote(image())
@@ -323,6 +356,7 @@ import CloudKit
     var offline = false, holdUpload = false, failRemoval = false, corruptDownloads = false, hideChangeRecords = false
     var uploadFailure: PhotoHandoffError?
     var pages: [PhotoChangePage] = []
+    var responseOwnerName: String?
     var records: [PhotoAccount: [UUID: (RemoteHandoffPhoto, Data)]] = [:]
     var uploads: [(UUID, PhotoAccount)] = []
     var downloads = 0, identityCalls = 0, cancellations = 0, changeCalls = 0
@@ -352,7 +386,16 @@ import CloudKit
         guard !offline, owner == account else { throw PhotoHandoffError.accountChanged }
         changeCalls += 1
         if !pages.isEmpty { return pages.removeFirst() }
-        return PhotoChangePage(photos: hideChangeRecords ? [] : (records[owner] ?? [:]).values.map(\.0), checkpoint: self.checkpoint)
+        var photos = hideChangeRecords ? [] : (records[owner] ?? [:]).values.map(\.0)
+        if let responseOwnerName {
+            photos = try photos.map { photo in
+                let zone = CKRecordZone.ID(zoneName: "WorkbenchPhotosV1", ownerName: responseOwnerName)
+                let record = CKRecord(recordType: "PhotoV1", recordID: CKRecord.ID(recordName: photo.id.uuidString, zoneID: zone))
+                record["metadata"] = try JSONEncoder().encode(photo) as NSData
+                return try CloudPhotoTransport.decode(record, account: owner)
+            }
+        }
+        return PhotoChangePage(photos: photos, checkpoint: self.checkpoint)
     }
     func download(_ photo: RemoteHandoffPhoto, account owner: PhotoAccount) async throws -> Data {
         guard !offline, owner == account else { throw PhotoHandoffError.accountChanged }

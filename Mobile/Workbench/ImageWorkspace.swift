@@ -8,6 +8,7 @@ struct MobileImageWorkspace: View {
     let kind: MobileImageKind
     var projectID: UUID? = nil
     @EnvironmentObject private var store: MobileStore
+    @EnvironmentObject private var scenes: SceneLibraryModel
     @State private var project: MobileImageProject?
     @State private var lastSaved: MobileImageProject?
     @State private var loaded = false
@@ -28,7 +29,9 @@ struct MobileImageWorkspace: View {
     @State private var saveTask: Task<Void, Never>?
     @State private var share: ImageShare?
     @State private var exporting = false
-    @State private var presenting = false
+    @StateObject private var wallpaperSaver = WallpaperPhotoSaver()
+    @Environment(\.openURL) private var openURL
+    @State private var convertedSceneID: UUID?
     @State private var reused: MobileImageProject?
     @State private var showingReused = false
     @State private var dragStart: CGPoint?
@@ -45,12 +48,12 @@ struct MobileImageWorkspace: View {
                             HStack(alignment: .top, spacing: 28) {
                                 preview(project, image: background, width: max(280, min(geometry.size.width, 1200) - 348),
                                         maximumHeight: max(320, geometry.size.height - 110))
-                                editor(project).frame(width: 280)
+                                editor(project).frame(width: 280).disabled(kind == .wallpaper && (wallpaperSaver.isBusy || exporting))
                             }
                         } else {
                             preview(project, image: background, width: geometry.size.width - 40,
                                     maximumHeight: min(520, max(300, geometry.size.height * 0.56)))
-                            editor(project)
+                            editor(project).disabled(kind == .wallpaper && (wallpaperSaver.isBusy || exporting))
                         }
                     } else {
                         emptyState
@@ -77,15 +80,19 @@ struct MobileImageWorkspace: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button("New image…", systemImage: "photo.badge.plus") { beginPhotos(.newImage) }
+                        if kind == .wallpaper, wallpaperSaver.state == .saved || wallpaperSaver.state == .unconfirmed {
+                            Button("Save another Photos copy", systemImage: "photo.badge.plus") { saveWallpaperToPhotos(allowAnotherCopy: true) }
+                        }
                         if let project {
                             Section("Use the original image in") {
-                                ForEach(MobileImageKind.allCases.filter { $0 != kind }) { target in
+                                Button("Scene for Mac", systemImage: "rectangle.inset.filled") { createScene() }
+                                ForEach(MobileImageKind.allCases.filter { $0 != kind && $0 != .backdrop }) { target in
                                     Button(target.title, systemImage: target.symbol) { reuse(project, as: target) }
                                 }
                             }
                         }
                     } label: { Image(systemName: "ellipsis.circle") }
-                        .accessibilityLabel("Image actions").disabled(importing || store.writesDisabled)
+                        .accessibilityLabel("Image actions").disabled(importing || store.writesDisabled || (kind == .wallpaper && (wallpaperSaver.isBusy || exporting)))
                 }
             }
         }
@@ -123,17 +130,17 @@ struct MobileImageWorkspace: View {
             } catch { notice = error.localizedDescription }
         }
         .sheet(item: $share) { item in MobileImageShareSheet(url: item.url) }
-        .fullScreenCover(isPresented: $presenting) {
-            if let project, let background {
-                MobileScenePresentation(project: project, background: background, foreground: foreground,
-                                        logo: logo, persona: persona)
-            }
+        .navigationDestination(isPresented: Binding(get: { convertedSceneID != nil }, set: { if !$0 { convertedSceneID = nil } })) {
+            if let convertedSceneID { MobileSceneEditor(sceneID: convertedSceneID) }
         }
         .navigationDestination(isPresented: $showingReused) {
             if let reused { MobileImageWorkspace(kind: reused.kind, projectID: reused.id) }
         }
         .task { load() }
-        .onChange(of: project) { _, next in
+        .onChange(of: project) { previous, next in
+            if kind == .wallpaper, previous?.asset != next?.asset || previous?.zoom != next?.zoom || previous?.centerX != next?.centerX || previous?.centerY != next?.centerY || previous?.wallpaperAspect != next?.wallpaperAspect {
+                wallpaperSaver.imageChanged()
+            }
             guard next != lastSaved else { return }
             saveTask?.cancel()
             saveTask = Task { @MainActor in
@@ -154,7 +161,7 @@ struct MobileImageWorkspace: View {
                 Text(kind == .markup ? "Make your point." : kind == .wallpaper ? "A calmer screen." : "Set the scene.")
                     .font(.largeTitle.weight(.semibold))
                 Text(kind == .markup ? "Draw on a photo or screenshot, then share a new image. Your original stays intact."
-                     : kind == .wallpaper ? "Frame an image for your device, then save it for Apple’s wallpaper settings."
+                     : kind == .wallpaper ? "Frame an image for your device, then save a copy to Photos."
                      : "Combine a backdrop with your picture, logo or finished persona card.")
                     .font(.body).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
@@ -268,31 +275,48 @@ struct MobileImageWorkspace: View {
                 }
             }
             VStack(alignment: .leading, spacing: 10) {
-                Button { export() } label: {
-                    Label(exporting ? "Preparing image…" : "Share PNG", systemImage: "square.and.arrow.up")
-                        .frame(maxWidth: .infinity)
-                }.buttonStyle(.borderedProminent).controlSize(.large)
-                    .disabled(exporting || importing || drawingUnavailable || drawingControls.exceedsLimit)
+                if kind == .wallpaper {
+                    Button { saveWallpaperToPhotos() } label: {
+                        HStack {
+                            if wallpaperSaver.isBusy || exporting { ProgressView() }
+                            Label(wallpaperSaver.state == .saved ? "Saved to Photos" : wallpaperSaver.isBusy ? "Saving to Photos…" : "Save to Photos", systemImage: wallpaperSaver.state == .saved ? "checkmark.circle" : "square.and.arrow.down")
+                        }.frame(maxWidth: .infinity, minHeight: 36)
+                    }.buttonStyle(.borderedProminent).controlSize(.large)
+                        .disabled(exporting || importing || wallpaperSaver.isBusy || wallpaperSaver.state == .saved || wallpaperSaver.state == .unconfirmed)
+                        .accessibilityIdentifier("wallpaper.savePhotos")
+                    if let message = wallpaperSaver.message {
+                        Label(message, systemImage: wallpaperSaver.state == .saved ? "checkmark.circle" : "info.circle")
+                            .font(.callout).foregroundStyle(.secondary).accessibilityIdentifier("wallpaper.photoSaveStatus")
+                    }
+                    if wallpaperSaver.state == .denied {
+                        Button("Open Photos permission settings", systemImage: "gearshape") { if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) } }
+                            .frame(minHeight: 44)
+                    }
+                    if wallpaperSaver.state == .saved {
+                        Text("In Photos, open the saved picture → Share → Use as Wallpaper. Review Apple’s crop, then add it.")
+                            .font(.callout).fixedSize(horizontal: false, vertical: true)
+                    }
+                    Button { export() } label: { Label("Share PNG", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 36) }
+                        .buttonStyle(.bordered).controlSize(.large).disabled(exporting || importing || wallpaperSaver.isBusy)
+                } else {
+                    Button { export() } label: {
+                        Label(exporting ? "Preparing image…" : "Share PNG", systemImage: "square.and.arrow.up")
+                            .frame(maxWidth: .infinity)
+                    }.buttonStyle(.borderedProminent).controlSize(.large)
+                        .disabled(exporting || importing || drawingUnavailable || drawingControls.exceedsLimit)
+                }
                 Text("A new image, up to 3840 pixels. The original stays unchanged.")
                     .font(.caption).foregroundStyle(.secondary)
                 if kind == .backdrop {
-                    Button {
-                        toolsVisible = false; _ = saveNow(); presenting = true
-                    } label: { Label("Present on this device", systemImage: "play.rectangle").frame(maxWidth: .infinity) }
+                    Button { createScene() } label: { Label("Create scene for Mac", systemImage: "rectangle.inset.filled").frame(maxWidth: .infinity) }
                         .buttonStyle(.bordered).controlSize(.large)
-                    Text("Displays this scene inside Workbench. Start screen sharing in your meeting app when you are ready.")
+                        .disabled(scenes.isStorageBlocked || importing || exporting)
+                    Text("Creates an editable scene with this background, logo and persona. Your original composition stays here; its picture, caption and drawing can also be recovered from the scene.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
             if kind == .wallpaper {
-                DisclosureGroup("Set it as your wallpaper") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("1. Share PNG, then choose Save Image.")
-                        Text("2. Open Settings → Wallpaper → Add New Wallpaper → Photos.")
-                        Text("3. Choose your saved image and review Apple’s final crop.")
-                        Text("Apple controls the clock, widgets and final wallpaper appearance.").foregroundStyle(.secondary)
-                    }.font(.callout).padding(.top, 10)
-                }
+                Text("Apple’s wallpaper picker handles the final crop, clock and widgets.").font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -337,7 +361,7 @@ struct MobileImageWorkspace: View {
     }
     private func cropGesture(size: CGSize, image: UIImage) -> some Gesture {
         DragGesture(minimumDistance: 3).onChanged { value in
-            guard !store.writesDisabled, let project else { return }
+            guard !store.writesDisabled, !(kind == .wallpaper && (wallpaperSaver.isBusy || exporting)), let project else { return }
             if dragStart == nil { dragStart = CGPoint(x: project.centerX, y: project.centerY) }
             guard let start = dragStart else { return }
             let rect = MobileImageRenderer.cropRect(image: image.size, canvas: size, zoom: project.zoom,
@@ -348,7 +372,7 @@ struct MobileImageWorkspace: View {
             }
         }.onEnded { _ in dragStart = nil }
             .simultaneously(with: MagnificationGesture().onChanged { value in
-                guard !store.writesDisabled, let project else { return }
+                guard !store.writesDisabled, !(kind == .wallpaper && (wallpaperSaver.isBusy || exporting)), let project else { return }
                 if zoomStart == nil { zoomStart = project.zoom }
                 edit { $0.zoom = min(5, max(1, (zoomStart ?? 1) * value)) }
             }.onEnded { _ in zoomStart = nil })
@@ -431,8 +455,13 @@ struct MobileImageWorkspace: View {
         guard saveNow(), let copy = store.reuse(original, as: target) else { return }
         reused = copy; showingReused = true
     }
+    private func createScene() {
+        guard saveNow(), let project else { return }
+        do { convertedSceneID = try MobileSceneImport.convert(project: project, store: store, scenes: scenes).id }
+        catch { notice = error.localizedDescription }
+    }
     private func export() {
-        guard let project else { return }
+        guard !exporting, !(kind == .wallpaper && wallpaperSaver.isBusy), let project else { return }
         exporting = true; toolsVisible = false
         defer { exporting = false }
         do {
@@ -446,6 +475,21 @@ struct MobileImageWorkspace: View {
             try data.write(to: url, options: .atomic)
             _ = saveNow(); share = ImageShare(url: url)
         } catch { notice = error.localizedDescription }
+    }
+
+    private func saveWallpaperToPhotos(allowAnotherCopy: Bool = false) {
+        guard kind == .wallpaper, !exporting, !wallpaperSaver.isBusy, let project else { return }
+        exporting = true; notice = nil
+        do {
+            guard let image = store.image(project, maxPixels: 3840) else { throw MobileStoreError.invalid("The original image could not be opened.") }
+            let result = try MobileImageRenderer.render(project: project, background: image)
+            guard let data = result.pngData() else { throw MobileStoreError.invalid("The PNG could not be created. Your saved work is unchanged.") }
+            _ = saveNow()
+            Task { @MainActor in
+                defer { exporting = false }
+                await wallpaperSaver.save(pngData: data, allowAnotherCopy: allowAnotherCopy)
+            }
+        } catch { exporting = false; notice = error.localizedDescription }
     }
 }
 
@@ -465,7 +509,7 @@ private enum ImageDestination: Equatable {
 }
 
 private struct ImageShare: Identifiable { let id = UUID(); let url: URL }
-private struct MobileImageShareSheet: UIViewControllerRepresentable {
+struct MobileImageShareSheet: UIViewControllerRepresentable {
     let url: URL
     func makeUIViewController(context: Context) -> UIActivityViewController {
         let controller = UIActivityViewController(activityItems: [url], applicationActivities: nil)
@@ -473,31 +517,4 @@ private struct MobileImageShareSheet: UIViewControllerRepresentable {
         return controller
     }
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) { }
-}
-
-private struct MobileScenePresentation: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
-    let project: MobileImageProject
-    let background: UIImage
-    let foreground: UIImage?
-    let logo: UIImage?
-    let persona: UIImage?
-    @State private var previousIdleTimer: Bool?
-    var body: some View {
-        GeometryReader { geometry in
-            let width = min(geometry.size.width, geometry.size.height * 16 / 9)
-            MobileCompositionPreview(project: project, background: background, foreground: foreground, logo: logo, persona: persona)
-                .frame(width: width, height: width * 9 / 16).frame(maxWidth: .infinity, maxHeight: .infinity)
-        }.background(.black).ignoresSafeArea()
-            .overlay(alignment: .topTrailing) {
-                Button("End", systemImage: "xmark") { dismiss() }.buttonStyle(.borderedProminent)
-                    .tint(.black.opacity(0.65)).padding(20).keyboardShortcut(.escape, modifiers: [])
-                    .accessibilityLabel("End presentation")
-            }
-            .statusBarHidden()
-            .onAppear { previousIdleTimer = UIApplication.shared.isIdleTimerDisabled; UIApplication.shared.isIdleTimerDisabled = true }
-            .onChange(of: scenePhase) { _, phase in UIApplication.shared.isIdleTimerDisabled = phase == .active ? true : (previousIdleTimer ?? false) }
-            .onDisappear { if let previousIdleTimer { UIApplication.shared.isIdleTimerDisabled = previousIdleTimer } }
-    }
 }

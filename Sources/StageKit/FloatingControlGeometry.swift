@@ -29,10 +29,28 @@ public enum FloatingControlAnchor: String, CaseIterable, Codable, Identifiable {
     }
 }
 
+public struct FloatingControlTarget: Identifiable, Equatable {
+    public let anchor: FloatingControlAnchor
+    public let frame: NSRect
+    public var id: FloatingControlAnchor { anchor }
+}
+
 /// AppKit coordinates, including displays left of or below the main display.
 /// Every result fits the visible frame. Tiny frames reduce the margin before
 /// reducing the control size, so a disconnected display cannot strand controls.
 public enum FloatingControlGeometry {
+    /// Every distinct valid destination, in the same stable order as Position.
+    /// Coincident footprints on a small display are one target, not stacked guides.
+    public static func targets(size: NSSize, visibleFrame: NSRect, inset: CGFloat = 16) -> [FloatingControlTarget] {
+        var result: [FloatingControlTarget] = []
+        for anchor in FloatingControlAnchor.allCases {
+            let frame = self.frame(anchor: anchor, size: size, visibleFrame: visibleFrame, inset: inset)
+            guard valid(frame), !result.contains(where: { $0.frame == frame }) else { continue }
+            result.append(FloatingControlTarget(anchor: anchor, frame: frame))
+        }
+        return result
+    }
+
     public static func frame(anchor: FloatingControlAnchor, size: NSSize, visibleFrame: NSRect, inset: CGFloat = 16) -> NSRect {
         let bounded = clamp(NSRect(origin: visibleFrame.origin, size: size), to: visibleFrame, inset: inset)
         guard valid(visibleFrame) else { return .zero }

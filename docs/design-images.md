@@ -1,5 +1,26 @@
 # Product-guide image experiments
 
+## Personal scene refinement — 13 September 2026
+
+Both experiments were shown inline for review. They use fictional imagery and are retained as exploration, not evidence of implemented or tested behavior. The newer [personal-scenes decision](research/personal-scenes.md) supersedes the earlier photo-only navigation limit below.
+
+| File | Critical decision |
+| --- | --- |
+| `site/assets/guide/scene-preparation-concept-a.png` | Keep editable scene preparation and matching Mac layout. Reject the invented extra tabs, favourites, brand tagline and third quick action. Keep Tools/Saved and only two quick actions. |
+| `site/assets/guide/persona-controls-concept-b.png` | Keep the separate click control, scoped group and all-target drag study. Reject the oversized card, audience-facing edit icon and invented settings categories. Private control content is scoped; screen-share invisibility is not promised. |
+
+### Scene preparation prompt
+
+```text
+Use case: ui-mockup. Create a carefully composed high-fidelity native Apple product design exploration for the open-source app Workbench. Landscape 1800x1200-ish canvas. This is a working interface study, no advertising slogan. Off-white neutral board, system typography, very restrained mint accent. Title small: "Scene preparation · Concept A". Show three readable native interface frames left-to-right: iPhone Scenes library with two fictional saved scenes and a clear primary camera button; iPhone editing a saved scene with a realistic coastal office reception backdrop, an empty phone-shaped preview positioned to left, a small original generic logo and a persona card at bottom right; Mac Scenes window showing that same scene ready to present. Use captions below frames "Choose a saved scene", "Capture or replace the backdrop", "Open on Mac". Existing scene sample is "Harbor · Reception". Keep customer grouping in editing UI only. iPhone editor title "Reception"; top small status "Saved · iCloud"; an honest separate transfer status "Changes in iCloud", not a false confirmed Mac receipt. Core edit controls: "Backdrop", "Device position" with Left/Centre/Right, "Logo", "Persona". The large primary action is "Done" because edits are saved and synced. No "Present on this device", no Share PNG dominating the scene flow, no web login or avatar dashboard. Mac has sidebar Home, Dictate, Read aloud, Annotate, Scenes, Wallpapers, Saved. Clear "Present" action only on Mac. Under board add two native Home Screen quick-action menu rows "Capture for scene" and "Dictate". Use natural generous spacing, highly legible compact controls, light mode material, SF-like line icons. Not a fake screenshot or release claim: visibly label bottom "Design exploration — behavior requires implementation and testing". All imagery generic fictional, no actual customer brands, no personal data. Grounded in iOS 26 and macOS native controls.
+```
+
+### Persona control prompt
+
+```text
+Use case: ui-mockup. Make a high-fidelity Mac utility interface interaction study for Workbench persona controls. Landscape design board on warm neutral background, large readable realistic UI details, restrained system typography, mint accent. Small title "Personas · Concept B". Left two-thirds: fictional business website on a Mac screen with a carefully illustrated Black female healthcare operations manager persona overlaid bottom right, bright approachable professional illustration, teal circle backdrop and an editable label "Operations manager" in a restrained native card. Beside artwork a tiny floating dark material click tile with person icon, divider, chevron; no prospect names, no words Demo or Live. Above tile an open compact popover with heading "Personas", three thumbnails of diverse industry personas from the current selected group only, readable job labels "Operations", "Front desk", "Team lead", hide control, Next control, and no all-customer dropdown or long list. No fake privacy invisibility promise: small note "Controls can appear in whole-screen sharing". Right upper detail: pre-presentation library settings window shows group "Harbor" editable, portrait chooser, separate label text field "Operations manager", native color well "Background", and clear native "Use in scene" button. Distinguish editable text/color from artwork; no typography baked into portrait. Right lower detail: miniature screen drag-placement study showing all eight valid edge/corner snap targets as subtle outlines simultaneously, one nearest target highlighted mint, floating tile drag path. Explain "Drag to place. Click to open." and "Only the selected group appears while presenting." Show a keyboard-focus ring and sensible generous click areas. Visual cohesion across light and dark material, no glowing futuristic HUD or dashboard clutter. Footer "Design exploration — not shipping UI".
+```
+
 ## Selected-photo handoff — 13 September 2026
 
 Two built-in image-generation experiments were shown inline in the task and are retained on the [photo handoff page](../site/handoff/index.html). Both use a synthetic reception, without people, real branding or location claims. They are design hypotheses, not cloud-transfer evidence.
@@ -173,3 +194,71 @@ Claude reviewed a generic public product brief with no repository source or priv
 Mobile actual evidence: `mobile-tools-actual.png`, `mobile-wallpaper-actual.png`, `mobile-reading-actual.png` and `mobile-markup-focus-actual.png` are unedited iPhone XCTest attachments. `mobile-ipad-tools-actual.png` is the corresponding iPad attachment. `mobile-ipad-present-actual.png` and `mobile-ipad-paused-actual.png` are native Simulator-window captures from manual testing. All use synthetic content; none proves physical-device model quality or audience visibility.
 
 Actual photo-handoff captures (`photo-handoff-iphone-preview-actual.png`, `photo-handoff-iphone-saved-actual.png`) come from final native Simulator UI tests with cloud access disabled. `photo-handoff-mac-actual.png` and `photo-handoff-offline-actual.png` use the actual Mac view/shared model in a disposable app with an explicitly simulated transport. Its synthetic photo has a fixed fixture timestamp. Neither set proves a physical camera or live CloudKit transfer.
+
+## Persona portrait starter library — 13 September 2026
+
+Eight fictional portraits generated with the built-in image tool. Role labels and background colours are native editable controls, not baked into the picture. Actual PNG alpha was checked for every bundled asset. A reference-based intermediate batch produced opaque checkerboards and was rejected; the final four were regenerated from text. Demographic variety guides the artwork, not the app’s labels or filtering.
+
+### care-lead
+
+Asset: `Resources/PersonaPortraits/care-lead.png`
+
+Prompt:
+
+> Use case: stylized-concept. Asset type: individual fictional persona portrait for the Workbench native Mac/iPhone starter library. Create ONE centered head-and-shoulders bust portrait, polished contemporary editorial 3D illustration with restrained natural proportions, soft tactile shading and clear facial features, not childish or plastic. Square 1024x1024 composition, subject fills 82 percent height, complete top of head and shoulders inside frame, lower torso fades nowhere and has a clean cut edge at the bottom. Soft even frontal studio lighting. An adult Black woman healthcare team leader aged about 45, natural short coiled hair, subtle glasses, plain teal clinical scrub top, relaxed confident warmth. GENUINELY TRANSPARENT BACKGROUND with alpha channel, all outside pixels transparent, including around hair. No backdrop, no coloured circle, no text, no badge lettering, no logo, no frame, no label, no watermark, no checkerboard pixels. The app adds its own native editable background colour and role text. One person only, no equipment or gestures obscuring face.
+
+### field-lead
+
+Asset: `Resources/PersonaPortraits/field-lead.png`
+
+Prompt:
+
+> Use case: stylized-concept. Asset type: individual fictional persona portrait for the Workbench native Mac/iPhone starter library. Create ONE centered head-and-shoulders bust portrait, polished contemporary editorial 3D illustration with restrained natural proportions, soft tactile shading and clear facial features, not childish or plastic. Square 1024x1024 composition, subject fills 82 percent height, complete top of head and shoulders inside frame, lower torso fades nowhere and has a clean cut edge at the bottom. Soft even frontal studio lighting. An adult East Asian woman construction site supervisor aged about 40, navy collared shirt, simple orange high-visibility vest with reflective strips, plain white hard hat, confident friendly expression. GENUINELY TRANSPARENT BACKGROUND with alpha channel, all outside pixels transparent, including around hair. No backdrop, no coloured circle, no text, no badge lettering, no logo, no frame, no label, no watermark, no checkerboard pixels. The app adds its own native editable background colour and role text. One person only, no equipment or gestures obscuring face.
+
+### front-desk
+
+Asset: `Resources/PersonaPortraits/front-desk.png`
+
+Prompt:
+
+> Use case: stylized-concept. Asset type: individual fictional persona portrait for the Workbench native Mac/iPhone starter library. Create ONE centered head-and-shoulders bust portrait, polished contemporary editorial 3D illustration with restrained natural proportions, soft tactile shading and clear facial features, not childish or plastic. Square 1024x1024 composition, subject fills 82 percent height, complete top of head and shoulders inside frame, lower torso fades nowhere and has a clean cut edge at the bottom. Soft even frontal studio lighting. An adult South Asian man hospitality front-desk lead aged about 30, warm brown skin, short tidy hair, plain warm blue collared shirt without tie, approachable calm expression. GENUINELY TRANSPARENT BACKGROUND with alpha channel, all outside pixels transparent, including around hair. No backdrop, no coloured circle, no text, no badge lettering, no logo, no frame, no label, no watermark, no checkerboard pixels. The app adds its own native editable background colour and role text. One person only, no equipment or gestures obscuring face.
+
+### operations-lead
+
+Asset: `Resources/PersonaPortraits/operations-lead.png`
+
+Prompt:
+
+> Use case: stylized-concept. Asset type: individual fictional persona portrait for the Workbench native Mac/iPhone starter library. Create ONE centered head-and-shoulders bust portrait, polished contemporary editorial 3D illustration with restrained natural proportions, soft tactile shading and clear facial features, not childish or plastic. Square 1024x1024 composition, subject fills 82 percent height, complete top of head and shoulders inside frame, lower torso fades nowhere and has a clean cut edge at the bottom. Soft even frontal studio lighting. An adult white woman operations director aged about 60, short silver hair, contemporary charcoal jacket over cream top, confident relaxed smile. GENUINELY TRANSPARENT BACKGROUND with alpha channel, all outside pixels transparent, including around hair. No backdrop, no coloured circle, no text, no badge lettering, no logo, no frame, no label, no watermark, no checkerboard pixels. The app adds its own native editable background colour and role text. One person only, no equipment or gestures obscuring face.
+
+### logistics-lead
+
+Asset: `Resources/PersonaPortraits/logistics-lead.png`
+
+Prompt:
+
+> Use case: stylized-concept. Asset type: individual fictional persona portrait for the Workbench native Mac/iPhone starter library. Create ONE centered head-and-shoulders bust portrait, polished contemporary editorial 3D illustration with restrained natural proportions, soft tactile shading and clear facial features, not childish or plastic. Square 1024x1024 composition, subject fills 82 percent height, complete top of head and shoulders inside frame, lower torso fades nowhere and has a clean cut edge at the bottom. Soft even frontal studio lighting. An adult Black man logistics manager aged about 55, closely cropped salt-and-pepper hair and short beard, dark green polo shirt and simple unbranded yellow high-visibility vest, friendly capable expression. GENUINELY TRANSPARENT BACKGROUND with alpha channel, all outside pixels transparent, including around hair. No backdrop, no coloured circle, no text, no badge lettering, no logo, no frame, no label, no watermark, no checkerboard pixels. The app adds its own native editable background colour and role text. One person only, no equipment or gestures obscuring face.
+
+### care-coordinator
+
+Asset: `Resources/PersonaPortraits/care-coordinator.png`
+
+Prompt:
+
+> Use case: stylized-concept. Asset type: individual fictional persona portrait for the Workbench native Mac/iPhone starter library. Create ONE centered head-and-shoulders bust portrait, polished contemporary editorial 3D illustration with restrained natural proportions, soft tactile shading and clear facial features, not childish or plastic. Square 1024x1024 composition, subject fills 82 percent height, complete top of head and shoulders inside frame, lower torso fades nowhere and has a clean cut edge at the bottom. Soft even frontal studio lighting. An adult Middle Eastern man healthcare coordinator aged about 35, warm olive skin, dark curls, short neat beard, plain navy clinical scrub top, relaxed warm expression. GENUINELY TRANSPARENT BACKGROUND with alpha channel, all outside pixels transparent, including around hair. No backdrop, no coloured circle, no text, no badge lettering, no logo, no frame, no label, no watermark, no checkerboard pixels. The app adds its own native editable background colour and role text. One person only, no equipment or gestures obscuring face.
+
+### hospitality-lead
+
+Asset: `Resources/PersonaPortraits/hospitality-lead.png`
+
+Prompt:
+
+> Use case: stylized-concept. Asset type: individual fictional persona portrait for the Workbench native Mac/iPhone starter library. Create ONE centered head-and-shoulders bust portrait, polished contemporary editorial 3D illustration with restrained natural proportions, soft tactile shading and clear facial features, not childish or plastic. Square 1024x1024 composition, subject fills 82 percent height, complete top of head and shoulders inside frame, lower torso fades nowhere and has a clean cut edge at the bottom. Soft even frontal studio lighting. An adult Latino man head chef aged about 45, medium brown skin, short dark hair, plain cream chef jacket without hat or lettering, calm friendly expression. GENUINELY TRANSPARENT BACKGROUND with alpha channel, all outside pixels transparent, including around hair. No backdrop, no coloured circle, no text, no badge lettering, no logo, no frame, no label, no watermark, no checkerboard pixels. The app adds its own native editable background colour and role text. One person only, no equipment or gestures obscuring face.
+
+### field-technician
+
+Asset: `Resources/PersonaPortraits/field-technician.png`
+
+Prompt:
+
+> Use case: stylized-concept. Asset type: individual fictional persona portrait for the Workbench native Mac/iPhone starter library. Create ONE centered head-and-shoulders bust portrait, polished contemporary editorial 3D illustration with restrained natural proportions, soft tactile shading and clear facial features, not childish or plastic. Square 1024x1024 composition, subject fills 82 percent height, complete top of head and shoulders inside frame, lower torso fades nowhere and has a clean cut edge at the bottom. Soft even frontal studio lighting. An adult white woman field technician aged about 28, fair skin, light brown hair tied back neatly, plain dark blue work shirt with no vest and no hat, relaxed confident expression. GENUINELY TRANSPARENT BACKGROUND with alpha channel, all outside pixels transparent, including around hair. No backdrop, no coloured circle, no text, no badge lettering, no logo, no frame, no label, no watermark, no checkerboard pixels. The app adds its own native editable background colour and role text. One person only, no equipment or gestures obscuring face.
