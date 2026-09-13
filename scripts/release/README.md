@@ -55,7 +55,7 @@ the signing/notarization gates in `release.py` or authorise a production release
 Run on an interactive release Mac after quitting the installed app so it releases global shortcuts. Ordinary contributors can build and test without a paid Apple account.
 
 1. Have a Developer ID Application certificate and its private key available in Keychain.
-2. Create the notarytool Keychain profile using `xcrun notarytool store-credentials Workbench` and its secure prompts. Keep passwords, private keys and signing exports out of arguments, source control and public conversations.
+2. Reuse an existing authenticated notarytool Keychain profile. If none exists, create one using `xcrun notarytool store-credentials Workbench` and its secure prompts. Keep passwords, private keys and signing exports out of arguments, source control and public conversations.
 3. Set the marketing version in `scripts/Info.plist`, review the work and commit it. Production uses its committed build number; the Preview builder assigns a UTC timestamp build number. Keep the channel identities above unchanged.
 4. Find the public certificate fingerprint with `security find-identity -v -p codesigning`.
 5. Choose the channel explicitly when making a Preview.
@@ -68,6 +68,18 @@ python3 scripts/release/release.py --preview \
   --team-id APPLE_TEAM_ID \
   --keychain-profile Workbench
 ```
+
+For a Preview that includes personal photo and scene sync, add the existing Developer ID provisioning profile explicitly:
+
+```sh
+python3 scripts/release/release.py --preview \
+  --identity CERTIFICATE_SHA1_FINGERPRINT \
+  --team-id APPLE_TEAM_ID \
+  --keychain-profile Workbench \
+  --photo-cloud-profile /absolute/path/to/embedded.provisionprofile
+```
+
+The profile must cover the Preview bundle, selected certificate and Production iCloud container. The helper verifies that capability on both the signed candidate and the final extracted ZIP. Omitting this option deliberately produces a local-only app; it must not be advertised as supporting personal sync. Production cloud packaging is not configured by this option.
 
 Official **production** retains the existing default:
 
@@ -84,11 +96,12 @@ Both routes enforce the same release gates:
 - The selected Developer ID Application private key, Apple team and working notarization profile.
 - The configured regression suite and executable self-checks. Preview reuses `preview.py` for its identity conversion and signing; production keeps its build-then-sign route.
 - Exact bundle name, bundle ID, executable, channel, version and archive contents. The archive cannot contain another app, unrelated files, duplicate paths or extraction traversal paths.
+- Real, discoverable Transcribe with Workbench Shortcuts metadata, required during building and checked in the packaged app.
 - Nested signing with hardened runtime and a secure timestamp, Apple Silicon executable coverage and full signature verification.
 - A single notarization submission, explicit `Accepted` status, stapling and Gatekeeper assessment.
 - Re-extraction of the final ZIP, another identity/version/signature/ticket check and Gatekeeper assessment of that exact packaged app.
 
-The final channel ZIP, `SHA256SUMS.txt` and `release.json` appear only after these checks succeed. Release directories are never overwritten. `release.json` records the source commit, channel, bundle ID, executable, version/build, architecture, signing team, notarization ID and final archive SHA-256. The tool does not install the app, create a GitHub release or publish website links.
+The final channel ZIP, `SHA256SUMS.txt` and `release.json` appear only after these checks succeed. Release directories are never overwritten. `release.json` records the source commit, channel, bundle ID, executable, version/build, architecture, signing team, notarization ID, validated iCloud capability and final archive SHA-256. The tool does not install the app, create a GitHub release or publish website links.
 
 ## Interrupted notarization and recovery evidence
 

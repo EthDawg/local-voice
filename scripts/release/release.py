@@ -15,6 +15,7 @@ import plistlib
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
 
@@ -85,14 +86,54 @@ def require_clean_source(expected=None):
     return source
 
 
-def build_archive(root, config, identity):
-    if config["channel"] == "preview":
-        # Reuse the Preview builder's identity, executable and channel conversion.
-        # It signs the converted app with this exact Developer ID. The same
-        # signature/team checks below remain mandatory before notarization.
-        return preview_tools().build(config, identity=identity)
-    run(*config["build"])
-    return root / config["archive"]
+def build_archive(root, config, identity, photo_cloud_profile=None):
+    if photo_cloud_profile and config["channel"] != "preview":
+        raise RuntimeError("Photo cloud provisioning is only supported for Workbench Preview")
+    # The Preview helper starts its own build subprocess. Require real action
+    # metadata through that entire chain, even if the caller disabled the gate.
+    previous = os.environ.get("REQUIRE_APP_INTENTS")
+    os.environ["REQUIRE_APP_INTENTS"] = "1"
+    try:
+        if config["channel"] == "preview":
+            return preview_tools().build(config, identity=identity,
+                                         photo_cloud_profile=photo_cloud_profile)
+        run(*config["build"])
+        return root / config["archive"]
+    finally:
+        if previous is None:
+            os.environ.pop("REQUIRE_APP_INTENTS", None)
+        else:
+            os.environ["REQUIRE_APP_INTENTS"] = previous
+
+
+def validate_app_intents(app):
+    """Check the actual archive, as well as requiring metadata during its build."""
+    path = app / "Contents/Resources/Metadata.appintents/extract.actionsdata"
+    try:
+        if path.is_symlink():
+            raise ValueError("Metadata is a symbolic link")
+        action = json.loads(path.read_text())["actions"]["TranscribeWithWorkbench"]
+        if (action.get("fullyQualifiedTypeName") != "LocalVoice.TranscribeWithWorkbench"
+                or action.get("isDiscoverable") is not True
+                or action.get("openAppWhenRun") is not False
+                or not isinstance(action.get("parameters"), list)
+                or len(action["parameters"]) != 1 or not action.get("outputType")):
+            raise ValueError("Required action contract is missing")
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
+        raise RuntimeError("Release requires valid Transcribe with Workbench App Intents metadata") from error
+
+
+def validate_cloud(app, root, team, enabled):
+    """Report enabled cloud capabilities only after the signed profile gate passes."""
+    info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+    if not enabled:
+        if info.get("WorkbenchPhotoCloudProvisioned") not in (None, False):
+            raise RuntimeError("Cloud-enabled releases require an explicit --photo-cloud-profile")
+        return {"enabled": False}
+    run(sys.executable, root / "scripts/check-photo-cloud.py", "--platform", "macos",
+        "--team", team, "--environment", "Production", "--app", app)
+    return {"enabled": True, "container": info["WorkbenchPhotoCloudContainer"],
+            "environment": info["WorkbenchPhotoCloudEnvironment"]}
 
 
 def validate_identity(app, config):
@@ -148,11 +189,19 @@ def main():
     parser.add_argument("--team-id", required=True)
     parser.add_argument("--keychain-profile", required=True, help="Existing notarytool Keychain profile name")
     parser.add_argument("--preview", action="store_true", help="Sign and notarize the separate Workbench Preview; production is the default")
+    parser.add_argument("--photo-cloud-profile", type=Path,
+                        help="Existing Developer ID CloudKit profile; requires --preview")
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Fa-f0-9]{40}", args.identity):
         parser.error("--identity must be the certificate SHA-1 fingerprint, not an ad-hoc identity")
     if not re.fullmatch(r"[A-Z0-9]{10}", args.team_id):
         parser.error("Invalid Apple team ID")
+    if args.photo_cloud_profile:
+        if not args.preview:
+            parser.error("--photo-cloud-profile requires --preview")
+        args.photo_cloud_profile = args.photo_cloud_profile.resolve()
+        if not args.photo_cloud_profile.is_file():
+            parser.error("--photo-cloud-profile must be an existing provisioning profile file")
     root = Path(__file__).resolve().parents[2]
     os.chdir(root)
     config = configuration(root, preview=args.preview)
@@ -165,7 +214,7 @@ def main():
     run("xcrun", "notarytool", "history", "--keychain-profile", args.keychain_profile,
         "--output-format", "json", capture=True)
     run(*config["regressions"])
-    archive = build_archive(root, config, args.identity)
+    archive = build_archive(root, config, args.identity, photo_cloud_profile=args.photo_cloud_profile)
     # Regressions/builds must not silently change the commit being released.
     require_clean_source(expected=source)
     validate_archive(archive, config)
@@ -191,6 +240,9 @@ def main():
             run(*command, path)
         signature = check_signature(app, args.team_id)
         (output / "signature.txt").write_text(signature)
+        validate_app_intents(app)
+        candidate["icloud"] = validate_cloud(app, root, args.team_id, bool(args.photo_cloud_profile))
+        (output / "candidate.json").write_text(json.dumps(candidate, indent=2) + "\n")
         executable = app / "Contents/MacOS" / config["executable"]
         architectures = run("lipo", "-archs", executable, capture=True).stdout.strip()
         if "arm64" not in architectures.split():
@@ -236,6 +288,9 @@ def main():
         if any(final_info[key] != info[key] for key in ("CFBundleShortVersionString", "CFBundleVersion")):
             raise RuntimeError("The final archive version does not match the notarized candidate")
         check_signature(delivered, args.team_id)
+        validate_app_intents(delivered)
+        if validate_cloud(delivered, root, args.team_id, bool(args.photo_cloud_profile)) != candidate["icloud"]:
+            raise RuntimeError("The final archive cloud configuration does not match the notarized candidate")
         run("xcrun", "stapler", "validate", delivered)
         run("spctl", "--assess", "--type", "execute", "--verbose=4", delivered)
         digest = hashlib.sha256(packaged.read_bytes()).hexdigest()

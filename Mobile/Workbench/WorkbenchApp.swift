@@ -211,6 +211,8 @@ struct MobileAboutView: View {
                 Section("Preview boundaries") {
                     Text("Personal scene sync is optional and uses the same Apple Account on your devices. Drafts, recordings, markup and wallpaper projects stay local. The separate photo inbox sends only photos you choose. This Preview has no custom keyboard, cross-app overlays or background microphone.")
                     Text("Original image assets are retained when you delete a saved project. Deleting the app removes its local library; export important work first.")
+                    Link("Privacy Policy", destination: URL(string: "https://workbench-mac.vercel.app/privacy.html")!)
+                        .accessibilityIdentifier("about.privacyPolicy")
                     Link("Mobile guide", destination: URL(string: "https://workbench-mac.vercel.app/mobile/")!)
                     Link("Source and feedback", destination: URL(string: "https://github.com/EthDawg/local-voice")!)
                 }
