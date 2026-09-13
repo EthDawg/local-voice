@@ -48,7 +48,7 @@ No ReplayKit broadcast extension, ScreenCaptureKit stream, external-display scen
 
 ## Build and test
 
-Use full **Xcode 26+** with the iOS 26 SDK and an installed iOS 26 Simulator runtime. The Mac SwiftPM build and Developer ID/notarization scripts do not build or distribute this target.
+Use full **Xcode 26.1+** with the iOS 26.1+ SDK and an installed iOS 26 Simulator runtime. The Mac SwiftPM build and Developer ID/notarization scripts do not build or distribute this target.
 
 ```sh
 python3 scripts/mobile-project.py

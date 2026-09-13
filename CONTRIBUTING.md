@@ -42,7 +42,7 @@ CI runs automated checks and packaging on a macOS runner. A maintainer may need 
 
 ## Build and check the mobile Preview
 
-Use full Xcode 26+ with the iOS 26 SDK and an installed iOS 26 Simulator runtime. From the same checkout:
+Use full Xcode 26.1+ with the iOS 26.1+ SDK and an installed iOS 26 Simulator runtime. From the same checkout:
 
 ```sh
 python3 scripts/mobile-project.py
