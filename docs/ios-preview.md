@@ -84,8 +84,8 @@ TestFlight requires a separate archive, signing and App Store Connect workflow. 
 | Manual iPad Simulator | Starter backdrop, portrait/landscape presentation, End back to editor, PNG share-sheet handoff; reading Pause/Resume and Stop through the persistent control observed | In-app interactions with synthetic content; no external receiver or physical audio-route claim |
 | Shared Mac behavior | Mac debug build passed; 43 correction transaction checks and 13 draft cleanup checks passed | Extracting the three shared sources preserves the affected Mac contracts |
 | Generic iOS Release archive | Final source archived successfully with signing disabled | Release compilation and packaging; not installable until signed |
-| Development-signed iOS archive | Blocked: Xcode reported no signed-in accounts and no provisioning profile | Apple account/provisioning still required |
-| Connected iPhone | Unavailable to Xcode | No physical install, microphone/model or playback acceptance result |
+| Signed iOS Release archive | Passed with the issued ad hoc profile and Apple Distribution certificate; signature, exact bundle, container and Production environment verified | Local Release Testing export and physical installation are separate checks; no upload |
+| Connected iPhone | Physical iPhone 16 Pro Max connected, Developer Mode enabled and exact device included in its Preview profile | No physical camera, microphone/model or playback acceptance result yet |
 
 Actual screenshots are retained in `site/assets/guide/mobile-*-actual.png` and shown in the [mobile guide](https://workbench-mac.vercel.app/mobile/). iPhone images are unedited XCTest attachments from isolated libraries; iPad presentation/paused-reading images were captured through native computer controls. The generated concepts remain separately labelled. Visual review found and fixed an empty playback accessory overlapping Share, a blank app icon and drawing focus stealing; functional tests alone did not establish those visual outcomes.
 

@@ -49,6 +49,15 @@ def info_for(config):
                 WorkbenchPhotoCloudEnvironment=config['environment'])
 
 
+def issued_shape_profile(config):
+    """Synthetic values with the shapes observed in issued Apple profiles."""
+    profile = profile_for(config)
+    profile['Entitlements']['com.apple.developer.icloud-services'] = '*'
+    profile['Entitlements']['com.apple.developer.icloud-container-environment'] = (
+        ['Production', 'Development'] if config['platform'] == 'ios' else 'Production')
+    return profile
+
+
 def make_app(root, config, info=None):
     app = Path(root) / 'Synthetic Preview.app'
     contents = app / 'Contents' if config['platform'] == 'macos' else app
@@ -82,6 +91,89 @@ class PhotoCloudChecks(unittest.TestCase):
         # Explicit overrides remain supported; defaults remain the paired Preview IDs.
         config = dict(expected(), bundle='com.example.private.preview', container='iCloud.com.example.private.preview')
         CHECK.check_profile(profile_for(config), now=NOW, **config)
+
+    def test_issued_profile_service_wildcard_and_environment_allowlist(self):
+        for config in (expected(), expected('macos'), expected(environment='Development')):
+            with self.subTest(config=config):
+                CHECK.check_profile(issued_shape_profile(config), now=NOW, **config)
+        for environments in (['Production'], ['Development', 'Production'], 'Production'):
+            profile = issued_shape_profile(expected())
+            profile['Entitlements']['com.apple.developer.icloud-container-environment'] = environments
+            CHECK.check_profile(profile, now=NOW, **expected())
+
+    def test_profile_allowlists_reject_wrong_values_substrings_and_malformed_types(self):
+        cases = {
+            'com.apple.developer.icloud-services': [
+                None, True, 1, [], {}, {'*': True}, ['*'], ['CloudKit', '*'],
+                'CloudKit', '*CloudKit*', ' * ', 'CloudKit,CloudDocuments',
+                ['prefixCloudKitsuffix'], ['CloudDocuments'], ['CloudKit', 1],
+                ['CloudKit', ''], ['CloudKit', 'CloudKit'], ['CloudKit', 'Cloud*'],
+            ],
+            'com.apple.developer.icloud-container-environment': [
+                None, True, 1, [], {}, {'Production': True}, ['Development'],
+                'Development', '*', ['*'], 'production', ' Production ',
+                'Production,Development', 'prefixProductionsuffix',
+                ['Production', '*'], ['Production', 'Sandbox'], ['Production', ''],
+                ['Production', 1], ['Production', 'Production'], [['Production']],
+            ],
+            'com.apple.developer.icloud-container-identifiers': [
+                '*', ['*'], [CHECK.CONTAINER, '*'], CHECK.CONTAINER,
+                {'*': True}, [CHECK.CONTAINER, 1], ['prefix' + CHECK.CONTAINER],
+            ],
+        }
+        for key, values in cases.items():
+            for value in values:
+                profile = issued_shape_profile(expected())
+                profile['Entitlements'][key] = value
+                with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                    CHECK.check_profile(profile, now=NOW, **expected())
+
+    def test_profile_authorization_does_not_relax_binary_claims(self):
+        for config in (expected(), expected('macos')):
+            with self.subTest(platform=config['platform']), tempfile.TemporaryDirectory() as root:
+                app, embedded = make_app(root, config)
+                profile = issued_shape_profile(config)
+                with patch.object(CHECK.subprocess, 'run', side_effect=signed_results(config)), patch.object(CHECK, 'load_profile', return_value=profile) as load:
+                    CHECK.check_app(app, config)
+                    load.assert_called_once_with(embedded)
+                cases = [
+                    ('com.apple.developer.icloud-services', '*'),
+                    ('com.apple.developer.icloud-services', ['CloudKit', '*']),
+                    ('com.apple.developer.icloud-services', ['CloudKit', 'Cloud*']),
+                    ('com.apple.developer.icloud-container-environment', ['Production']),
+                    ('com.apple.developer.icloud-container-environment', ['Production', 'Development']),
+                    ('com.apple.developer.icloud-container-identifiers', [CHECK.CONTAINER, '*']),
+                ]
+                for key, value in cases:
+                    signed = dict(profile_for(config)['Entitlements'], **{key: value})
+                    with self.subTest(key=key, value=value), patch.object(CHECK.subprocess, 'run', side_effect=signed_results(config, entitlements=signed)), patch.object(CHECK, 'load_profile', return_value=profile) as load:
+                        with self.assertRaises(ValueError):
+                            CHECK.check_app(app, config)
+                        load.assert_not_called()
+
+    def test_profile_authorization_is_narrowed_to_exact_output_claims(self):
+        for config in (expected(), expected('macos'), expected(environment='Development')):
+            with self.subTest(config=config), tempfile.TemporaryDirectory() as root:
+                profile = issued_shape_profile(config)
+                original = deepcopy(profile)
+                output = Path(root) / 'scoped.entitlements'
+                CHECK.write_scoped_entitlements(output, profile, config)
+                claims = plistlib.loads(output.read_bytes())
+                self.assertEqual(claims['com.apple.developer.icloud-services'], ['CloudKit'])
+                self.assertEqual(claims['com.apple.developer.icloud-container-environment'], config['environment'])
+                self.assertEqual(claims['com.apple.developer.icloud-container-identifiers'], [config['container']])
+                CHECK.check_entitlements(claims, **config)
+                self.assertEqual(profile, original)
+                self.assertNotIn(b'<string>*</string>', output.read_bytes())
+
+    def test_wrong_profile_environment_creates_no_signing_output(self):
+        profile = issued_shape_profile(expected())
+        profile['Entitlements']['com.apple.developer.icloud-container-environment'] = ['Development']
+        with tempfile.TemporaryDirectory() as root:
+            output = Path(root) / 'scoped.entitlements'
+            with self.assertRaisesRegex(ValueError, 'does not authorise'):
+                CHECK.write_scoped_entitlements(output, profile, expected())
+            self.assertFalse(output.exists())
 
     def test_malformed_expected_configuration_fails_closed(self):
         cases = {

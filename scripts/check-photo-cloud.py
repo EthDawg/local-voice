@@ -62,7 +62,7 @@ def load_dictionary(data, label):
     return require_dictionary(value, label)
 
 
-def check_entitlements(entitlements, *, platform, container, environment, bundle, team):
+def _check_identity_and_container(entitlements, *, platform, container, environment, bundle, team):
     check_expected(platform=platform, container=container, environment=environment, bundle=bundle, team=team)
     require_dictionary(entitlements, 'Entitlements')
     required_identifier_key = 'com.apple.application-identifier' if platform == 'macos' else 'application-identifier'
@@ -74,13 +74,40 @@ def check_entitlements(entitlements, *, platform, container, environment, bundle
     if entitlements.get('com.apple.developer.team-identifier') != team:
         raise ValueError('The team entitlement does not match the selected team.')
     containers = string_list(entitlements.get('com.apple.developer.icloud-container-identifiers'), 'iCloud containers')
-    if container not in containers:
+    if container not in containers or any('*' in value for value in containers):
         raise ValueError('The shared photo container is not authorised.')
-    services = string_list(entitlements.get('com.apple.developer.icloud-services'), 'iCloud services')
-    if 'CloudKit' not in services:
+
+
+def _check_cloudkit_service_claim(value):
+    services = string_list(value, 'iCloud services')
+    if 'CloudKit' not in services or any('*' in service for service in services):
         raise ValueError('The CloudKit service is not authorised.')
-    if entitlements.get('com.apple.developer.icloud-container-environment') != environment:
+
+
+def check_entitlements(entitlements, **expected):
+    """Check claims embedded in an app signature, never profile allowlists."""
+    _check_identity_and_container(entitlements, **expected)
+    _check_cloudkit_service_claim(entitlements.get('com.apple.developer.icloud-services'))
+    if entitlements.get('com.apple.developer.icloud-container-environment') != expected['environment']:
         raise ValueError('The entitlement does not match the selected CloudKit environment.')
+
+
+def check_profile_entitlements(entitlements, **expected):
+    # TN3125 distinguishes a profile's authorization allowlist from the app's
+    # exact claims. Issued Apple profiles can authorize all iCloud services with
+    # the literal string "*", and one or both environments in a string array.
+    _check_identity_and_container(entitlements, **expected)
+    services = entitlements.get('com.apple.developer.icloud-services')
+    if not (isinstance(services, str) and services == '*'):
+        _check_cloudkit_service_claim(services)
+    environments = entitlements.get('com.apple.developer.icloud-container-environment')
+    if isinstance(environments, str):
+        environments = [environments]
+    else:
+        environments = string_list(environments, 'Profile iCloud environments')
+    if (any(value not in ('Development', 'Production') for value in environments)
+            or expected['environment'] not in environments):
+        raise ValueError('The profile does not authorise the selected CloudKit environment.')
 
 
 def utc_date(value, label):
@@ -102,7 +129,7 @@ def check_profile(profile, *, now=None, **expected):
     platform = 'iOS' if expected['platform'] == 'ios' else 'OSX'
     if platform not in string_list(profile.get('Platform'), 'Profile platforms'):
         raise ValueError('The provisioning profile is for a different platform.')
-    check_entitlements(profile.get('Entitlements', {}), **expected)
+    check_profile_entitlements(profile.get('Entitlements', {}), **expected)
 
 
 def load_profile(path):
@@ -149,8 +176,10 @@ def write_scoped_entitlements(path, profile, expected):
     entitlements = {key: value for key, value in profile['Entitlements'].items() if key in allowed}
     entitlements['com.apple.developer.icloud-container-identifiers'] = [expected['container']]
     entitlements['com.apple.developer.icloud-services'] = ['CloudKit']
+    entitlements['com.apple.developer.icloud-container-environment'] = expected['environment']
     if expected['platform'] == 'macos':
         entitlements.update({'com.apple.security.device.audio-input': True, 'com.apple.security.device.camera': True})
+    check_entitlements(entitlements, **expected)
     payload = plistlib.dumps(entitlements)
     # Serialize before exclusive creation; leave existing reviewed output intact.
     with path.open('xb') as stream:

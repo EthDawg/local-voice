@@ -107,18 +107,78 @@ The Mac compiles the shared code as a SwiftPM target. The mobile project generat
 
 ## Signing and configuration gate
 
-Ordinary mobile builds default to cloud disabled. The optional [`PhotoCloud.xcconfig`](../Mobile/Configuration/PhotoCloud.xcconfig) and [entitlements](../Mobile/Configuration/PhotoCloud.entitlements) describe a provisioned paired Preview, not proof one exists. Both apps must be authorised for `iCloud.com.ethdawg.workbench.preview` and the **same Production environment** for the current Developer ID Mac pairing. A Development iPhone build against that Mac is a different database. Production schema deployment and device provisioning remain explicit setup steps. [Apple iCloud configuration](https://developer.apple.com/documentation/xcode/configuring-icloud-services)
+Ordinary mobile builds default to cloud disabled. The optional [`PhotoCloud.xcconfig`](../Mobile/Configuration/PhotoCloud.xcconfig) and [entitlements](../Mobile/Configuration/PhotoCloud.entitlements) enable the provisioned paired Preview. Both apps must be authorised for `iCloud.com.ethdawg.workbench.preview` and the **same Production environment** for the current Developer ID Mac pairing. A Development iPhone build against that Mac accesses a different database. A Release build configuration alone does not select Production CloudKit. [Apple iCloud configuration](https://developer.apple.com/documentation/xcode/configuring-icloud-services)
 
 [`check-photo-cloud.py`](../scripts/check-photo-cloud.py) checks exact Preview bundle/team, CloudKit container and environment, profile platform/expiry, and, for `--app`, the actual signature and embedded profile. It does not create capabilities, sign in or prove account/transfer availability. Mac runtime additionally inspects signed entitlements. iOS uses the packaging-verified build marker because it has no public `SecTask` entitlement API; setting a marker alone is not sufficient provisioning evidence.
+
+A profile describes what Apple **authorises**; a signed app declares what it **uses**. The issued profiles inspected during setup had the following shapes. The checker accepts these profile allowlists without allowing them as app claims. [Apple TN3125](https://developer.apple.com/documentation/technotes/tn3125-inside-code-signing-provisioning-profiles)
+
+| Location | iCloud services | CloudKit environment |
+| --- | --- | --- |
+| Issued Developer ID Mac profile | Literal string `*` | String `Production` |
+| Issued iOS ad hoc profile | Literal string `*` | Array containing `Production` and `Development` |
+| Signed paired app | Array containing `CloudKit`, with no wildcard entries | Exact string `Production` |
+
+Profile environment arrays must contain distinct supported values and authorise the requested environment. The container array must explicitly include the paired container. Generated signing entitlements narrow the authorisation to that container, `['CloudKit']` and the selected environment string; profile wildcards and environment arrays are never copied into the app's claims. All **29 synthetic checker tests** passed, including wrong-environment, malformed-array, substring and profile-versus-app cases. Run them with `python3 scripts/test-photo-cloud.py`. These tests do not establish that an issued profile includes a particular phone or authorises a selected signing certificate; check those separately before installation.
 
 After authorised profiles exist, preflight them and the resulting apps with the actual team and paths, for example:
 
 ```sh
 python3 scripts/check-photo-cloud.py --platform ios --team TEAM_ID --environment Production --profile /path/to/iphone.mobileprovision
+python3 scripts/check-photo-cloud.py --platform macos --team TEAM_ID --environment Production --profile /path/to/mac.provisionprofile
 python3 scripts/check-photo-cloud.py --platform macos --team TEAM_ID --environment Production --app "/path/to/Workbench Preview.app"
 ```
 
-The optional Mac packaging command is `bash scripts/build.sh --preview --photo-cloud-profile /path/to/mac.provisionprofile`; add `--identity` if certificate selection is ambiguous. It verifies the profile before building and the signed app afterwards. For mobile, use a profile and signing/export route that authorises the chosen environment; do not assume an ordinary Development build reaches Production. Apple’s [archived CloudKit test guide](https://developer.apple.com/library/archive/documentation/DataManagement/Conceptual/CloudKitQuickStart/TestingYourApp/TestingYourApp.html) describes selecting an environment for designated-device ad hoc testing; current Xcode/profile choices must be verified rather than copying its old UI steps. Regenerate with `python3 scripts/mobile-project.py`, apply the optional xcconfig in the signed Xcode build, then run the app preflight. See [iOS Preview](ios-preview.md) for the native target workflow. These steps do not establish notarization, TestFlight, App Store or public release status.
+The optional Mac packaging command is `bash scripts/build.sh --preview --photo-cloud-profile /path/to/mac.provisionprofile`; select the intended Developer ID identity if more than one is available. It verifies the profile before building and the signed app afterwards.
+
+For iOS, register the intended physical phone and use an installed **ad hoc distribution profile** plus its authorised **Apple Distribution** certificate. The profile must include that phone; an App Store profile is not a substitute for direct installation. Regenerate with `python3 scripts/mobile-project.py`, then archive the `WorkbenchMobile` scheme for a device. The generator writes explicit target defaults `NO` and `Development`: merely assigning a base xcconfig can leave those target values winning. Use `-xcconfig` as an override, or explicitly change the target's Release values, and inspect the resolved settings before building. For example, with the actual team/profile and output paths substituted:
+
+```sh
+xcodebuild -project Mobile/Workbench.xcodeproj -scheme WorkbenchMobile \
+  -configuration Release -destination 'generic/platform=iOS' \
+  -xcconfig Mobile/Configuration/PhotoCloud.xcconfig \
+  -archivePath /path/to/WorkbenchMobile.xcarchive \
+  DEVELOPMENT_TEAM=TEAM_ID CODE_SIGN_STYLE=Manual \
+  CODE_SIGN_IDENTITY='Apple Distribution' \
+  PROVISIONING_PROFILE_SPECIFIER=PROFILE_NAME archive
+```
+
+In Xcode 26, **Organizer → Distribute App → Release Testing** exports an installable build for registered devices. For CLI export, `release-testing` is the current method name; `ad-hoc` is deprecated. Use a local `ExportOptions.plist` with the actual team/profile substituted:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+  <key>method</key><string>release-testing</string>
+  <key>destination</key><string>export</string>
+  <key>iCloudContainerEnvironment</key><string>Production</string>
+  <key>teamID</key><string>TEAM_ID</string>
+  <key>signingStyle</key><string>manual</string>
+  <key>signingCertificate</key><string>Apple Distribution</string>
+  <key>provisioningProfiles</key><dict>
+    <key>com.ethdawg.workbench.mobile.preview</key><string>PROFILE_NAME</string>
+  </dict>
+</dict></plist>
+```
+
+```sh
+xcodebuild -exportArchive -archivePath /path/to/WorkbenchMobile.xcarchive \
+  -exportPath /path/to/Export -exportOptionsPlist /path/to/ExportOptions.plist
+```
+
+Inspect the exported IPA's `Payload/WorkbenchMobile.app` with the `--app` preflight before installation. Export can re-sign the archive: verify its final profile, signature and Info values, not just the source entitlements or archive. Workbench's Info marker must be enabled and its Info environment must match the signed `Production` entitlement. Install that exact export and launch normally without test arguments; an ordinary Debug Run may overwrite it with a Development build. This route needs no TestFlight or App Store upload. [Apple registered-device distribution](https://developer.apple.com/documentation/xcode/distributing-your-app-to-registered-devices), [current distribution methods](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases)
+
+The schema was deployed to Production and its field types verified during setup on 13 September 2026:
+
+| Record type | Field | CloudKit type |
+| --- | --- | --- |
+| `PhotoV1` | `metadata` | Bytes |
+| `PhotoV1` | `image` | Asset |
+
+To reproduce it without creating service tokens, open CloudKit Console, select this container's **Development** environment and **Schema → Record Types**, then create or verify `PhotoV1` and those exact fields. Save, choose **Deploy Schema Changes**, review the changes and deploy to Production. Confirm both fields there. This copies schema, not Development records. The app creates each user's private `WorkbenchPhotosV1` zone; no manually shared zone or public photo record is needed. Its zone-change and record-ID fetches require no query index. A `recordName` QUERYABLE index is optional for Console record searches. [Apple schema editing](https://developer.apple.com/documentation/cloudkit/inspecting-and-editing-an-icloud-container-s-schema), [schema deployment](https://developer.apple.com/documentation/cloudkit/deploying-an-icloud-container-s-schema)
+
+Production security-role inspection showed `_world` and `_creator` listing only the system `Users` record type, and `_icloud` listing no record types: **no `PhotoV1` public-role grants were present**. Keep that distinction when reviewing access. Apple describes these role permissions as public-database access control; each user's private database remains private to that user. Workbench uses the private database and does not need a public grant to transfer the user's photos. The Mac's account-availability check succeeded during setup; that does not prove a photo upload or download. [Apple database and access-control model](https://developer.apple.com/icloud/cloudkit/designing/)
+
+See [iOS Preview](ios-preview.md) for the native target workflow. Provisioning and schema setup do not establish a completed paired photo transfer, notarization, TestFlight, App Store or public release status.
 
 ## Verification and acceptance
 
@@ -128,7 +188,9 @@ Verified on 13 September 2026:
 - iPhone and iPad each passed the existing 18 unit tests and 5 UI journeys. The 2 new local photo UI journeys passed on each after fixing an ambiguous test selector. Both photo journeys passed again after the final visual refinement. The final unsigned iOS device archive also passed.
 - The Mac Stage suite ran 73 tests / 1,753 assertions. Its photo replacement and preservation checks passed; 2 global-shortcut integration assertions conflicted with another running app on this desktop. This local run is not a full-suite pass. The subsequent [clean CI run for native commit `f43244d`](https://github.com/EthDawg/local-voice/actions/runs/34739007455) passed all three jobs: Mac, iPhone and iPad, including those shortcut checks.
 - A disposable native Mac app compiled the actual handoff view and shared model. Manual CUA review verified a simulated arrival, retained image during simulated offline failure, same-ID recovery without duplication and the explicit reuse callback. Screenshots visibly say **Simulated arrival · no iCloud**. Its backdrop callback is simulated; real scene preservation is covered separately by the Stage tests.
-- The connected iPhone was reported unavailable and both Xcode provisioning-profile locations were empty. No physical camera, live cloud record, paired transfer or signed handoff binary is verified.
+- The physical iPhone 16 Pro Max is now connected with Developer Mode enabled. Issued profiles authorize the exact phone, the selected signing certificates and the shared container. Inspecting those real profiles exposed service-wildcard and environment-allowlist shapes absent from the synthetic fixtures; the corrected preflight passes all 29 checks while retaining strict signed-app claims.
+- Both signed native builds passed. The Developer ID Mac Preview is installed with existing data preserved; its installed signature/profile/configuration passed preflight, and its normal **From iPhone** view successfully checked the live private iCloud account. The iOS ad hoc archive passed signature/profile/configuration preflight; local export and physical installation remain separate acceptance steps.
+- Production schema deployment completed and readback verified `PhotoV1.image` as Asset and `PhotoV1.metadata` as Bytes. Production public security roles grant no permissions on `PhotoV1`; the implementation uses each account's private database. No physical camera photo, live photo record or paired transfer is verified yet.
 
 
 
