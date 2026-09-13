@@ -80,3 +80,5 @@ The short implementation map is [design.md](design.md). The earlier suite model 
 ## Improving the commodity utility
 
 The [category comparison](utility-comparison.md) ranks three useful steps per existing job. The [architecture decision](commodity-strategy.md) records stable jobs, replaceable engines and storage boundaries. Use the [model evaluation template](model-evaluation.md) before changing a default engine. GitHub issues remain the canonical contribution queue.
+
+Backdrop selection and crop are part of scene preparation. [Background management](background-management.md) records the competitor comparison, reversible replacement contract and deferred motion/stock work. They do not add a wallpaper daemon or a sixth utility.

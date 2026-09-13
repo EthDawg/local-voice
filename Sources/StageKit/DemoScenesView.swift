@@ -9,6 +9,7 @@ struct DemoScenesView: View {
     @State private var choosingLogo = false
     @State private var creatingTextLogo = false
     @State private var textLogoName = "Your company"
+    @State private var backdropReplacement: BackdropReplacement?
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 14) {
@@ -65,6 +66,8 @@ struct DemoScenesView: View {
                         HStack {
                             Text("Drag to position")
                             Spacer()
+                            Button("Change backdrop…") { backdropReplacement = BackdropReplacement(scene: model.selected ?? scene, root: model.root) }
+                                .disabled(model.storageBlocked)
                             Text("Layout saved automatically").foregroundStyle(Workbench.accent)
                         }.font(.caption).foregroundStyle(.secondary)
                         HStack(spacing: 22) {
@@ -103,7 +106,14 @@ struct DemoScenesView: View {
                         }.padding(.top, 10)
                         }.font(.caption)
                     } else {
-                        ContentUnavailableView("Backdrop missing", systemImage: "photo.badge.exclamationmark", description: Text("Add the original image again to create a new scene."))
+                        ContentUnavailableView {
+                            Label("Backdrop missing", systemImage: "photo.badge.exclamationmark")
+                        } description: {
+                            Text("Choose a replacement to keep this scene’s saved layout.")
+                        } actions: {
+                            Button("Change backdrop…") { backdropReplacement = BackdropReplacement(scene: model.selected ?? scene, root: model.root) }
+                                .disabled(model.storageBlocked)
+                        }
                     }
                 } else if !model.scenes.isEmpty {
                     VStack(spacing: 14) {
@@ -146,8 +156,8 @@ struct DemoScenesView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         #if !APP_STORE
-                        Button("Present full screen") { commitName(); model.startDemo() }.buttonStyle(.borderedProminent).controlSize(.large).disabled(model.desktopBusy)
-                        Button("Present in window") { commitName(); model.startDemo(mode: .windowed) }.controlSize(.large).disabled(model.desktopBusy)
+                        Button("Present full screen") { commitName(); model.startDemo() }.buttonStyle(.borderedProminent).controlSize(.large).disabled(model.desktopBusy || !model.systemIntegrationEnabled)
+                        Button("Present in window") { commitName(); model.startDemo(mode: .windowed) }.controlSize(.large).disabled(model.desktopBusy || !model.systemIntegrationEnabled)
                         #else
                         Button("Export image…") { commitName(); model.exportPNG() }.buttonStyle(.borderedProminent).controlSize(.large)
                         #endif
@@ -155,7 +165,7 @@ struct DemoScenesView: View {
                         Menu("More") {
                         #if !APP_STORE
                         Button("Export image…") { commitName(); model.exportPNG() }
-                        Button("Use as desktop") { commitName(); model.applyDesktop() }.disabled(model.desktopBusy)
+                        Button("Use as desktop") { commitName(); model.applyDesktop() }.disabled(model.desktopBusy || !model.systemIntegrationEnabled)
                         #endif
                         }.fixedSize().accessibilityLabel("More demo actions")
                     }
@@ -173,6 +183,7 @@ struct DemoScenesView: View {
             }
         }
         .background(Workbench.background).tint(Workbench.accent).workbenchTheme()
+        .sheet(item: $backdropReplacement) { draft in BackdropReplacementView(model: model, draft: draft) }
         .sheet(isPresented: $choosingStarter) {
             SceneStarterGallery(model: model) { starter in
                 do { try model.useStarter(starter); choosingStarter = false }

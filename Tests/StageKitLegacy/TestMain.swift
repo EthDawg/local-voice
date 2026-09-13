@@ -4,21 +4,27 @@ import AppKit
 struct TestRunner {
     static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
+        if args == ["--backdrop-fixture"] {
+            _ = NSApplication.shared
+            BackdropReplacementFixture().run()
+            return
+        }
         if args == ["--board-presentation-fixture"] {
             _ = NSApplication.shared
             BoardPresentationFixture().run()
             return
         }
         let boardPresentationOnly = args == ["--board-presentation-only"]
-        guard args.isEmpty || args == ["--ci"] || args == ["--scenes-only"] || boardPresentationOnly else {
-            print("Usage: StageMarkTests [--ci | --scenes-only | --board-presentation-only | --board-presentation-fixture]")
+        let backdropOnly = args == ["--backdrop-only"]
+        guard args.isEmpty || args == ["--ci"] || args == ["--scenes-only"] || boardPresentationOnly || backdropOnly else {
+            print("Usage: StageMarkTests [--ci | --scenes-only | --board-presentation-only | --board-presentation-fixture | --backdrop-only | --backdrop-fixture]")
             exit(2)
         }
         let scenesOnly = args == ["--scenes-only"]
         let hostedCI = args == ["--ci"]
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.accessory)
-        if !scenesOnly && !boardPresentationOnly { NSApp.finishLaunching() }
+        if !scenesOnly && !boardPresentationOnly && !backdropOnly { NSApp.finishLaunching() }
         let suite = CoreTests()
         let integration = IntegrationTests()
         let scenes = SceneTests()
@@ -31,6 +37,15 @@ struct TestRunner {
         let workbench = WorkbenchModuleTests()
         let boardExport = BoardExportTests()
         let presentationLifecycle = PresentationLifecycleTests()
+        let backdrop = BackdropReplacementTests()
+        let backdropTests: [(String, () throws -> Void)] = [
+            ("backdrop draft choice crop and cancellation", backdrop.testDraftCropChoiceAndCancelNeverWrite),
+            ("backdrop commit preserves current foreground and originals", backdrop.testImportedCommitPreservesCurrentForegroundAndOriginals),
+            ("backdrop saved reuse deduplication and missing-image repair", backdrop.testSavedReuseDeduplicationAndMissingBackdropRepair),
+            ("backdrop stale deleted invalid and blocked preservation", backdrop.testStaleDeletedInvalidAndBlockedApplyPreserveBytes),
+            ("backdrop failed save rollback and changed-image rejection", backdrop.testCommitFailureCleansOnlyNewCopyAndChangedSavedImageRejects),
+            ("backdrop preview and saved composition pixels", backdrop.testPreviewAndSavedRenderingAtSameAspectKeepForeground)
+        ]
         var tests: [(String, () throws -> Void)] = [
             ("board export pixels orientation text and Retina", boardExport.testBoardPixelsOrientationTextAndRetinaScale),
             ("board snapshot file bounds and invalid input", boardExport.testSnapshotPersistenceBoundsAndInvalidInput),
@@ -98,7 +113,10 @@ struct TestRunner {
             ("native drawing lifecycle and board isolation", integration.testDrawingLifecycleAndBoardIsolation),
             ("global shortcut registration and release", integration.testShortcutRegistrationAndRelease)
         ]
-        if boardPresentationOnly {
+        tests.insert(contentsOf: backdropTests, at: 5)
+        if backdropOnly {
+            tests = backdropTests
+        } else if boardPresentationOnly {
             tests = Array(tests.prefix(5))
         } else if scenesOnly {
             tests = Array(tests.prefix { $0.0 != "line hit testing" })
@@ -107,7 +125,7 @@ struct TestRunner {
         } else {
             tests.append(("menu bar and non-destructive quick adjustments", integration.testMenuBarAccessAndQuickAdjustmentsPreserveBoard))
         }
-        if !scenesOnly && !boardPresentationOnly { tests.append(("embedded navigation and recording suspension", workbench.testEmbeddedCallbacksAndSuspendedShortcutSettings)) }
+        if !scenesOnly && !boardPresentationOnly && !backdropOnly { tests.append(("embedded navigation and recording suspension", workbench.testEmbeddedCallbacksAndSuspendedShortcutSettings)) }
         for (name, test) in tests {
             let before = assertionFailures
             do { try test() } catch { assertionFailures += 1; print("FAIL \(name): \(error)") }

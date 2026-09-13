@@ -207,6 +207,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     @Published private(set) var desktopBusy = false
     @Published private(set) var screenAspect: CGFloat = 16.0 / 9.0
     let root: URL
+    let systemIntegrationEnabled: Bool
     let personas: PersonaLibrary
     private var window: NSWindow?
     private var presentation: DemoPresentation?
@@ -228,8 +229,9 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     }
     private var archiveURL: URL { root.appendingPathComponent("scenes.json") }
     private var snapshotURL: URL { root.appendingPathComponent("desktop-restore.json") }
-    init(root: URL? = nil, readOnlyReason: String? = nil) {
+    init(root: URL? = nil, readOnlyReason: String? = nil, systemIntegrationEnabled: Bool = true) {
         self.root = root ?? Workbench.supportDirectory(component: "StageMark").appendingPathComponent("Scenes")
+        self.systemIntegrationEnabled = systemIntegrationEnabled
         self.personas = PersonaLibrary(root: self.root, readOnlyReason: readOnlyReason)
         super.init()
         if let readOnlyReason {
@@ -300,6 +302,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
         } catch { notice = error.localizedDescription }
     }
     func startDemo(mode: PresentationMode = .fullScreen) {
+        guard systemIntegrationEnabled else { return }
         guard mayBeginInteraction?() != false else { notice = "Finish your current recording or keyboard practice before presenting."; return }
         guard let scene = selected, let image = image(for: scene) else { return }
         if scene.logo != nil && logoImage(for: scene) == nil { notice = SceneError.missingLogo.localizedDescription; return }
@@ -331,6 +334,42 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
             let checked = try scene.validated()
             try persist(scenes.map { $0.id == scene.id ? checked : $0 })
         } catch { notice = error.localizedDescription }
+    }
+    func applyBackdrop(_ draft: BackdropReplacement) throws {
+        guard !storageBlocked else { throw SceneError.storageBlocked }
+        guard draft.root.standardizedFileURL == root.standardizedFileURL else { throw BackdropReplacementError.closed }
+        guard draft.active else { throw BackdropReplacementError.closed }
+        guard draft.canApply, let candidate = draft.candidate else { throw BackdropReplacementError.noChange }
+        // Re-read at commit so a preview cannot replace newer names, foreground
+        // placements or other scenes, nor overwrite a now-corrupt archive.
+        var latest = try SceneStorage.load(archiveURL)
+        guard let index = latest.firstIndex(where: { $0.id == draft.sceneID }) else { throw BackdropReplacementError.sceneMissing }
+        guard SceneBackdrop(latest[index]) == draft.original else { throw BackdropReplacementError.staleScene }
+        var copied: URL?
+        do {
+            let filename: String
+            if let existing = candidate.existingFilename {
+                _ = try DemoScene(background: existing).validated()
+                guard let fresh = try? BackdropImage.read(root.appendingPathComponent(existing)),
+                      fresh.digest == candidate.image.digest else { throw BackdropReplacementError.imageChanged }
+                filename = existing
+            } else {
+                filename = "backdrop-" + UUID().uuidString + "." + candidate.image.fileExtension
+                let destination = root.appendingPathComponent(filename)
+                try candidate.image.data.write(to: destination, options: .atomic)
+                copied = destination
+            }
+            var fields = draft.original
+            fields.image = filename; fields.x = draft.x; fields.y = draft.y; fields.zoom = draft.zoom
+            latest[index] = try fields.applying(to: latest[index])
+            try persist(latest)
+            imageCache.removeObject(forKey: filename as NSString)
+            draft.cancel()
+            notice = "Backdrop saved. It will be used next time you present, export or apply this scene."
+        } catch {
+            if let copied { try? FileManager.default.removeItem(at: copied) }
+            throw error
+        }
     }
     func importImage() {
         let panel = NSOpenPanel(); panel.allowedContentTypes = [.png, .jpeg, .heic]; panel.canChooseDirectories = false
@@ -559,6 +598,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     }
     #if !APP_STORE
     func applyDesktop() {
+        guard systemIntegrationEnabled else { return }
         guard !desktopBusy else { return }
         desktopBusy = true
         do {
@@ -601,6 +641,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
         } catch { desktopBusy = false; notice = error.localizedDescription }
     }
     func restoreDesktop() {
+        guard systemIntegrationEnabled else { return }
         guard !desktopBusy else { return }
         desktopBusy = true
         do {

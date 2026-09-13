@@ -83,3 +83,7 @@ The app-window review flow follows the [dictation comparison and correction cont
 ## Everyday utility increment
 
 [Utility comparison and contracts](utility-comparison.md) specifies playback seeking, board image export, windowed presentation and contextual resource recall. [Commodity strategy](commodity-strategy.md) records the architecture and model-upgrade acceptance process. These extend existing surfaces; they do not add a universal floating mode menu.
+
+## Backdrop editing contract
+
+Within Present a device, **Change backdrop…** previews a replacement in the existing composition. Apply patches only the image and crop; Cancel leaves the saved archive and files untouched. The same operation repairs missing images. This remains scene preparation, with macOS owning everyday wallpaper management. See [the comparison, decisions and test contract](background-management.md).

@@ -16,6 +16,22 @@ Workbench should make a few everyday jobs dependable and pleasant without a requ
 
 A phone's live screen travels **to the Mac scene**. Workbench does not send Mac dictation or input to that phone. Separate floating overlays are not guaranteed to appear in another app's window share.
 
+## What is worth copying, and what to develop next
+
+A competitor could reproduce individual controls quickly. The stronger investment is a complete, dependable job, portable originals and fewer surprising transitions. These are differentiation hypotheses, not claims that competitors lack these features. Five pillars are sufficient; the engine layer is a shared foundation. [The background review](background-management.md) deepens Present without adding another pillar.
+
+| Pillar | Strongest current behaviour worth copying | One recommendation to distinguish the experience | Proof that would justify it |
+| --- | --- | --- | --- |
+| Dictate | Recoverable originals plus a personal correction with exact preview and safe Undo | **Context-respecting delivery:** personal names remain literal while insertion handles surrounding spaces and sentence boundaries, with clear copy fallback. Useful with every speech engine. | Same test phrases inserted mid-sentence in representative Mac/browser fields; no joins, duplicated spaces, submitted messages or changed names. Continue [#14](https://github.com/EthDawg/local-voice/issues/14). |
+| Read aloud | Generate once, then seek, replay and export the same audio | **A reading that keeps your place:** explicitly retain one reading and resume after interruption/relaunch, tied to that exact audio and text revision. Define its ownership, replacement/deletion and missing-file recovery. Validate a recurring long-reading need before building; no reading library. | Relaunch/sleep tests restore a bounded position without regenerating audio; changed/missing audio is explained. Consistent generation cancellation ([#16](https://github.com/EthDawg/local-voice/issues/16)) is a prerequisite, not a second flagship. |
+| Annotate | Retained ink and clean board export through the same renderer | **Explain, then share the marked image:** a deliberate native Screenshot handoff preserves marks and lets the user inspect the image before copying/saving. | The captured region, retained ink and exported pixels align at Retina/multiple displays; Cancel preserves the drawing. Continue [#18](https://github.com/EthDawg/local-voice/issues/18). |
+| Present | A prepared device/brand/persona composition, contextual controls and a scene that survives window-mode changes | **A fresh branded takeaway:** capture one current device frame inside that same composition, with controls excluded and disconnected/stale frames rejected. The backdrop editor supports preparation; this completes follow-up collateral. | Captured frame belongs to the selected connected device and current session; preview/export agree at the chosen aspect. Continue [#20](https://github.com/EthDawg/local-voice/issues/20). |
+| Saved resources | One small searchable collection of prompts, links and local file references with explicit keyboard actions | **A library people can safely exchange:** conditionally add review of added/changed/conflicting items before import; retain intentional local edits and explain unresolved file references. Validate a real collateral-exchange scenario first; code co-maintainership alone is not evidence of this need. Portable JSON stays the exchange format. | Exchange edited copies between two isolated libraries; review resolves differences without hidden overwrites or copying private media. Continue [#23](https://github.com/EthDawg/local-voice/issues/23). |
+
+Considered and cut: more dictation writing modes before insertion quality; more voices before reliable reading sessions; more brushes before a completed image handoff; browser/tenant orchestration before a fresh scene snapshot; semantic indexing before clear library exchange. Quick Look remains the more immediate native baseline ([#22](https://github.com/EthDawg/local-voice/issues/22)) until library exchange is demonstrated. Lack of novelty is no reason to skip a useful commodity feature. Existing file bookmarks already resolve ordinary moved files; “self-healing references” is not an unimplemented blank slate.
+
+The supporting engine advantage should be **evidence-backed interchangeability**: change the recogniser or voice without changing the person's workflow, then publish same-input accuracy, latency and failure results. This requires the corpus in #24; the current app has not established output-quality leadership. These recommendations are directions for review, not five additional features implemented in the backdrop change.
+
 ## Current boundaries, verified in source
 
 ```mermaid
@@ -62,6 +78,6 @@ Claude challenged the generic architecture proposal without repository source or
 
 ## What this increment changes
 
-Read aloud gains seeking in existing audio; annotation boards gain copy/PNG export; device scenes gain a normal resizable presentation option; saved resources gain a contextual Return action with truthful copy feedback. These use existing playback, renderer, window and library ownership. No new model, persisted user format, network service or application framework is introduced.
+Read aloud gains seeking in existing audio; annotation boards gain copy/PNG export; device scenes gain a normal resizable presentation option; saved resources gain a contextual Return action with truthful copy feedback. Backdrop replacement now preserves a prepared scene and repairs missing images through an explicit preview/apply operation. These use existing playback, renderer, window and library ownership. No new model, persisted user format, network service or application framework is introduced.
 
 Apple submission and notarization upload remain on hold. See the release record for exact build, signature, checksum and remaining native/hardware checks.
