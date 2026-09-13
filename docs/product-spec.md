@@ -60,7 +60,7 @@ Whole-display sharing includes visible overlays. Browser-tab capture excludes se
 
 ## Scope
 
-Implement contextual presentation controls, compact/expanded recording HUD, shared placement, local refinement management, and persona overlays. Logo web discovery and animated backdrop playback are separate extensions of the asset library, not reasons for a universal mode picker. Apple submission and notarization upload remain on hold.
+Implement contextual presentation controls, compact/expanded recording HUD, shared placement, local refinement management, and persona overlays. Logo web discovery and animated backdrop playback are separate extensions of the asset library, not reasons for a universal mode picker. The earlier publication hold was superseded by the maintainer’s 14 September release instruction. Mac Preview 3 is now notarized and published; iOS is uploaded to App Store Connect with testing and review stages still separate.
 
 ## Acceptance
 
@@ -70,7 +70,7 @@ Implement contextual presentation controls, compact/expanded recording HUD, shar
 - Geometry tests cover anchors, negative display origins, removed displays, snap thresholds and resizing.
 - Test refinement with a loopback fixture, failures, cancellation and original preservation. Report actual model/hardware testing separately.
 - Inspect native UI using synthetic data. Real phone, physical unplug and meeting receiver checks are distinct claims.
-- Deploy the tested guide to the existing Vercel project, publish source and a signed Preview archive with checksum, and update installed Preview while preserving data. No App Store or notarization upload.
+- Deploy the tested guide to the existing Vercel project, publish source and a signed Preview archive with checksum, and update installed Preview while preserving data. Use the explicit distribution workflow and report notarization, upload, tester availability and App Review separately; none is implied by a successful compile.
 
 ## Design evidence
 

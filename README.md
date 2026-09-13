@@ -13,6 +13,8 @@ Workbench brings Voice and StageMark into **one native app, one home window and 
 
 An **iPhone and iPad Preview for iOS/iPadOS 26+** is also in development as a separate native SwiftUI target. It offers foreground dictation, installed-voice reading, PencilKit image markup, independent wallpaper crop/export and editable scenes prepared for Mac. The Mac capabilities below retain their own platform boundaries. See the [mobile scope, build instructions and test record](docs/ios-preview.md) and [mobile research](docs/mobile-research.md); no mobile App Store or TestFlight release is claimed.
 
+**Mac download:** [Workbench Preview 3](https://github.com/EthDawg/local-voice/releases/tag/v2.0.0-preview.3) is Developer ID signed, Apple-notarized and stapled. The exact downloaded ZIP was hash-verified. Its notes distinguish verified packaging from remaining physical-device acceptance. The iOS build is uploaded to App Store Connect, with tester distribution and review still pending.
+
 ## What is in the app?
 
 | Capability | What it does |
@@ -90,15 +92,15 @@ Keep a consistent Preview identity and path between updates. Preview has its own
 
 ## Cross-device preparation
 
-### Photo for Mac · source Preview
+### Photo for Mac · Preview
 
 Take or choose a photo on iPhone, keep the original locally and deliberately send an optimised copy through private iCloud. Mac Saved resources → From iPhone opens an existing scene’s backdrop preview or saves an independent copy. The [photo handoff guide](https://workbench-mac.vercel.app/handoff/) and [canonical specification](docs/photo-handoff.md) record the research, limits and signing route. A real existing iPhone photo has now downloaded on Mac after a retry. Repeated deferred delivery remains an acceptance task; this feature is not in the public Preview 2 download.
 
-### Personal scenes — source Preview
+### Personal scenes — Preview
 
 Prepare an editable scene on iPhone or iPad and present it on Mac. New scenes keep their original pictures, device placement and optional logo/persona. Personal iCloud sync is opt-in and tied to the same Apple Account; an editable `.workbenchscene` copy also works without cloud. Existing mobile compositions remain recoverable. The Mac has eight starter portraits, editable role/colour cards and floating controls limited to a prepared persona group.
 
-The [visual scene guide](https://workbench-mac.vercel.app/scenes/) includes generated design studies and actual native screenshots. The [scene contract](docs/research/personal-scenes.md) owns persistence, migration, conflict rules and current evidence. Mac upload has succeeded; a complete paired scene round trip remains unverified. Public downloads, TestFlight and App Store submission are unchanged.
+The [visual scene guide](https://workbench-mac.vercel.app/scenes/) includes generated design studies and actual native screenshots. The [scene contract](docs/research/personal-scenes.md) owns persistence, migration, conflict rules and current evidence. Mac upload has succeeded; a complete paired scene round trip remains unverified. The notarized Mac Preview 3 includes this implementation. iOS upload, tester distribution and App Review are separate stages; see the [mobile release record](docs/ios-preview.md#release-preparation--14-september-2026).
 
 ## Data, privacy and recovery
 

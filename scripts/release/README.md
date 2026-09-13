@@ -147,3 +147,8 @@ That installer validates the production identity, Developer ID signature, notari
 This is the Developer ID direct-download workflow. It performs no App Store Connect, submission or listing operations. A future App Store edition needs separate sandbox and distribution validation; this release does not establish that compatibility.
 
 Reference: [Apple's notarization guidance](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
+
+
+### GitHub asset filenames
+
+GitHub normalizes spaces in uploaded asset names: `Workbench Preview.zip` is delivered as `Workbench.Preview.zip`. Preserve the app bytes and SHA-256, but prepare the public checksum file and `release.json` using the actual delivered asset filename. Download the uploaded ZIP and checksum, then run `shasum -a 256 -c SHA256SUMS.txt` in that directory before updating website links. Local packaging receipts retain the original local archive name. Never publish the intermediate `submission.zip`.

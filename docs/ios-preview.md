@@ -74,7 +74,7 @@ Debug UI tests use fresh temporary libraries through `--ui-testing`; photo fixtu
 
 A generic unsigned iOS archive checks compilation and packaging only. Installation needs an available trusted device, Developer Mode and authorised iOS signing/provisioning. Mac Developer ID signing and notarization do not satisfy that requirement. Follow the [paired Preview signing commands](photo-handoff.md#signing-and-configuration-gate) for the shared Production container; ordinary mobile builds keep cloud access off. Install and inspect the exact exported app, since export can re-sign it and a Debug Run can replace it.
 
-TestFlight/App Store distribution is a separate workflow. Neither has been performed. A signed local install is not a public release or Apple approval.
+TestFlight/App Store distribution is a separate workflow. The current build has been uploaded to App Store Connect; tester distribution and App Review remain pending. A signed local install is not a public release or Apple approval.
 
 ## Verification: current versus historical
 
@@ -84,7 +84,7 @@ The signed physical iPhone Preview has installed and launched normally, with its
 
 The [a434b92 CI run](https://github.com/EthDawg/local-voice/actions/runs/34760192289) passed Mac, iPhone and iPad, including the speech-readiness correction. It supersedes an earlier iPhone photo-discard failure; three unchanged local repetitions also passed, and CI now retains native results and synthetic screenshots for future diagnosis. The speech-readiness correction also passed ten focused native tests and has signed install and physical-readiness evidence in the canonical scene record.
 
-Version labels alone do not identify a development artifact: export signatures and installation receipts establish which source was installed. Earlier test totals, unsigned archives and pre-Scenes screenshots are historical evidence. Actual screenshots in `site/assets/guide/` use synthetic content and retain their provenance; generated concepts are labelled separately. No public binary, TestFlight upload or App Store submission has been made.
+Version labels alone do not identify a development artifact: export signatures and installation receipts establish which source was installed. Earlier test totals, unsigned archives and pre-Scenes screenshots are historical evidence. Actual screenshots in `site/assets/guide/` use synthetic content and retain their provenance; generated concepts are labelled separately. A signed App Store distribution build has now been uploaded; no public iOS release or App Review submission is claimed.
 
 Still separate: fresh physical speech recognition and interrupted recovery; camera capture beyond Mirroring's unsupported camera screen; denied Photos permission and final wallpaper installation; paired scene recovery; Lock Screen audio, Bluetooth/AirPlay, Pencil accuracy, memory/energy, VoiceOver, large Dynamic Type and meeting recipients. The iOS 26.0 fallback playback inset compiles but was not exercised by the iOS 26.5 Simulator runs. Consult the canonical evidence record for the latest speech-readiness observation rather than treating a Ready label as a successful transcript.
 
@@ -93,3 +93,14 @@ The privacy manifest describes app-owned/user-selected file metadata access (`C6
 ## Platform references
 
 Research checked 13 September 2026: [running on devices](https://developer.apple.com/documentation/xcode/building-and-running-an-app), [Developer Mode](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device), [custom keyboard restrictions](https://developer.apple.com/documentation/uikit/configuring-open-access-for-a-custom-keyboard) and [extension storage coordination](https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/ExtensionScenarios.html). [Mobile research](mobile-research.md) retains native and competitor references with their review limits.
+
+
+## Release preparation — 14 September 2026
+
+Source `48bc7c0` produced the signed iOS 2.1.0 (1) archive and an App Store Connect export. The existing Preview bundle identity is retained so an update can preserve the installed library; the store record is **Workbench — Everyday Tools**. Xcode reported a successful upload and package processing. Upload is separate from completed processing, tester distribution and App Review.
+
+The package includes the required UserDefaults privacy reason and an accessible **About → Privacy Policy** link. The [policy](https://workbench-mac.vercel.app/privacy.html) now describes optional scene uploads, retained local/original assets, embedded image metadata and deletion-marker limits. No private keys or user libraries were exported.
+
+The current iPhone 17 Pro Max simulator run passed all **63 unit tests and 7 of 8 UI tests**. The first photo-navigation case left Saved visible; it then passed three unchanged targeted repetitions. The initial failure is retained as an intermittent observation, not rewritten as a clean full-suite pass or a diagnosed app defect. Independent [GitHub CI at the exact release source](https://github.com/EthDawg/local-voice/actions/runs/34761974846) subsequently passed all Mac, iPhone and iPad jobs. Four genuine 1320×2868 screenshots were captured and uploaded to the store listing. Cloud was disabled in those synthetic tests.
+
+Before requesting App Review, complete fresh physical dictation and paired editable-scene acceptance, resolve any repeatable navigation problem, finish store privacy/export-compliance and age-rating answers, confirm review contact details and verify required screenshots. The Free Apps Agreement is active; EU distribution additionally needs the account holder’s trader-status determination. A Release Testing export is not an App Store artifact: use `method=app-store-connect`, Production iCloud and the verified retained signing identity, keeping distribution profiles and account logs private.

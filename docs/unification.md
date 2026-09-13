@@ -38,11 +38,11 @@ remain separate steps.
 - [x] Virtual keyboard assignment/conflicts/practice verified using real keys without activating tools.
 - [x] Annotation/board/timer focus and shutdown verified alongside speech.
 - [ ] Device presentation, QuickTime and iPhone Mirroring paths exercised with available hardware; limitations disclosed. With Camera access enabled, the native iPhone feed showed Live at 1320 × 2868; manual Reconnect briefly showed Not live before resuming. Physical USB unplug/replug and the audience's screen-sharing view remain unverified. Stale-frame invalidation has regression coverage. Earlier QuickTime and iPhone Mirroring handoffs are recorded in the Preview evidence.
-- [ ] Downloadable signed/notarised unified Preview published on GitHub; public bytes and installed copy verified.
+- [x] Preview 3 published on GitHub from `48bc7c0`: Developer ID signed, notarized, stapled and Gatekeeper accepted. Public ZIP hash and normal installation verified; existing scenes/photo retained. Fresh-Mac and live hardware checks remain separate.
 - [ ] Unified landing page explains one app and its download. No website signup is needed.
 - [x] Optional introduction during app use opens an editable draft to Ethan and Matt in the user's email app. The user explicitly chose this flow on 12 September; Workbench does not send email or claim delivery. No website signup, transcript, device or usage data is included.
 - [x] Useful synthetic examples/media for landing page prepared; no heavy image generation. Nine-second silent illustrated annotation workflow, explicitly labelled as an illustration.
-- [x] README, contributor/architecture source maps, model docs and migration/release notes match the local unified app. Historical Voice evidence is explicitly scoped; candidate site links target the matching Preview release. Public publication remains a separate unchecked item.
+- [x] README, contributor/architecture source maps, model docs and migration/release notes match the local unified app. Historical Voice evidence is explicitly scoped; candidate site links target the matching Preview release. Preview 3 publication is verified above; remaining native acceptance remains separate.
 - [x] No App Store submission changed.
 
 ## Source preservation

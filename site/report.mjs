@@ -1,4 +1,4 @@
-const version = '2.0.0-preview.2';
+const version = '2.0.0-preview.3';
 const source = `https://github.com/EthDawg/local-voice/tree/v${version}`;
 const documents = `https://github.com/EthDawg/local-voice/blob/v${version}`;
 const guide = `${documents}/CONTRIBUTING.md`;

@@ -1,6 +1,6 @@
 # Photo for Mac
 
-Product and engineering contract for selected-photo handoff. A real existing iPhone photo has downloaded on the installed Mac Preview after a transient timeout and retry, and the newer install retains it. This is one observed download, not proof of every deferred-delivery or account-recovery path. Editable scenes are a separate journey: see the [personal-scenes contract](research/personal-scenes.md) and [canonical public evidence](https://workbench-mac.vercel.app/scenes/#evidence). Paired editable-scene delivery remains unverified; no public handoff release is claimed.
+Product and engineering contract for selected-photo handoff. A real existing iPhone photo has downloaded on the installed Mac Preview after a transient timeout and retry, and the newer install retains it. This is one observed download, not proof of every deferred-delivery or account-recovery path. Editable scenes are a separate journey: see the [personal-scenes contract](research/personal-scenes.md) and [canonical public evidence](https://workbench-mac.vercel.app/scenes/#evidence). Paired editable-scene delivery remains unverified; the signed and notarized Mac Preview 3 now includes handoff. The iOS build has been uploaded to App Store Connect, with tester distribution and review still pending.
 
 ## The job and its boundaries
 
