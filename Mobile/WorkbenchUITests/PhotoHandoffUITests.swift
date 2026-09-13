@@ -94,7 +94,18 @@ final class PhotoHandoffUITests: XCTestCase {
         // A stable action identifier also works in the iPad confirmation popover.
         let discard = app.buttons.matching(identifier: "handoff.discardAndLeave").firstMatch
         XCTAssertTrue(discard.waitForExistence(timeout: 5)); discard.tap()
-        XCTAssertTrue(app.navigationBars["Saved"].waitForExistence(timeout: 5))
+        let returnedToSaved = app.navigationBars["Saved"].waitForExistence(timeout: 5)
+        if !returnedToSaved {
+            // Capture the failed destination without adding any interaction or
+            // extra wait to the normal confirmation/navigation sequence.
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "Navigation after discarding unsaved photo"
+            hierarchy.lifetime = .keepAlways; add(hierarchy)
+            let screen = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screen.name = "Discard destination - isolated local fixture"
+            screen.lifetime = .keepAlways; add(screen)
+        }
+        XCTAssertTrue(returnedToSaved, "Discarding the unsaved preview must return to Saved")
         let entry = app.buttons["saved.photoHandoff"]
         reveal(entry, in: app); entry.tap()
         XCTAssertFalse(app.textFields["handoff.name"].exists)
