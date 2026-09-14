@@ -72,6 +72,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         capturePanel = CapturePanelController(model: model)
         presenterPanel = PresenterPanelController(model: model.presenter, setup: { [weak self] in self?.navigate("library") })
         model.onShowPresenter = { [weak self] in self?.showPresenter() }
+        model.presenter.mayActivate = { [weak self] in
+            guard let self else { return false }
+            return self.model.phase == .idle && !self.shortcutsSuspended
+        }
         model.library.switchBrowser = { [weak self] id in
             self?.model.presenter.activate(id) { [weak self] reply in
                 if reply.ok != true { self?.showPresenter() }

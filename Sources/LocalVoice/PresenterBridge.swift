@@ -85,6 +85,7 @@ final class PresenterModel: ObservableObject {
     @Published var message: String?
     @Published private(set) var busy = false
     var onSwitch: (() -> Void)?
+    var mayActivate: (() -> Bool)?
     let library: DemoLibraryModel
     let machineID: UUID
     private let defaults: UserDefaults
@@ -224,7 +225,7 @@ final class PresenterModel: ObservableObject {
             completion?(reply)
         }
         let request = PresenterMessage(type: "activate")
-        guard !busy else { done(request.reply(ok: false, error: "busy")); return }
+        guard !busy, mayActivate?() != false else { done(request.reply(ok: false, error: "busy")); return }
         guard let destination = destinations.first(where: { $0.id == id }) else { done(request.reply(ok: false, error: "missing")); return }
         guard let connection = profiles.first(where: { $0.value.id == destination.profileID }), let peer = peers[connection.key] else {
             done(request.reply(ok: false, error: "offline")); return
@@ -252,7 +253,7 @@ final class PresenterModel: ObservableObject {
         case "missing": "This destination was removed. Save the current tab again in the Workbench extension."
         case "wrongProfile": "Update this destination from its paired Chrome profile."
         case "timeout": "Chrome did not confirm the switch. Check the destination before trying again."
-        case "busy": "Finish the current switch or resource edit, then try again."
+        case "busy": "Finish the current recording, keyboard practice, switch or resource edit, then try again."
         case "permission": "Open this site in its Chrome profile and update the destination to allow access again."
         case "ambiguous": "Several tabs match. Open the right tab and update this destination in the Workbench extension."
         case "saveFailed": "The resource could not be saved. Check Saved resources in Workbench."

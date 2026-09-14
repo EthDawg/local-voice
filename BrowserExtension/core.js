@@ -7,7 +7,7 @@ export const ERRORS = Object.freeze({
   invalidMessage: "Workbench could not read this request. Retry after updating the app and extension.",
   permission: "Open this destination in its paired profile, then save or update it to allow this address.",
   ambiguous: "Several tabs match. Open the right tab, then update this destination in Workbench.",
-  busy: "A destination is already opening. Wait a moment, then try again.",
+  busy: "Finish the current recording, keyboard practice, switch or resource edit, then try again.",
   timeout: "Opening could not be confirmed. Check Chrome before trying again.",
   changed: "The tab changed while opening. Open the right tab, then update this destination.",
   failed: "Chrome could not focus this destination. Check the browser, then try again.",

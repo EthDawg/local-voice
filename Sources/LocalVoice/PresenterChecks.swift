@@ -61,6 +61,9 @@ enum PresenterChecks {
         try check(other.destinations.isEmpty, "copied resource cannot silently route on another Mac")
         otherDefaults.removePersistentDomain(forName: otherSuite)
         var activation = PresenterMessage(type: "activate"); activation.destinationID = destinationID
+        model.mayActivate = { false }
+        try check(try await exchange(activation, first).error == "busy" && !model.busy, "shared lifecycle guard blocks browser activation during another interaction")
+        model.mayActivate = { true }; activation.id = UUID()
         try PresenterSocket.write(PresenterWire.encode(activation), to: first)
         let focus = try await receive(second)
         try check(focus.type == "focus" && focus.destinationID == destinationID, "cross-profile request goes only to destination owner")
