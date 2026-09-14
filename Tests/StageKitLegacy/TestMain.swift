@@ -4,6 +4,11 @@ import AppKit
 struct TestRunner {
     static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
+        if args == ["--persona-session-fixture"] || Bundle.main.bundleIdentifier == "app.workbench.overlay-review" {
+            _ = NSApplication.shared
+            PersonaSessionFixture().run()
+            return
+        }
         if args == ["--backdrop-fixture"] {
             _ = NSApplication.shared
             BackdropReplacementFixture().run()
@@ -14,10 +19,15 @@ struct TestRunner {
             BoardPresentationFixture().run()
             return
         }
+        if args == ["--phone-guide-fixture"] || Bundle.main.bundleIdentifier == "app.workbench.phone-route-review" {
+            _ = NSApplication.shared
+            PhonePresentationFixture().run()
+            return
+        }
         let boardPresentationOnly = args == ["--board-presentation-only"]
         let backdropOnly = args == ["--backdrop-only"]
         guard args.isEmpty || args == ["--ci"] || args == ["--scenes-only"] || boardPresentationOnly || backdropOnly else {
-            print("Usage: StageMarkTests [--ci | --scenes-only | --board-presentation-only | --board-presentation-fixture | --backdrop-only | --backdrop-fixture]")
+            print("Usage: StageMarkTests [--ci | --scenes-only | --board-presentation-only | --board-presentation-fixture | --backdrop-only | --backdrop-fixture | --persona-session-fixture | --phone-guide-fixture]")
             exit(2)
         }
         let scenesOnly = args == ["--scenes-only"]
@@ -30,9 +40,14 @@ struct TestRunner {
         let scenes = SceneTests()
         let assets = SceneAssetTests()
         let demo = DemoModeTests()
+        let phonePresentation = PhonePresentationTests()
+        let desktopMotion = DesktopMotionTests()
+        let gentleMotion = GentleMotionTests()
+        let ambientScenes = AmbientSceneTests()
         let viewportFit = ViewportFitTests()
         let logoImport = LogoImportTests()
         let personas = PersonaTests()
+        let personaSessions = PersonaSessionTests()
         let personaStarters = PersonaStarterTests()
         let floating = FloatingControlGeometryTests()
         let sceneSync = SceneSyncAdapterTests()
@@ -55,6 +70,22 @@ struct TestRunner {
             ("board private clipboard image and failure preservation", boardExport.testPrivateClipboardPNGAndFailurePreservation),
             ("presentation window and fullscreen lifecycle", presentationLifecycle.testModeChangesKeepPresentationAndEndClosesOnce),
             ("presentation transition interruption and failure recovery", presentationLifecycle.testEndDuringNativeTransitionsAndFailureRecovery),
+            ("phone: restricted versus denied video access", phonePresentation.testRestrictedCameraGuidanceDoesNotOfferUserPermissionToggle),
+            ("phone: explicit first source selection", phonePresentation.testFirstCaptureRequiresExplicitSelectionEvenForMuxedHint),
+            ("phone: handoff waits for capture and window", phonePresentation.testNativeHandoffWaitsForBothCaptureAndWindowInEitherOrder),
+            ("phone: handoff launch and ordinary close ownership", phonePresentation.testHandoffKeepsFirstRequestAndDoesNotRetryFailedLaunchOrOrdinaryClose),
+            ("phone: handoff native transition failure", phonePresentation.testHandoffWaitsThroughFailedNativeTransitionAndRepeatedEnd),
+            ("phone: capture release retains pending handoff", phonePresentation.testCaptureStopCompletionRetainsHandoffAfterPresenterRelease),
+            ("persona sessions: empty return and visible feedback", personaSessions.testEmptySetCanBeRevisitedAndLiveFailuresStayVisible),
+            ("persona sessions: opt-in archive migration", personaSessions.testOptInMigrationBacksUpExactArchiveAndPreservesLegacyPlacement),
+            ("persona sessions: independent placed copies", personaSessions.testTwoInstancesOwnIndependentGeometryVisibilityLockAndOrder),
+            ("persona sessions: paused switching and frozen scope", personaSessions.testPausedGroupSwitchKeepsLayoutsAndFrozenAllowedScope),
+            ("persona sessions: frozen artwork and failed start", personaSessions.testFrozenArtworkSurvivesLibraryEditsAndFailedReplacementStart),
+            ("persona sessions: explicit conflict-aware layout save", personaSessions.testSaveLayoutIsExplicitAtomicAndRejectsChangedPreparation),
+            ("persona sessions: read-only and busy state", personaSessions.testReadOnlySessionsAndInteractionGuardsNeverWriteOrTrapOverlays),
+            ("persona sessions: invalid and future archive preservation", personaSessions.testInvalidLayoutsAndFutureArchivePreserveOriginalBytes),
+            ("persona sessions: bounded replacement preflight", personaSessions.testBoundedPreflightAlsoProtectsLegacyShowAndCurrentSession),
+            ("persona: visible single-card launch failure", personaSessions.testSingleCardLaunchFailureReturnsErrorAndPreservesExistingOutput),
             ("floating: AllTargetsAreDistinctFiniteAndBounded", floating.testAllTargetsAreDistinctFiniteAndBounded),
             ("floating: GuideLayoutPreservesTargetsAndFlipsDisplayCoordinates", floating.testGuideLayoutPreservesTargetsAndFlipsDisplayCoordinates),
             ("floating: GuideStateClearsWhenDragOrDisplayEnds", floating.testGuideStateClearsWhenDragOrDisplayEnds),
@@ -86,6 +117,8 @@ struct TestRunner {
             ("persona corrupt future and concurrent archive preservation", personas.testCorruptFutureAndConcurrentArchivesStayUntouched),
             ("persona scene attachment transparency and missing-file recovery", personas.testSceneAttachmentTransparencyAndMissingFile),
             ("persona native window focus lock drag and visibility", personas.testNativeOverlayWindowAndDragLifecycle),
+            ("persona ungrouped HUD scope and native controls", personas.testUngroupedHUDStaysScopedToDisplayedPersonaAndControlsItsLifecycle),
+            ("persona read-only HUD browsing and placement", personas.testReadOnlyUngroupedHUDDoesNotPersistBrowsingOrPlacement),
             ("desktop verification waits for macOS and times out safely", scenes.testDesktopVerificationWaitsForMacOSAndStopsAtTimeout),
             ("scene search keeps customer selection consistent", scenes.testSceneSearchSelectsOnlyMatchingCustomers),
             ("desktop recovery across interrupted scene switch", scenes.testDesktopRecoverySurvivesInterruptedSwitch),
@@ -134,6 +167,20 @@ struct TestRunner {
             ("native drawing lifecycle and board isolation", integration.testDrawingLifecycleAndBoardIsolation),
             ("global shortcut registration and release", integration.testShortcutRegistrationAndRelease)
         ]
+        tests.insert(contentsOf: [
+            ("ambient starter exact assets duplicate and reopen", ambientScenes.testAllStartersKeepExactPortableAssetsThroughDuplicateAndReopen),
+            ("ambient crop replacement and original preservation", ambientScenes.testCropKeepsRecipeAndReplacementClearsItWithoutRemovingOriginals),
+            ("ambient stale recipe draft rejection", ambientScenes.testStaleCropAndSceneDraftRejectAnInterveningRecipeChange),
+            ("ambient native scene poster orientation and window mask", ambientScenes.testMovingSceneViewMatchesPosterOrientationAndClipsCloudsToWindow),
+            ("ambient missing detail poster fallback", ambientScenes.testMissingRigAssetKeepsCompletePosterAndDoesNotBecomePhotoZoom),
+            ("motion legacy and portable settings", gentleMotion.testLegacyAndPortableSceneMotion),
+            ("motion export pixels stay still", gentleMotion.testMotionDoesNotChangeStillExport),
+            ("motion foreground remains transparent", gentleMotion.testForegroundExcludesPhotograph),
+            ("motion transparent photo keeps still base", gentleMotion.testTransparentPhotographKeepsStillBase),
+            ("desktop ownership and spaces", desktopMotion.testDesktopOwnershipLossCannotResumeOrFollowAnotherSpace),
+            ("desktop sleep and pause independence", desktopMotion.testDesktopSleepReasonsAndPauseRemainIndependent),
+            ("desktop removal and fresh session", desktopMotion.testDesktopRemovalStopsEvenDuringSleepAndRestartNeedsNewSession)
+        ], at: 5)
         tests.insert(contentsOf: backdropTests, at: 5)
         if backdropOnly {
             tests = backdropTests

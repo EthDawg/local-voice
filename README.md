@@ -105,6 +105,8 @@ Prepare an editable scene on iPhone or iPad and present it on Mac. New scenes ke
 
 The [visual scene guide](https://workbench-mac.vercel.app/scenes/) includes generated design studies and actual native screenshots. The [scene contract](docs/research/personal-scenes.md) owns persistence, migration, conflict rules and current evidence. Mac upload has succeeded; a complete paired scene round trip remains unverified. The notarized Mac Preview 3 includes this implementation. iOS upload, tester distribution and App Review are separate stages; see the [mobile release record](docs/ios-preview.md#release-preparation--14-september-2026).
 
+The newer local Preview adds **Window light, Campus breeze and Coastal sky**: three original starter pictures with optional, localized cloud or foliage motion. [The ambient scene guide](https://workbench-mac.vercel.app/scenes/ambient/) shows the artwork, native captures and Apple platform boundaries; [the implementation record](docs/research/ambient-scenes.md) owns the research and remaining acceptance checks. Motion runs inside Workbench on iPhone/iPad and in app-owned presentation or desktop layers on Mac. Export stays still. These starters are not in the public Preview 3 download; editable exchange requires updated apps that support scene format v2.
+
 ## Data, privacy and recovery
 
 - **Transcripts:** originals, drafts, dictionary, reading preferences and the last 100 captures are stored locally. Cleanup is optional: Original, deterministic Light, or guarded Natural editing using available Apple Intelligence or a configured local Ollama model. Saved dictionary replacements apply to delivered text in every cleanup mode; the recogniser's original remains available. Cleanup checks cannot prove meaning is unchanged.

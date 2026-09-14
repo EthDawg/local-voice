@@ -3,27 +3,32 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Workbench destinations</title>
+  <title>Workbench Preview destinations</title>
   <link rel="stylesheet" href="popup.css">
   <script type="module" src="popup.js"></script>
 </head>
 <body>
   <header>
-    <span class="mark" aria-hidden="true">W</span>
-    <div><h1>Workbench</h1><p class="eyebrow">Your next destination</p></div>
+    <img class="mark" src="icons/icon48.png" width="34" height="34" alt="">
+    <div><h1>Workbench <span class="preview-label">Preview</span></h1><p class="eyebrow">Your next destination</p></div>
     <span id="connection-state" class="connection">Connecting…</span>
   </header>
   <main>
     <div id="feedback" class="feedback" role="status" aria-live="polite" hidden></div>
     <section id="setup" aria-labelledby="setup-heading" hidden>
+      <div class="companion-note">
+        <strong>Requires Workbench Preview for macOS.</strong>
+        <p>Install the companion and enable Chrome connection in Saved resources.</p>
+        <a href="https://workbench-mac.vercel.app/" target="_blank" rel="noopener noreferrer">Get the Mac companion ↗</a>
+      </div>
       <h2 id="setup-heading">Name this Chrome profile</h2>
       <p>Choose a name you will recognise while presenting. Connect Workbench in each profile you use.</p>
+      <p class="data-note">Your chosen names, profile labels and saved addresses stay on this device and are shared with the local Workbench app. No passwords or page content are read. <a href="privacy.html" target="_blank" rel="noopener noreferrer">Privacy &amp; permissions</a></p>
       <form id="connect-form">
         <label for="profile-name">Profile name</label>
         <input id="profile-name" name="profileName" placeholder="e.g. Manager profile" maxlength="80" required autocomplete="off">
         <button class="primary full" type="submit">Connect profile <span aria-hidden="true">↗</span></button>
       </form>
-      <p class="caption">Open the Workbench Mac app and enable Chrome connection in Saved resources first.</p>
     </section>
     <section id="paired" aria-labelledby="destinations-heading" hidden>
       <div class="section-heading"><h2 id="destinations-heading">Destinations</h2><button id="refresh" class="text-button" type="button">Refresh</button></div>
@@ -53,6 +58,6 @@
       </details>
     </section>
   </main>
-  <footer><span id="current-profile">Chrome connection</span><span>Saved in Workbench</span></footer>
+  <footer><span id="current-profile">Chrome connection</span><a href="privacy.html" target="_blank" rel="noopener noreferrer">Privacy &amp; permissions</a></footer>
 </body>
 </html>

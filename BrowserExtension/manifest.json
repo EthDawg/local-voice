@@ -1,8 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Workbench",
+  "name": "Workbench Preview",
   "version": "0.1.0",
-  "description": "Return to a named demo destination in its paired Chrome profile.",
+  "description": "Save named destinations and return to the right Chrome profile. Requires the Workbench Preview companion for macOS.",
+  "homepage_url": "https://workbench-mac.vercel.app/",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
   "minimum_chrome_version": "120",
   "permissions": [
     "nativeMessaging",
@@ -21,7 +28,11 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Workbench destinations"
+    "default_title": "Workbench Preview destinations",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"

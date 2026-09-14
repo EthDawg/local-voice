@@ -13,6 +13,7 @@ enum Action: String, CaseIterable, Codable, Identifiable {
     case pen, highlighter, arrow, line, rectangle, ellipse, text, eraser
     case clear, undo, redo, whiteboard, blackboard, pointer, fade, timer, controls, scenes
     case color1, color2, color3, color4, color5, color6
+    case overlayControls, overlayNext, overlayPrevious, overlayVisibility, overlayEnd
     var id: String { rawValue }
     var tool: DrawingTool? { DrawingTool(rawValue: rawValue) }
     var title: String {
@@ -26,6 +27,11 @@ enum Action: String, CaseIterable, Codable, Identifiable {
         case .timer: return "Break timer"
         case .controls: return "Open drawing controls"
         case .scenes: return "Demo scenes"
+        case .overlayControls: return "Focus overlay controls"
+        case .overlayNext: return "Next prepared overlay set"
+        case .overlayPrevious: return "Previous prepared overlay set"
+        case .overlayVisibility: return "Hide or show presentation overlays"
+        case .overlayEnd: return "End presentation overlays"
         case .color1, .color2, .color3, .color4, .color5, .color6: return "Colour \(rawValue.last!)"
         default: return rawValue.capitalized
         }
@@ -56,10 +62,16 @@ enum Action: String, CaseIterable, Codable, Identifiable {
         case .color4: key = kVK_ANSI_4
         case .color5: key = kVK_ANSI_5
         case .color6: key = kVK_ANSI_6
+        case .overlayControls: key = kVK_ANSI_I
+        case .overlayNext: key = kVK_RightArrow
+        case .overlayPrevious: key = kVK_LeftArrow
+        case .overlayVisibility: key = kVK_ANSI_U
+        case .overlayEnd: key = kVK_ANSI_J
         }
         let shifted = self == .redo || rawValue.hasPrefix("color")
-        return Shortcut(keyCode: UInt32(key), modifiers: UInt32(controlKey | optionKey | (shifted ? shiftKey : 0)))
+        return Shortcut(keyCode: UInt32(key), modifiers: UInt32(controlKey | optionKey | (shifted ? shiftKey : 0)), enabled: !isOverlayAction)
     }
+    var isOverlayAction: Bool { [.overlayControls, .overlayNext, .overlayPrevious, .overlayVisibility, .overlayEnd].contains(self) }
 }
 
 struct Shortcut: Codable, Equatable, Hashable {

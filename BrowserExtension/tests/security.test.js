@@ -23,7 +23,10 @@ test("manifest retains minimal adapter permissions, fixed identity and strict MV
 test("popup uses local assets and text-only rendering without inline execution", async () => {
   const html = await read("popup.html");
   const js = await read("popup.js");
-  assert.doesNotMatch(html, /\son\w+\s*=|<script(?![^>]*\bsrc=)|(?:src|href)=["']https?:/i);
+  assert.doesNotMatch(html, /\son\w+\s*=|<script(?![^>]*\bsrc=)|\bsrc=["']https?:/i);
+  assert.match(html, /href="privacy.html"[^>]*rel="noopener noreferrer"/);
+  assert.match(html, /Requires Workbench Preview for macOS/);
+  assert.match(html, /profile labels and saved addresses stay on this device/);
   assert.doesNotMatch(js, /innerHTML|outerHTML|insertAdjacentHTML|eval\(|new Function/);
   assert.match(js, /chrome\.permissions\.request/);
   assert.match(html, /aria-live="polite"/);

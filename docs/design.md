@@ -86,9 +86,17 @@ StageKit's `DemoCapture` uses AVFoundation external-device discovery and a video
 
 `NativePresentationApps` resolves and opens installed QuickTime Player or iPhone Mirroring using `NSWorkspace`. It does not embed, automate or capture those apps. A meeting app can share the selected Workbench or Apple window. A successful launch is not proof of device connection or a successful meeting share.
 
+The shared **Connection & audio…** guide separates picture, voice conversation and Mac control. First source selection is explicit. `PresentationHandoff` joins capture teardown and native window closure before an explicit End preview & open action launches Apple’s app. Restricted video access is distinguished from user-denied access. [The phone route contract](phone-presenting.md) records the flow, native limits and receiver checks.
+
 `TranscribeWithWorkbench` is the existing App Intent. Apple Shortcuts owns `Record Audio`; the intent accepts audio and returns that invocation's text through the normal voice pipeline. It never starts the microphone, copies or submits the result. Full Xcode metadata extraction and native discovery need package-level testing. The final live recording composition must be verified separately from synthetic invocation checks; [earlier integration notes](voice-integrations.md) are historical evidence for the previous Voice version.
 
 No Services implementation, Share extension, private iPhone Mirroring integration or general app-automation bridge is added by this consolidation. Those are future adapters only if a useful workflow justifies them. Windows portability is likewise a future design decision: isolate platform-facing code, but do not promise portability for AppKit, AVFoundation device capture, Carbon or App Intents.
+
+## Capture recovery
+
+`CaptureRecoveryStore` owns one versioned local pending capture in `LocalVoice/CaptureRecovery`, separate from the ordinary draft/history file. It owns only validated UUID-named recording files and a bounded metadata record; imported audio URLs never become deletion targets. A capture must commit to history before normal delivery or Shortcuts success. Failed saving retains raw text, current draft and owned audio. Retry saving uses the same history ID and never replays an old destination or reruns a model. A changed or unreadable journal stays intact and blocks a new capture until reviewed.
+
+Quit stops work and preserves pending recovery. On reopening, an acknowledged journal can be cleared; an unacknowledged capture never replaces a differing nonempty saved draft. Retry adds that immutable capture to Recent transcripts. Confirmed Discard removes only the pending owned files and preserves the current draft. A full disk can block both state and recovery-text writes: the error asks for Copy/Save before quitting and does not claim durable text. Photo and scene sync do not include this recovery folder.
 
 ## Saved state and migration
 
@@ -120,3 +128,15 @@ Source provenance is in [consolidation-source.md](consolidation-source.md). The 
 ## Portable personal scenes
 
 [The personal scene contract](research/personal-scenes.md) owns the shared model and migration/sync rules. SceneSyncKit separates local commits and portable packages from its CloudKit transport; Mac adapts that model to StageKit while iOS renders it natively. Explicit imports create independent scene IDs, and active presentations use frozen copies. The shared test suite runs both photo and scene targets in CI.
+
+## Gentle photograph motion
+
+`SceneSyncKit/GentlePhotoMotion.swift` supplies compositor parameters and a pure eligibility predicate to both native targets. The optional `gentleMotion` scene field preserves legacy still defaults and travels in existing local/portable scene records. No new asset type or cloud service is involved.
+
+`MovingSceneView` separates the Mac photograph layer from stationary foreground artwork and device video. `DesktopMotionController` owns one explicitly started desktop window, independent of a presentation. `SceneMotionPreview` implements the matching iOS photograph layer; editor playback is transient and galleries/export stay still. The [implementation record](gentle-motion.md) explains lifecycle and validation; the structured visual contract and mobile specification retain capability authority.
+
+The [authored ambient starters](research/ambient-scenes.md) extend those hosts with `SceneSyncKit/AmbientPhotoLayer.swift`. A versioned, allowlisted `SceneAmbience` recipe references an immutable clean plate and transparent detail; its complete poster remains the static fallback and export image. Both targets use the same native layer geometry and still compositor. Rig-bearing libraries/packages use scene format v2, preserve exact pre-migration backups and reject unsupported recipes. This adds no new cloud transport, background service or media runtime. Ordinary photos retain the separate gentle-scale option; authored rigs never combine with whole-photo zoom.
+
+## Prepared Mac overlay sessions
+
+`PersonaLibrary` remains the saved asset/group owner. `PersonaSessionController` in `PersonaSession.swift` owns one bounded live snapshot and a window controller per placed instance. `PersonaHUDController` receives sanitized value state and ID-based actions, never private library/group names. `PersonaPresentationPreparation` owns an explicit draft and saves through the existing archive; v3 preserves an exact pre-upgrade manifest. The shell exposes the same actions through the existing StageKit shortcut catalogue and menu panel. No browser DOM, tab or URL tracking is involved. The [persona contract](personas.md) owns lifecycle, compatibility and verification.

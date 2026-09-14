@@ -2,12 +2,17 @@
 * { box-sizing:border-box; }
 body { width:384px; margin:0; background:var(--bg); color:var(--ink); }
 header { display:flex; align-items:center; gap:10px; padding:20px 20px 16px; border-bottom:1px solid var(--line); }
-.mark { width:34px; height:34px; display:grid; place-items:center; background:var(--mint); color:var(--accent); border-radius:11px; font-size:20px; font-weight:650; }
+.mark { width:34px; height:34px; flex:none; object-fit:contain; }
 h1 { font-size:16px; letter-spacing:-.35px; margin:0; }
+.preview-label { font-size:10px; font-weight:500; letter-spacing:0; color:var(--muted); }
+a { color:var(--accent); text-underline-offset:3px; }
+.companion-note { padding:12px; margin-bottom:18px; border-radius:10px; border:1px solid var(--line); background:var(--surface); font-size:12px; }
+.companion-note p { margin:5px 0 8px; }
+.data-note { font-size:11px; line-height:1.55; }
 .eyebrow { color:var(--muted); font-size:11px; margin:1px 0 0; }
 .connection { margin-left:auto; font-size:10px; color:var(--muted); max-width:74px; text-align:right; }
 .connection[data-connected="true"] { color:var(--accent); }
-main { padding:18px 20px 16px; min-height:110px; max-height:500px; overflow-y:auto; }
+main { padding:18px 20px 16px; min-height:110px; max-height:480px; overflow-y:auto; }
 h2 { font-size:14px; margin:0; font-weight:650; letter-spacing:-.1px; }
 p { margin:9px 0 15px; color:var(--muted); }
 label { display:block; font-size:11px; font-weight:600; margin:14px 0 6px; }
@@ -47,6 +52,15 @@ details[open] summary span { transform:rotate(45deg); }
 code { font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
 footer { display:flex; justify-content:space-between; gap:12px; border-top:1px solid var(--line); padding:11px 20px; color:var(--muted); font-size:10px; }
 footer span:first-child { max-width:185px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.privacy-page { width:auto; max-width:760px; margin:0 auto; padding:24px; }
+.privacy-page header { padding:0 0 20px; }
+.privacy-page main { padding:24px 0; max-height:none; }
+.privacy-page main h1 { font-size:26px; margin-bottom:12px; }
+.privacy-page h2 { margin-top:26px; }
+.privacy-page p,.privacy-page li { line-height:1.65; }
+.privacy-page ul { padding-left:22px; }
+.privacy-page li { margin-bottom:8px; }
+.privacy-page footer { padding:16px 0; }
 [hidden] { display:none !important; }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 @media (prefers-color-scheme:dark) { :root { --bg:#172322; --surface:#20312e; --ink:#e4ede9; --muted:#a0b4ac; --line:#354841; --mint:#263f35; --accent:#a2e4c6; --focus:#a2e4c6; --error:#f4b8a8; } .primary { background:#b5edd4; color:#15352a; } }

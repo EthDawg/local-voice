@@ -20,6 +20,8 @@ Make frequent Mac tasks easy to start, understand and leave. Local dictation is 
 
 Tapping an iPhone field focuses it; the user then taps the Dictation button. Workbench's USB preview sends no touches, keys or Mac dictation to the device. A narrow Mac browser page remains a Mac field. Apple documents that iPhone Mirroring does not support the iPhone microphone or camera.
 
+**Connection & audio…** is available in preparation and Source. First source selection is explicit; reconnect uses only the saved device ID. End preview & open releases capture and closes the presentation before launching Apple’s app. This does not add phone audio to Workbench. The [phone presentation contract](phone-presenting.md) owns route-specific steps and voice rehearsal.
+
 Sources: [iPhone dictation](https://support.apple.com/en-gb/guide/iphone/iph2c0651d2/ios), [iPhone Mirroring](https://support.apple.com/en-au/120421), [QuickTime device capture](https://support.apple.com/en-au/guide/quicktime-player/qtp356b55534/mac).
 
 ## Surfaces
@@ -45,6 +47,8 @@ The mobile tile contains no Dictate, Read aloud, cleanup modes or model download
 5. Delivery: paste only to the intended verified Mac target, otherwise copy and explain. Preserve the original.
 6. Complete/error: truthful receipt, review/original/retry where available. Temporary results may dismiss; active capture cannot silently disappear.
 
+A capture’s history commit precedes text delivery. Save failure keeps one local recovery with a stable ID. Retry saving performs no recognition or delivery; it preserves later draft edits and adds the original capture once. Quit retains unfinished recovery, and normal Dictate offers a confirmed discard. Cold recovery preserves a newer saved draft. Failed state and recovery writes must never be described as a saved transcript.
+
 Cleaning an existing draft uses the same cancellable processing lifecycle. Cancel leaves the draft, retained original and cleanup method untouched. A late model result cannot overwrite cancellation or an edit made while cleanup was running. Draft cleanup never delivers text to a previously captured app target.
 
 Snapshot cleanup configuration for each capture. Changes cannot silently alter an in-flight operation. Original, Light cleanup and Natural/local-model editing describe output behavior, not unrelated jobs. Speech recognition and text refinement are distinct responsibilities. The ordinary model-manager view owns readiness and download/load progress. Optional Ollama refinement is explicitly selected, loopback-only, bounded and cancellable; failures fall back visibly to conservative cleanup and retain the original. Never silently switch to a cloud service.
@@ -58,6 +62,16 @@ Presentation defaults to right edge centre; persona to bottom right; dictation t
 ## Sharing
 
 Whole-display sharing includes visible overlays. Browser-tab capture excludes separate native windows. A persona embedded in a scene belongs to that scene's rendering. Receiver-side tests are required before claiming individual-window inclusion or hidden controls in Teams/Zoom. Window sharing flags do not guarantee exclusion from another app's capture. Customer artwork remains separate from controls and original images are preserved.
+
+### Persona controls and group boundaries
+
+Showing a persona always provides nearby Hide, Lock and Size controls, including an older or ungrouped image. **Focus floating controls** provides keyboard access. An ungrouped overlay has one candidate: the displayed persona. It never gains access to the rest of the library through the floating picker or previous/next buttons.
+
+For a prepared group, freeze allowed candidates and rendered artwork when showing the overlay. An ungrouped card stays scoped to itself. The [persona contract](personas.md) additionally defines explicitly prepared multiple-overlay sessions: ordered groups, independent placed copies, a compact click menu, reversible Hide all, explicit layout saves and End. Browsing or editing preparation cannot silently change a running session. Removing an item only subtracts affected copies. Read-only browsing and temporary placement must not write the archive.
+
+Multiple-overlay sessions and device scenes have distinct owners. Starting a device scene pauses independent overlays; they do not reappear until explicitly resumed. Mobile's single placed persona and native image exports remain unchanged. Five optional global overlay actions share the existing Keyboard Coach; they start disabled. Native menu keyboard focus and click routes remain available.
+
+The previous public Preview and a newly installed source build are separate releases. The persona contract and its actual verification record must identify which behavior was built, installed, tested and published.
 
 ## Scope
 
@@ -90,3 +104,9 @@ The app-window review flow follows the [dictation comparison and correction cont
 ## Backdrop editing contract
 
 Within Present a device, **Change backdrop…** previews a replacement in the existing composition. Apply patches only the image and crop; Cancel leaves the saved archive and files untouched. The same operation repairs missing images. This remains scene preparation. Persistent wallpaper is a separate accepted product direction, with its current/proposed boundaries and lifecycle in the [visual-experience contract](../site/handbook/contract.json). See [the comparison, decisions and test contract](background-management.md).
+
+## Optional background motion
+
+[Gentle motion](gentle-motion.md) adds a saved scene preference with off-by-default legacy behavior. Mac preparation stays still for accurate dragging; Mac presentation gets a Pause/Play background control. The iOS scene editor previews it with a separate transient Pause/Play button and still crop controls.
+
+The non-App-Store Mac **More → Use as animated desktop** action creates an independent applied snapshot after verifying its native still. **Pause**, **Resume** and **Stop motion** sit in the scene window while that desktop session exists. End presentation keeps it; Quit, Space changes and ownership loss stop it. This is an explicit reuse action, not the proposed independent wallpaper picker. The canonical [visual contract](../site/handbook/contract.json) owns exact lifecycle/evidence.

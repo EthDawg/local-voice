@@ -1,4 +1,4 @@
-# Workbench Chrome adapter
+# Workbench Preview Chrome adapter
 
 An unpacked Manifest V3 adapter for the Workbench Mac app. Saved resources in Workbench owns the destinations; each Chrome profile explicitly pairs under a name you choose. This adapter stores no passwords and does not sign in, change credentials, read page content, or establish that a persona is authenticated.
 
@@ -35,3 +35,13 @@ Success verifies Chrome’s tab-active and window-focused flags. It does not ver
 Run `node --test BrowserExtension/tests/*.test.js` from the repository root. No npm install or runtime dependencies are needed. Tests use deterministic Chrome API fakes for URL handling, tab selection, permissions, duplicate tabs, focus verification, navigation and cancellation races, wire correlation, disconnects, timeouts, size limits and manifest/popup boundaries.
 
 These tests do not establish live Chrome/native integration. Dogfood the matching native host with synthetic profiles and pages before distribution, including two profiles, browser restart, closed tabs, duplicate URLs, minimized windows, permission refusal and a tenant subdomain update.
+
+## Prepare the Chrome Web Store package
+
+Run `python3 scripts/package-chrome.py` from the repository root. The reproducible archive is `dist/WorkbenchPreview-Chrome-0.1.0.zip`; the manifest sits at ZIP root. The script validates manifest capabilities, local asset references, exact icon dimensions and ZIP readback. Its fixed runtime allowlist excludes tests, development metadata, source artwork, listing copy and private or unrecognised files. `--check` validates without writing, and `--output` selects another ZIP destination.
+
+Run `python3 BrowserExtension/tests/package_test.py` for the packaging regressions. Store copy, reviewer steps, permissions reasons and remaining publication requirements live in [store/listing.md](store/listing.md). [privacy.html](privacy.html) is the in-product privacy page; [the public-policy draft](store/privacy-policy-draft.md) must also be published on the companion website before submission.
+
+The icons reuse the repository’s canonical `scripts/icon.swift` artwork. To regenerate them on macOS, first run that script into a temporary directory, then run `swift BrowserExtension/store/render-assets.swift <temporary-directory>/icon_512x512@2x.png BrowserExtension`. This creates exact 16/32/48/128px PNGs and the separate 440×280 promotional tile. The 128px icon keeps transparent store padding. The tile is branding artwork; the store still needs a screenshot of the actual extension.
+
+The store name is **Workbench Preview**, version **0.1.0**. The existing unpacked identity remains unchanged. Verify the dashboard’s assigned identity and update the native host allowlist together before distributing a store-installed build. Packaging does not publish the extension or install its native companion.
