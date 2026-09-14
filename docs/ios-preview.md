@@ -126,3 +126,9 @@ The earlier [363abbc CI run](https://github.com/EthDawg/workbench/actions/runs/3
 ## Gentle motion acceptance — 15 September 2026
 
 The iPhone 17 Pro / iOS 26.5 Simulator passed 14 focused tests: photograph-layer animation and cleanup, crop restoration, power/accessibility/lifecycle eligibility, and actual scene save/reopen/duplicate preservation. Parent native UI checks created Coast, enabled Gentle motion, used Pause/Play and opened Crop backdrop; the preview reported still while cropping and retained the saved motion preference. This is Simulator/source evidence, not an installed phone release or a demonstration of Apple’s final Lock Screen effect. [Cross-platform details and screenshots](gentle-motion.md).
+
+## Authored ambient starting pictures (15 September 2026)
+
+Tools → Scenes → Start with a picture now offers Window light, Campus breeze and Coastal sky alongside the still palettes. Selecting one deliberately creates a local scene with gentle motion on and Device frame off. Enable the existing Device frame toggle for a mobile-presentation layout. Gallery and crop previews stay still; only the selected eligible editor animates. Pause/Play is temporary; Gentle motion is saved. Reduce Motion, animated-image autoplay settings, low power, thermal state and inactive/hidden views suppress motion.
+
+These generated layered pictures are neither captured video nor Live Photos. Export remains a still PNG; the system Wallpaper picker belongs to Apple. `.workbenchscene` v2 contains the poster, clean plate and detail plus all existing artwork/recovery assets. The first rig save preserves the v1 manifest; older apps refuse v2 rather than discard its recipe. Update both peers before exchanging an ambient scene. Replacing a backdrop clears the old recipe and motion atomically; crop and foreground edits retain it. See [the researched contract and native evidence](research/ambient-scenes.md).
