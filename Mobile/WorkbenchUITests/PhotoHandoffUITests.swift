@@ -76,9 +76,18 @@ final class PhotoHandoffUITests: XCTestCase {
         XCTAssertFalse(app.buttons["handoff.send"].isEnabled)
         screenshot("Synthetic photo preview - cloud disabled", app: app)
         let keep = app.buttons["handoff.keep"]
-        reveal(keep, in: app); keep.tap()
+        reveal(keep, in: app)
+        XCTAssertTrue(keep.isEnabled, "Keep must be available before the native tap")
+        keep.tap()
         let notice = app.staticTexts["handoff.notice"]
-        XCTAssertTrue(notice.waitForExistence(timeout: 10))
+        let kept = notice.waitForExistence(timeout: 10)
+        if !kept {
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "Photo state after Keep produced no notice"
+            hierarchy.lifetime = .keepAlways; add(hierarchy)
+            screenshot("Photo state after Keep produced no notice", app: app)
+        }
+        XCTAssertTrue(kept)
         XCTAssertEqual(notice.label, "Original kept on this device.")
         app.navigationBars.buttons.firstMatch.tap()
 
