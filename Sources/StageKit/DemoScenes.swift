@@ -11,6 +11,7 @@ struct DemoScene: Codable, Identifiable, Equatable {
     var backgroundX = 0.5
     var backgroundY = 0.5
     var zoom = 1.0
+    var gentleMotion: Bool? = nil
     var showsPhone = true
     var phoneX = 0.5
     var phoneY = 0.5
@@ -22,12 +23,13 @@ struct DemoScene: Codable, Identifiable, Equatable {
     /// Local edit provenance, deliberately absent from portable/legacy JSON.
     var libraryRevision: UUID? = nil
     private enum CodingKeys: String, CodingKey {
-        case id, name, background, backgroundX, backgroundY, zoom, showsPhone,
+        case id, name, background, backgroundX, backgroundY, zoom, gentleMotion, showsPhone,
              phoneX, phoneY, phoneHeight, logo, viewport, hand, persona
     }
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.id == rhs.id && lhs.name == rhs.name && lhs.background == rhs.background &&
         lhs.backgroundX == rhs.backgroundX && lhs.backgroundY == rhs.backgroundY && lhs.zoom == rhs.zoom &&
+        lhs.gentleMotion == rhs.gentleMotion &&
         lhs.showsPhone == rhs.showsPhone && lhs.phoneX == rhs.phoneX && lhs.phoneY == rhs.phoneY &&
         lhs.phoneHeight == rhs.phoneHeight && lhs.logo == rhs.logo && lhs.viewport == rhs.viewport &&
         lhs.hand == rhs.hand && lhs.persona == rhs.persona
@@ -108,10 +110,11 @@ enum SceneRenderer {
         return CGRect(x: left ? margin : size.width - margin - width,
                       y: top ? size.height - margin - height : margin, width: width, height: height)
     }
-    static func draw(_ scene: DemoScene, image: NSImage, size: CGSize, logoImage: NSImage? = nil, handImage: NSImage? = nil, personaImage: NSImage? = nil) {
+    static func draw(_ scene: DemoScene, image: NSImage, size: CGSize, logoImage: NSImage? = nil, handImage: NSImage? = nil, personaImage: NSImage? = nil, drawsBackground: Bool = true) {
         let bounds = CGRect(origin: .zero, size: size)
         NSGraphicsContext.saveGraphicsState()
         NSBezierPath(rect: bounds).addClip()
+        if drawsBackground {
         NSColor.windowBackgroundColor.setFill(); bounds.fill()
         let scale = max(size.width / image.size.width, size.height / image.size.height) * scene.zoom
         let fitted = CGSize(width: image.size.width * scale, height: image.size.height * scale)
@@ -119,6 +122,7 @@ enum SceneRenderer {
                               y: (size.height - fitted.height) * scene.backgroundY,
                               width: fitted.width, height: fitted.height),
                    from: .zero, operation: .sourceOver, fraction: 1)
+        }
         if scene.showsPhone, let hand = scene.hand, let handImage {
             HandRenderer.draw(hand, image: handImage, device: phoneRect(scene, in: size))
         }
@@ -226,6 +230,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     @Published private(set) var sceneSync: MacSceneSync?
     private var window: NSWindow?
     private var presentation: DemoPresentation?
+    let desktopMotion = MainActor.assumeIsolated { DesktopMotionController() }
     var onOpen: (() -> Void)?
     var onBeginPresentation: (() -> Void)?
     var mayBeginInteraction: (() -> Bool)?
@@ -354,7 +359,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     func endPresentation() { presentation?.end() }
     func shutdown() {
         personas.shutdown()
-        MainActor.assumeIsolated { sceneSync?.shutdown() }
+        MainActor.assumeIsolated { desktopMotion.stop(); sceneSync?.shutdown() }
         presentation?.onEnd = nil; presentation?.end(); presentation = nil
         window?.orderOut(nil); window?.contentView = nil; window?.delegate = nil; window = nil
         imageCache.removeAllObjects()
@@ -684,12 +689,13 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
         }
     }
     #if !APP_STORE
-    func applyDesktop() {
+    func applyDesktop(animate: Bool = false) {
         guard systemIntegrationEnabled else { return }
         guard !desktopBusy else { return }
         desktopBusy = true
         do {
             guard let scene = selected, let image = image(for: scene), let screen = targetScreen else { throw SceneError.noScene }
+            let logo = logoImage(for: scene), hand = handImage(for: scene), persona = personaImage(for: scene)
             let workspace = NSWorkspace.shared
             let screenID = AppCoordinator.displayID(screen)
             let output = root.appendingPathComponent("desktop-\(UUID().uuidString).png")
@@ -709,6 +715,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
             try JSONEncoder().encode(snapshots).write(to: snapshotURL, options: .atomic)
             hasDesktopSnapshot = true
             notice = "Applying the scene to this display…"
+            MainActor.assumeIsolated { desktopMotion.stop() }
             try workspace.setDesktopImageURL(output, for: screen, options: [.imageScaling: NSImageScaling.scaleAxesIndependently.rawValue])
             DesktopImageVerification.confirm(output, read: { workspace.desktopImageURL(for: screen) }) { [weak self] confirmed in
                 guard let self else { return }
@@ -722,7 +729,16 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
                         snapshots[index].appliedURL = output; snapshots[index].pendingURL = nil
                         try JSONEncoder().encode(snapshots).write(to: self.snapshotURL, options: .atomic)
                     }
-                    self.notice = "\(scene.name) is on this display. Restore desktop brings your previous picture back."
+                    if animate {
+                        let started = MainActor.assumeIsolated {
+                            self.desktopMotion.start(scene: scene, backdrop: image, logo: logo, hand: hand, persona: persona,
+                                                     screen: screen, expectedStill: output)
+                        }
+                        self.notice = started ? "Gentle desktop motion is on. Stop motion or quit Workbench to keep the still picture."
+                            : "The still picture is applied. Motion could not start on this display."
+                    } else {
+                        self.notice = "\(scene.name) is on this display. Restore desktop brings your previous picture back."
+                    }
                 } catch { self.notice = error.localizedDescription }
             }
         } catch { desktopBusy = false; notice = error.localizedDescription }
@@ -730,6 +746,7 @@ final class DemoScenes: NSObject, ObservableObject, NSWindowDelegate {
     func restoreDesktop() {
         guard systemIntegrationEnabled else { return }
         guard !desktopBusy else { return }
+        MainActor.assumeIsolated { desktopMotion.stop() }
         desktopBusy = true
         do {
             let snapshots = try JSONDecoder().decode([DesktopSnapshot].self, from: Data(contentsOf: snapshotURL))

@@ -24,6 +24,8 @@ public struct PortableScene: Codable, Equatable, Identifiable, Sendable {
     public var backgroundX = 0.5
     public var backgroundY = 0.5
     public var zoom = 1.0
+    /// Opt-in photograph motion. Absent in older documents means still.
+    public var gentleMotion: Bool? = nil
     public var showsPhone = true
     public var phoneX = 0.5
     public var phoneY = 0.5

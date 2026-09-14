@@ -226,6 +226,7 @@ struct MobileSceneSyncSettings: View {
 struct SceneThumbnail: View {
     let scene: PortableScene
     @ObservedObject var store: SceneLibraryModel
+    var motionPlaying = false // Gallery and exported previews stay still by default.
     @State private var images: [String: UIImage] = [:]
     @State private var loading = true
     private var visibleAssets: Set<String> { Set([scene.background, scene.logo?.image, scene.persona?.image].compactMap { $0 }) }
@@ -258,11 +259,9 @@ struct SceneThumbnail: View {
     }
     @ViewBuilder private func backdrop(in size: CGSize) -> some View {
         if let background = images[scene.background] {
-            let scale = max(size.width / background.size.width, size.height / background.size.height) * scene.zoom
-            let width = background.size.width * scale, height = background.size.height * scale
-            Image(uiImage: background).resizable().frame(width: width, height: height)
-                .position(x: width / 2 + (size.width - width) * scene.backgroundX,
-                          y: height / 2 + (size.height - height) * (1 - scene.backgroundY))
+            SceneMotionPreview(image: background, x: scene.backgroundX, y: scene.backgroundY,
+                zoom: scene.zoom, playing: motionPlaying)
+                .frame(width: size.width, height: size.height)
         } else if loading { ProgressView().tint(.white) }
         else { Image(systemName: "photo").foregroundStyle(.white.opacity(0.5)) }
     }
