@@ -83,6 +83,7 @@ enum MobileSceneImageLayer { case background, logo, persona }
             switch layer {
             case .background:
                 scene.background = asset; scene.backgroundX = 0.5; scene.backgroundY = 0.5; scene.zoom = 1
+                scene.ambience = nil; scene.gentleMotion = nil
             case .logo:
                 var layer = scene.logo ?? SceneLogoLayer(image: asset); layer.image = asset; scene.logo = layer
             case .persona:
@@ -145,6 +146,7 @@ struct MobileSceneEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityPlayAnimatedImages) private var animatedImagesEnabled
     @StateObject private var editor = MobileSceneEditingSession()
     @State private var selection: PhotosPickerItem?
     @State private var choosingPhoto = false
@@ -210,7 +212,8 @@ struct MobileSceneEditor: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .onScrollVisibilityChange(threshold: 0.05) { previewVisible = $0 }
                     .onDisappear { previewVisible = false }
-                Text("The device frame marks the live screen on your Mac.").font(.footnote).foregroundStyle(.secondary)
+                Text(draft.showsPhone ? "The device frame marks the live screen on your Mac."
+                     : "Turn on Device frame to prepare a device presentation.").font(.footnote).foregroundStyle(.secondary)
                 nameSection
                 Button("Replace backdrop", systemImage: "photo") { choose(.background) }.buttonStyle(.bordered).disabled(busy)
                 motionSection
@@ -230,7 +233,7 @@ struct MobileSceneEditor: View {
     private var motionPlayback: SceneMotionPlayback {
         SceneMotionPlayback(requested: editor.draft?.gentleMotion == true, paused: previewPaused,
             editingCrop: editingCrop, visible: previewVisible && !busy && !choosingPhoto && share == nil && !cloudSettings && personaCard == nil && !recovering,
-            active: scenePhase == .active, reduceMotion: reduceMotion, lowPower: lowPower, thermalState: thermalState)
+            active: scenePhase == .active, reduceMotion: reduceMotion, animatedImagesEnabled: animatedImagesEnabled, lowPower: lowPower, thermalState: thermalState)
     }
     private var motionSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -241,9 +244,13 @@ struct MobileSceneEditor: View {
                 Button(previewPaused ? "Play preview" : "Pause preview", systemImage: previewPaused ? "play.fill" : "pause.fill") {
                     previewPaused.toggle()
                 }.buttonStyle(.bordered).frame(minHeight: 44).accessibilityIdentifier("scene.motionPlayback")
-                Text(motionPlayback.explanation).font(.footnote).foregroundStyle(.secondary)
+                Text(motionPlayback.isPlaying && editor.draft?.ambience != nil
+                     ? "Clouds or leaves move gently. Your device, logo and persona stay still."
+                     : motionPlayback.explanation).font(.footnote).foregroundStyle(.secondary)
             } else {
-                Text("A slow, subtle zoom when you present this scene.").font(.footnote).foregroundStyle(.secondary)
+                Text(editor.draft?.ambience == nil ? "A slow, subtle zoom when you present this scene."
+                     : "Clouds or leaves move gently. The rest of your scene stays still.")
+                    .font(.footnote).foregroundStyle(.secondary)
             }
         }.padding(16).background(.background, in: RoundedRectangle(cornerRadius: 16))
     }

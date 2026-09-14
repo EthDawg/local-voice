@@ -13,13 +13,14 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
     private let logo: NSImage?
     private let hand: NSImage?
     private let persona: NSImage?
+    private let ambience: AmbientSceneImages?
     private let screen: NSScreen?
     private let mode: PresentationMode
     private var lifecycle = PresentationLifecycle()
     private var keepAwake: NSObjectProtocol?
-    init(scene: DemoScene, image: NSImage, logo: NSImage?, hand: NSImage?, persona: NSImage? = nil, screen: NSScreen?, root: URL, mode: PresentationMode = .fullScreen) {
+    init(scene: DemoScene, image: NSImage, logo: NSImage?, hand: NSImage?, persona: NSImage? = nil, ambience: AmbientSceneImages? = nil, screen: NSScreen?, root: URL, mode: PresentationMode = .fullScreen) {
         self.scene = scene; backdrop = image; self.logo = logo; self.hand = hand; self.persona = persona; self.screen = screen
-        self.mode = mode
+        self.mode = mode; self.ambience = ambience
         capture = DemoCapture(root: root)
         controls = PresentationControlsModel(root: root)
         super.init()
@@ -43,7 +44,7 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
         }
         window.onReconnect = { [weak self] in self?.capture.reconnect() }
         window.onRevealControls = { [weak self] in self?.controls.revealForKeyboard() }
-        window.contentView = NSHostingView(rootView: DemoStageContent(scene: scene, backdrop: backdrop, logo: logo, hand: hand, persona: persona, capture: capture, controls: controls) { [weak self] in self?.end() })
+        window.contentView = NSHostingView(rootView: DemoStageContent(scene: scene, backdrop: backdrop, logo: logo, hand: hand, persona: persona, ambience: ambience, capture: capture, controls: controls) { [weak self] in self?.end() })
         self.window = window
         NSApp.activate(ignoringOtherApps: true); window.makeKeyAndOrderFront(nil)
         if mode == .fullScreen { lifecycle.willEnter(); window.toggleFullScreen(nil) }
@@ -201,6 +202,7 @@ private struct DemoStageContent: View {
     let logo: NSImage?
     let hand: NSImage?
     let persona: NSImage?
+    let ambience: AmbientSceneImages?
     @ObservedObject var capture: DemoCapture
     @ObservedObject var controls: PresentationControlsModel
     let end: () -> Void
@@ -236,7 +238,7 @@ private struct DemoStageContent: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                DemoStageSurface(scene: liveScene, image: backdrop, logo: logo, hand: hand, persona: persona, previewLayer: capture.previewLayer, live: capture.live, motion: scene.gentleMotion == true && !motionPaused && !reduceMotion)
+                DemoStageSurface(scene: liveScene, image: backdrop, logo: logo, hand: hand, persona: persona, ambience: ambience, previewLayer: capture.previewLayer, live: capture.live, motion: scene.gentleMotion == true && !motionPaused && !reduceMotion)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onTapGesture { if controls.policy.isExpanded { controls.close() } }
                 if scene.showsPhone && !capture.live {
@@ -291,7 +293,7 @@ private struct DemoStageContent: View {
     private func tile(in size: CGSize) -> some View {
         Button { controls.toggleFromTile() } label: {
             HStack(spacing: 0) {
-                Image(systemName: "iphone").font(.system(size: 17, weight: .medium))
+                Image(systemName: scene.showsPhone ? "iphone" : "photo").font(.system(size: 17, weight: .medium))
                     .frame(width: 42, height: 40)
                 Divider().frame(height: 18)
                 Image(systemName: inwardChevron).font(.system(size: 11, weight: .semibold))
@@ -307,7 +309,7 @@ private struct DemoStageContent: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
                 HStack(spacing: 8) {
-                    Image(systemName: "iphone")
+                    Image(systemName: scene.showsPhone ? "iphone" : "photo")
                     Text(sourceName).font(.callout.weight(.semibold)).lineLimit(1)
                     Spacer(minLength: 0)
                 }.contentShape(Rectangle()).gesture(dragGesture(in: size))
@@ -391,12 +393,13 @@ private struct DemoStageSurface: NSViewRepresentable {
     let logo: NSImage?
     let hand: NSImage?
     let persona: NSImage?
+    let ambience: AmbientSceneImages?
     let previewLayer: AVCaptureVideoPreviewLayer
     let live: Bool
     let motion: Bool
     func makeNSView(context: Context) -> DemoStageSurfaceView { DemoStageSurfaceView(previewLayer: previewLayer) }
     func updateNSView(_ view: DemoStageSurfaceView, context: Context) {
-        view.configure(scene: scene, backdrop: image, logo: logo, hand: hand, persona: persona)
+        view.configure(scene: scene, backdrop: image, logo: logo, hand: hand, persona: persona, ambience: ambience)
         view.viewportScene = scene; view.isLive = live
         view.motionRequested = motion; view.needsLayout = true
     }
