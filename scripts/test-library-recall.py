@@ -16,6 +16,7 @@ import time
 
 PROJECT = Path(__file__).resolve().parents[1]
 SOURCES = [PROJECT / "Sources/LocalVoice" / name for name in ("DemoLibrary.swift", "DemoLibraryView.swift")]
+SOURCES.append(PROJECT / "Sources/PresenterKit/PresenterProtocol.swift")
 
 DEPENDENCIES = r'''
 import AppKit
@@ -43,11 +44,17 @@ struct FixturePreferences { func shortcut(_ id: UInt32) -> FixtureShortcut { Fix
     @Published var preferences = FixturePreferences()
     @Published var showingPhonePhotos = false
     let photoHandoff = FixturePhotoHandoff()
+    let presenter = FixturePresenter()
     var onUsePhotoAsBackdrop: ((URL, String) -> Void)?
 }
 // Photo arrival is covered by its own shared-module and UI checks. This recall
 // fixture deliberately keeps cloud and handoff dependencies out of its scope.
 final class FixturePhotoHandoff {}
+final class FixturePresenter {}
+struct ChromeConnectionView: View {
+    let presenter: FixturePresenter
+    var body: some View { EmptyView() }
+}
 struct PhotoHandoffView: View {
     let handoff: FixturePhotoHandoff
     var onUseAsBackdrop: ((URL, String) -> Void)?
@@ -235,7 +242,7 @@ def compile_fixture(directory: Path, main: str, binary: Path) -> None:
     copied = []
     for source in SOURCES:
         path = directory / source.name
-        path.write_text(source.read_text())
+        path.write_text(source.read_text().replace("import PresenterKit\n", ""))
         copied.append(path)
     dependencies = directory / "FixtureDependencies.swift"
     dependencies.write_text(DEPENDENCIES)

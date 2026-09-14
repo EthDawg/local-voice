@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import UniformTypeIdentifiers
+import PresenterKit
 
 enum DemoResourceKind: String, Codable, CaseIterable {
     case prompt = "Prompt", link = "Link", file = "File"
@@ -18,9 +19,10 @@ struct DemoResource: Codable, Identifiable, Equatable {
     var favorite = false
     var modified = Date()
     var bookmark: Data?
+    var browserTarget: BrowserTarget?
 
     var group: String { [product, persona].filter { !$0.isEmpty }.joined(separator: " · ") }
-    var primaryActionTitle: String { switch kind { case .prompt: "Copy prompt"; case .link: "Open link"; case .file: "Open file" } }
+    var primaryActionTitle: String { switch kind { case .prompt: "Copy prompt"; case .link: browserTarget == nil ? "Open link" : "Switch to tab"; case .file: "Open file" } }
     var primaryActionAvailable: Bool {
         switch kind {
         case .prompt: return !content.isEmpty
@@ -67,6 +69,9 @@ struct DemoResource: Codable, Identifiable, Equatable {
             && values?.contentType?.conforms(to: .application) != true
     }
     var validationMessage: String? {
+        if let target = browserTarget, kind != .link || !target.isValid || !PresenterURL.validName(title) || PresenterURL.canonical(content) != content {
+            return "A Chrome destination needs a short name and a complete web address without a query, fragment or credentials. Reconnect a changed tenant from its Chrome profile."
+        }
         if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "Give this resource a name." }
         if title.count > 200 || product.count > 200 || persona.count > 200 { return "Keep names under 200 characters." }
         if content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return kind == .file ? "Choose a local file." : (kind == .prompt ? "Add some text." : "Add a web address.") }
@@ -118,6 +123,7 @@ struct DemoLibraryStore {
         let resources = items.map { item -> DemoResource in
             var item = item
             if portable {
+                item.browserTarget = nil
                 if item.kind == .file, let resolved = item.fileURL { item.content = resolved.path }
                 item.bookmark = nil
             }
@@ -135,6 +141,7 @@ struct DemoLibraryStore {
         for var item in incoming where ids.insert(item.id).inserted {
             // Bookmarks are a local access grant, never accepted from an exchange file.
             item.bookmark = nil
+            item.browserTarget = nil
             merged.append(item)
         }
         try validate(merged)
@@ -145,6 +152,13 @@ struct DemoLibraryStore {
         let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
         guard size <= Self.byteLimit else { throw VoiceError.message("The saved library exceeds the 16 MB limit.") }
         return try Self.decode(Data(contentsOf: url))
+    }
+    func currentData() throws -> Data? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        guard (try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0) <= Self.byteLimit else {
+            throw VoiceError.message("The saved library exceeds the 16 MB limit.")
+        }
+        return try Data(contentsOf: url)
     }
     func save(_ items: [DemoResource]) throws {
         let data = try Self.encoded(items)
@@ -168,13 +182,15 @@ final class DemoLibraryModel: ObservableObject {
     let store: DemoLibraryStore
     private let copyText: (String) -> Int?
     private let openURL: (URL) -> Bool
+    private var savedData: Data?
+    var switchBrowser: ((UUID) -> Void)?
     init(store: DemoLibraryStore = DemoLibraryStore(),
          copyText: ((String) -> Int?)? = nil,
          openURL: ((URL) -> Bool)? = nil) {
         self.store = store
         self.copyText = copyText ?? { TextDelivery.copy($0) }
         self.openURL = openURL ?? { NSWorkspace.shared.open($0) }
-        do { resources = try store.load(); reconcileSelection() }
+        do { savedData = try store.currentData(); resources = try savedData.map(DemoLibraryStore.decode) ?? []; reconcileSelection() }
         catch { self.error = "The library could not be read. Saving is paused to preserve it. \(error.localizedDescription)"; savingDisabled = true }
     }
     var matches: [DemoResource] { DemoResource.matching(resources, query: query, favoritesOnly: favoritesOnly) }
@@ -201,7 +217,10 @@ final class DemoLibraryModel: ObservableObject {
     }
     @discardableResult private func commit(_ next: [DemoResource]) -> Bool {
         guard !savingDisabled else { return false }
-        do { try store.save(next); resources = next; error = nil; return true }
+        do {
+            guard try store.currentData() == savedData else { throw VoiceError.message("The library changed outside this window. Reopen Workbench before saving; the newer file is preserved.") }
+            try store.save(next); savedData = try store.currentData(); resources = next; error = nil; return true
+        }
         catch { self.error = error.localizedDescription; return false }
     }
     func favorite(_ item: DemoResource) {
@@ -244,6 +263,10 @@ final class DemoLibraryModel: ObservableObject {
     }
     func open(_ item: DemoResource, reveal: Bool = false) {
         if item.kind == .link {
+            if item.browserTarget != nil {
+                guard let switchBrowser else { error = "Open the complete Workbench app to switch to this Chrome destination."; return }
+                switchBrowser(item.id); return
+            }
             guard let url = item.webURL else { error = "This web link is not valid."; return }
             if !openURL(url) { error = "No application could open this link." }
             return
@@ -283,7 +306,9 @@ final class DemoLibraryModel: ObservableObject {
         do {
             let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
             guard size <= DemoLibraryStore.byteLimit else { throw VoiceError.message("Choose a library smaller than 16 MB.") }
-            let incoming = try DemoLibraryStore.decode(Data(contentsOf: url))
+            let incoming = try DemoLibraryStore.decode(Data(contentsOf: url)).map { item in
+                var copy = item; copy.browserTarget = nil; return copy
+            }
             let next = try DemoLibraryStore.merging(incoming, into: resources)
             let added = next.count - resources.count
             if commit(next) { notice = "Added \(added) resources. Existing resources kept. Files on another Mac may need Locate file." }

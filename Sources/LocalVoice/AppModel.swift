@@ -51,7 +51,7 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     @Published var preferences = VoicePreferences.load() {
         didSet {
             preferences.save()
-            if oldValue.dictationShortcut != preferences.dictationShortcut || oldValue.controlsShortcut != preferences.controlsShortcut || oldValue.libraryShortcut != preferences.libraryShortcut { onShortcutsChanged?() }
+            if oldValue.dictationShortcut != preferences.dictationShortcut || oldValue.controlsShortcut != preferences.controlsShortcut || oldValue.libraryShortcut != preferences.libraryShortcut || oldValue.presenterShortcut != preferences.presenterShortcut { onShortcutsChanged?() }
         }
     }
     @Published var rawTranscript = ""
@@ -114,6 +114,8 @@ final class AppModel: NSObject, ObservableObject, AVAudioPlayerDelegate, AVAudio
     let cleanupEngine = CleanupEngine()
     let store = StateStore()
     let library = DemoLibraryModel()
+    lazy var presenter = PresenterModel(library: library)
+    var onShowPresenter: (() -> Void)?
     let photoHandoff = PhotoHandoffModel(directory: Workbench.supportDirectory(component: "PhotoHandoff"), platform: "Mac")
     private var photoHandoffRefresh: Task<Void, Never>?
     private var photoHandoffActivation: AnyCancellable?

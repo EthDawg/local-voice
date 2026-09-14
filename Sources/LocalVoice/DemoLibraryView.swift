@@ -35,6 +35,7 @@ struct DemoLibraryView: View {
 
     private var resources: some View {
         VStack(alignment: .leading, spacing: 16) {
+            ChromeConnectionView(presenter: model.presenter)
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text("Ready when they ask.").font(.system(size: 30, weight: .semibold)).tracking(-0.8)
@@ -184,6 +185,11 @@ struct DemoLibraryView: View {
                 if item.fileAvailable && !item.canOpenFile { Text("Applications and executable files are available in Finder only.").font(.caption).foregroundStyle(.secondary) }
                 Button("Locate file…") { library.chooseFile(for: item) }.disabled(library.savingDisabled)
             } else {
+                if let target = item.browserTarget {
+                    Label("Chrome · \(target.profileName)", systemImage: "arrow.up.forward.app").font(.caption).foregroundStyle(.secondary)
+                    Button("Use default browser instead") { var copy = item; copy.browserTarget = nil; _ = library.save(copy) }
+                        .font(.caption).disabled(library.savingDisabled)
+                }
                 ScrollView { Text(item.content).font(.system(size: 13)).lineSpacing(4).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
                     .frame(maxHeight: .infinity)
                 HStack {

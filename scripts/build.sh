@@ -21,6 +21,8 @@ BIN_DIR="$(swift build -c release --show-bin-path --disable-sandbox)"
 APP_DIR="$PACKAGE_DIR/Workbench.app"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$BIN_DIR/LocalVoice" "$APP_DIR/Contents/MacOS/Workbench"
+cp "$BIN_DIR/WorkbenchBrowserHost" "$APP_DIR/Contents/MacOS/WorkbenchBrowserHost"
+ditto "$PROJECT_DIR/BrowserExtension" "$APP_DIR/Contents/Resources/BrowserExtension"
 for bundle in "$BIN_DIR"/*.bundle; do
     [ -e "$bundle" ] || continue
     ditto "$bundle" "$APP_DIR/Contents/Resources/$(basename "$bundle")"
