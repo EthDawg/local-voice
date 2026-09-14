@@ -20,6 +20,8 @@ Make frequent Mac tasks easy to start, understand and leave. Local dictation is 
 
 Tapping an iPhone field focuses it; the user then taps the Dictation button. Workbench's USB preview sends no touches, keys or Mac dictation to the device. A narrow Mac browser page remains a Mac field. Apple documents that iPhone Mirroring does not support the iPhone microphone or camera.
 
+**Connection & audio…** is available in preparation and Source. First source selection is explicit; reconnect uses only the saved device ID. End preview & open releases capture and closes the presentation before launching Apple’s app. This does not add phone audio to Workbench. The [phone presentation contract](phone-presenting.md) owns route-specific steps and voice rehearsal.
+
 Sources: [iPhone dictation](https://support.apple.com/en-gb/guide/iphone/iph2c0651d2/ios), [iPhone Mirroring](https://support.apple.com/en-au/120421), [QuickTime device capture](https://support.apple.com/en-au/guide/quicktime-player/qtp356b55534/mac).
 
 ## Surfaces
@@ -43,6 +45,8 @@ The mobile tile contains no Dictate, Read aloud, cleanup modes or model download
 4. Processing: microphone off; distinguish transcription and optional cleanup. Cancellation/generation checks prevent late results replacing a later capture.
 5. Delivery: paste only to the intended verified Mac target, otherwise copy and explain. Preserve the original.
 6. Complete/error: truthful receipt, review/original/retry where available. Temporary results may dismiss; active capture cannot silently disappear.
+
+A capture’s history commit precedes text delivery. Save failure keeps one local recovery with a stable ID. Retry saving performs no recognition or delivery; it preserves later draft edits and adds the original capture once. Quit retains unfinished recovery, and normal Dictate offers a confirmed discard. Cold recovery preserves a newer saved draft. Failed state and recovery writes must never be described as a saved transcript.
 
 Cleaning an existing draft uses the same cancellable processing lifecycle. Cancel leaves the draft, retained original and cleanup method untouched. A late model result cannot overwrite cancellation or an edit made while cleanup was running. Draft cleanup never delivers text to a previously captured app target.
 

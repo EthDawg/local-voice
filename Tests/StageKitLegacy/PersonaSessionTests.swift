@@ -298,7 +298,11 @@ final class PersonaSessionTests {
         try f.library.saveGroupLayout(large, overlays: [PersonaOverlayItem(personaID: ids[0])], publicLabel: nil)
         XCTAssertThrowsError(try f.library.startOverlaySession(groupIDs: [large], initialGroupID: large))
         XCTAssertEqual(f.library.sessionState.currentGroupID, f.group)
-        f.library.showOverlay() // The legacy entry must fail before creating a native panel.
+        let launch = f.library.showOverlay() // Fail before creating a native panel.
+        XCTAssertThrowsError(try launch.get())
+        if case .failure(let error) = launch {
+            XCTAssertEqual(error.localizedDescription, PersonaSessionError.tooManyCandidates.localizedDescription)
+        }
         XCTAssertEqual(f.library.sessionState.currentGroupID, f.group)
         XCTAssertTrue(panels.allSatisfy { $0.visible && !$0.closed })
         XCTAssertTrue(f.library.notice?.contains("32") == true)
@@ -307,5 +311,49 @@ final class PersonaSessionTests {
         XCTAssertEqual(try archive(f.root), saved)
         XCTAssertThrowsError(try f.library.startOverlaySession(groupIDs: [f.group, f.group], initialGroupID: f.group))
         XCTAssertEqual(f.displays.visible.count, 2)
+    }
+
+    func testSingleCardLaunchFailureReturnsErrorAndPreservesExistingOutput() throws {
+        let f = try fixture(); defer { cleanup(f) }
+        try f.library.startOverlaySession(groupIDs: [f.group], initialGroupID: f.group)
+        f.library.prepareGroup(f.group); f.library.selectedID = f.first.id
+        let panels = f.displays.current
+        let oldImages = panels.map(\.image), oldLabels = panels.map(\.label), oldStates = panels.map(\.state)
+        var didShow = false
+        f.library.onShow = { didShow = true }
+        let missingURL = f.root.appendingPathComponent(f.second.image)
+        let missingBytes = try Data(contentsOf: missingURL)
+        try FileManager.default.removeItem(at: missingURL)
+        let before = try files(f.root)
+        XCTAssertTrue(f.library.renderedImage(for: f.first) != nil, "The chosen card is valid; another frozen candidate is unavailable")
+        let missing = f.library.showOverlay()
+        XCTAssertThrowsError(try missing.get())
+        if case .failure(let error) = missing {
+            XCTAssertEqual(error.localizedDescription, PersonaSessionError.missingArtwork.localizedDescription)
+            XCTAssertEqual(f.library.notice, error.localizedDescription)
+        }
+        XCTAssertEqual(try files(f.root), before)
+        XCTAssertEqual(f.library.sessionState.currentGroupID, f.group)
+        XCTAssertEqual(f.library.sessionState.phase, .active)
+        XCTAssertEqual(f.displays.current.count, panels.count)
+        XCTAssertTrue(panels.allSatisfy { $0.visible && !$0.closed })
+        XCTAssertTrue(zip(panels, oldImages).allSatisfy { $0.image === $1 })
+        XCTAssertEqual(panels.map(\.label), oldLabels); XCTAssertEqual(panels.map(\.state), oldStates)
+        XCTAssertFalse(didShow, "Failure must not run the successful-launch shell callback")
+
+        try missingBytes.write(to: missingURL)
+        f.library.mayBeginInteraction = { false }
+        let restored = try files(f.root)
+        let busy = f.library.showOverlay()
+        XCTAssertThrowsError(try busy.get())
+        if case .failure(let error) = busy {
+            XCTAssertEqual(error.localizedDescription, PersonaSessionInteractionError.busy.localizedDescription)
+            XCTAssertEqual(f.library.notice, error.localizedDescription)
+        }
+        XCTAssertEqual(try files(f.root), restored)
+        XCTAssertEqual(f.library.sessionState.currentGroupID, f.group)
+        XCTAssertTrue(panels.allSatisfy { $0.visible && !$0.closed })
+        XCTAssertTrue(zip(panels, oldImages).allSatisfy { $0.image === $1 })
+        XCTAssertFalse(didShow)
     }
 }

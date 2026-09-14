@@ -330,9 +330,10 @@ struct RecordingOverlay: View {
             }.frame(maxWidth: .infinity, alignment: .leading)
             VStack(spacing: 4) {
                 if model.canRetry {
-                    Button { model.retryTranscription() } label: { Text("Retry").frame(minWidth: 44, minHeight: 28) }
-                        .buttonStyle(.borderedProminent).help("Retry the captured audio")
-                } else {
+                    Button { model.retryTranscription() } label: { Text(model.retryCaptureLabel).frame(minWidth: 44, minHeight: 28) }
+                        .buttonStyle(.borderedProminent).help(model.retryCaptureHelp)
+                }
+                if !model.canRetry || model.hasCaptureRecovery {
                     Button { model.dismissCaptureFailure(); model.onShowEditor?("dictate") } label: {
                         Text("Open Workbench").font(.system(size: 12)).frame(minHeight: 28)
                     }.buttonStyle(.bordered)

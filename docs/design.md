@@ -80,9 +80,17 @@ StageKit's `DemoCapture` uses AVFoundation external-device discovery and a video
 
 `NativePresentationApps` resolves and opens installed QuickTime Player or iPhone Mirroring using `NSWorkspace`. It does not embed, automate or capture those apps. A meeting app can share the selected Workbench or Apple window. A successful launch is not proof of device connection or a successful meeting share.
 
+The shared **Connection & audio…** guide separates picture, voice conversation and Mac control. First source selection is explicit. `PresentationHandoff` joins capture teardown and native window closure before an explicit End preview & open action launches Apple’s app. Restricted video access is distinguished from user-denied access. [The phone route contract](phone-presenting.md) records the flow, native limits and receiver checks.
+
 `TranscribeWithWorkbench` is the existing App Intent. Apple Shortcuts owns `Record Audio`; the intent accepts audio and returns that invocation's text through the normal voice pipeline. It never starts the microphone, copies or submits the result. Full Xcode metadata extraction and native discovery need package-level testing. The final live recording composition must be verified separately from synthetic invocation checks; [earlier integration notes](voice-integrations.md) are historical evidence for the previous Voice version.
 
 No Services implementation, Share extension, private iPhone Mirroring integration or general app-automation bridge is added by this consolidation. Those are future adapters only if a useful workflow justifies them. Windows portability is likewise a future design decision: isolate platform-facing code, but do not promise portability for AppKit, AVFoundation device capture, Carbon or App Intents.
+
+## Capture recovery
+
+`CaptureRecoveryStore` owns one versioned local pending capture in `LocalVoice/CaptureRecovery`, separate from the ordinary draft/history file. It owns only validated UUID-named recording files and a bounded metadata record; imported audio URLs never become deletion targets. A capture must commit to history before normal delivery or Shortcuts success. Failed saving retains raw text, current draft and owned audio. Retry saving uses the same history ID and never replays an old destination or reruns a model. A changed or unreadable journal stays intact and blocks a new capture until reviewed.
+
+Quit stops work and preserves pending recovery. On reopening, an acknowledged journal can be cleared; an unacknowledged capture never replaces a differing nonempty saved draft. Retry adds that immutable capture to Recent transcripts. Confirmed Discard removes only the pending owned files and preserves the current draft. A full disk can block both state and recovery-text writes: the error asks for Copy/Save before quitting and does not claim durable text. Photo and scene sync do not include this recovery folder.
 
 ## Saved state and migration
 

@@ -188,7 +188,10 @@ struct PersonaLibraryView: View {
                     resumeAfterDismiss = false
                     do { try library.resumeOverlaySession() } catch { reportLaunchFailure(error, resuming: true) }
                 } else if showAfterDismiss {
-                    showAfterDismiss = false; library.showOverlay()
+                    showAfterDismiss = false
+                    if case .failure(let error) = library.showOverlay() {
+                        reportLaunchFailure(error, resuming: false)
+                    }
                 }
             }
             .confirmationDialog("Discard the unsaved layout?", isPresented: $confirmingDiscard, titleVisibility: .visible) {

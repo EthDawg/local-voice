@@ -17,6 +17,7 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
     private let screen: NSScreen?
     private let mode: PresentationMode
     private var lifecycle = PresentationLifecycle()
+    private let handoff = PresentationHandoff()
     private var keepAwake: NSObjectProtocol?
     init(scene: DemoScene, image: NSImage, logo: NSImage?, hand: NSImage?, persona: NSImage? = nil, ambience: AmbientSceneImages? = nil, screen: NSScreen?, root: URL, mode: PresentationMode = .fullScreen) {
         self.scene = scene; backdrop = image; self.logo = logo; self.hand = hand; self.persona = persona; self.screen = screen
@@ -44,7 +45,8 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
         }
         window.onReconnect = { [weak self] in self?.capture.reconnect() }
         window.onRevealControls = { [weak self] in self?.controls.revealForKeyboard() }
-        window.contentView = NSHostingView(rootView: DemoStageContent(scene: scene, backdrop: backdrop, logo: logo, hand: hand, persona: persona, ambience: ambience, capture: capture, controls: controls) { [weak self] in self?.end() })
+        window.contentView = NSHostingView(rootView: DemoStageContent(scene: scene, backdrop: backdrop, logo: logo, hand: hand, persona: persona, ambience: ambience, capture: capture, controls: controls,
+            endAndOpen: { [weak self] in self?.endAndOpen($0) }, end: { [weak self] in self?.end() }))
         self.window = window
         NSApp.activate(ignoringOtherApps: true); window.makeKeyAndOrderFront(nil)
         if mode == .fullScreen { lifecycle.willEnter(); window.toggleFullScreen(nil) }
@@ -53,8 +55,26 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
     func bringForward() { NSApp.activate(ignoringOtherApps: true); window?.makeKeyAndOrderFront(nil) }
     func end() {
         guard !lifecycle.ending, !lifecycle.finished else { return }
-        capture.stop(); releaseKeepAwake()
+        let operation = handoff
+        capture.stop { operation.captureDidStop() }
+        releaseKeepAwake()
         apply(lifecycle.requestEnd())
+    }
+    private func endAndOpen(_ app: NativePresentationApp) {
+        guard !lifecycle.ending, !lifecycle.finished else { return }
+        guard handoff.request({
+            app.open { message in
+                // The source sheet and its parent are now closed, so a message
+                // on that former capture model would be invisible.
+                let alert = NSAlert()
+                alert.messageText = "Could not open \(app.title)"
+                alert.informativeText = message
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
+        }) else { return }
+        end()
     }
     private func apply(_ effect: PresentationLifecycle.Effect) {
         switch effect {
@@ -69,9 +89,11 @@ final class DemoPresentation: NSObject, NSWindowDelegate {
         guard !lifecycle.finished else { return }
         lifecycle.complete()
         controls.stop()
-        capture.stop(); releaseKeepAwake()
+        releaseKeepAwake()
         window?.delegate = nil; window?.orderOut(nil); window?.contentView = nil; window?.close(); window = nil
+        let operation = handoff
         let callback = onEnd; onEnd = nil; callback?()
+        operation.presentationDidClose()
     }
     private func releaseKeepAwake() {
         if let keepAwake { ProcessInfo.processInfo.endActivity(keepAwake); self.keepAwake = nil }
@@ -205,12 +227,14 @@ private struct DemoStageContent: View {
     let ambience: AmbientSceneImages?
     @ObservedObject var capture: DemoCapture
     @ObservedObject var controls: PresentationControlsModel
+    let endAndOpen: (NativePresentationApp) -> Void
     let end: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var fitToSource = true
     @State private var motionPaused = false
     @State private var choosingSource = false
+    @State private var pendingNativeApp: NativePresentationApp?
     @FocusState private var focusedControl: Control?
     private var liveScene: DemoScene {
         var value = scene
@@ -282,7 +306,11 @@ private struct DemoStageContent: View {
                 .onChange(of: controls.focusRequest) { _, _ in
                     focusedControl = controls.policy.isExpanded ? (scene.showsPhone ? .source : .close) : .tile
                 }
-                .sheet(isPresented: $choosingSource) { sourceSheet }
+                .sheet(isPresented: $choosingSource, onDismiss: {
+                    guard let app = pendingNativeApp else { return }
+                    pendingNativeApp = nil
+                    endAndOpen(app)
+                }) { sourceSheet }
         }.ignoresSafeArea()
     }
     private func dragGesture(in size: CGSize) -> some Gesture {
@@ -367,12 +395,18 @@ private struct DemoStageContent: View {
             }
             Text("Connect an unlocked iPhone or iPad by USB and trust this Mac. External video sources also work; Android needs a compatible video feed.").foregroundStyle(.secondary)
             if capture.sources.isEmpty { Text("No external sources found.") }
-            ForEach(capture.sources) { source in
-                Button {
-                    capture.select(source.id); choosingSource = false
-                } label: {
-                    HStack { Image(systemName: source.isScreen ? "iphone" : "video"); Text(source.name); Spacer(); if capture.selectedID == source.id { Image(systemName: "checkmark") } }
-                }.buttonStyle(.bordered)
+            if !capture.sources.isEmpty {
+                ScrollView {
+                    VStack(spacing: 8) {
+                        ForEach(capture.sources) { source in
+                            Button {
+                                capture.select(source.id); choosingSource = false
+                            } label: {
+                                HStack { Image(systemName: "video"); Text(source.name); Spacer(); if capture.selectedID == source.id { Image(systemName: "checkmark") } }
+                            }.buttonStyle(.bordered)
+                        }
+                    }
+                }.frame(height: min(CGFloat(capture.sources.count) * 36, 160))
             }
             Text(capture.message).font(.caption).foregroundStyle(.secondary)
             Toggle("Match device proportions", isOn: $fitToSource).toggleStyle(.checkbox)
@@ -382,7 +416,11 @@ private struct DemoStageContent: View {
             }
             Button("Refresh devices") { capture.refresh() }
             Divider()
-            NativePresentationApps { capture.reportNotice($0) }
+            NativePresentationApps(onEndAndOpen: { app in
+                guard pendingNativeApp == nil else { return }
+                pendingNativeApp = app
+                choosingSource = false
+            }) { capture.reportNotice($0) }
         }.padding(24).frame(width: 460).onExitCommand { choosingSource = false }
     }
 }
