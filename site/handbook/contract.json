@@ -81,11 +81,11 @@
       "id": "wallpaper-motion",
       "name": "Gentle desktop motion, while Workbench is open",
       "status": "implemented",
-      "entry": "Present a device → More → Use as animated desktop (non-App-Store build)",
+      "entry": "Present a device → More beside the presentation buttons → Use as animated desktop (non-App-Store build)",
       "effect": "Apply and verify the rendered scene as a native still, then show an independent click-through desktop layer. Only the photograph slowly zooms; foreground artwork stays still. Pause/Resume/Stop controls appear in the scene window.",
       "limit": "App-owned, one display and the current Space only. Stops on Quit or Space change; checks native wallpaper ownership periodically. A direct photo-only wallpaper picker is still proposed. No video import, Lock Screen installation, automatic login restart or energy claim.",
       "source": "Sources/StageKit/DesktopMotion.swift",
-      "evidence": "Native isolated Mac host checked desktop-layer Start/Pause/Resume/Stop and presentation-End independence without changing the user’s wallpaper. Ownership, nested sleep and removal policies passed unit checks. Actual native still apply is separately implemented; physical multi-display/Spaces and energy remain unverified."
+      "evidence": "Native isolated Mac host checked desktop-layer Start/Pause/Resume/Stop and presentation-End independence without changing the user’s wallpaper. Ownership, nested sleep and removal policies passed unit checks. Actual native still apply is separately implemented; physical multi-display/Spaces and energy remain unverified. The signed Mac Preview at source 9fe7959 was installed and opened with existing scenes present; the new toggle and desktop menu action were confirmed. It is not notarized or in the public download."
     },
     {
       "id": "scene-motion",
