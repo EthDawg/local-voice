@@ -40,8 +40,10 @@ The public phone guide was checked at desktop width and a 390-pixel iPhone viewp
 - Archive SHA-256: `9c96a518f048bd0559bc18899eca956300a4f7052349c3a7b01cf95069822921`.
 - Executable SHA-256: `f1f5c7ff2ee939f8143cbf9ceadb40db3df4fd0541fb765bbf98cae78834db3e`.
 - Installed-app inspection: Home → Present a device → Connection & audio → Voice conversation → Done passed without starting capture. The existing scenes stayed visible. No user library was replaced.
-- Site: eight tests and the static build passed. Publication is tracked separately below; the public downloadable binary remains Preview 3.
+- Site: eight tests and the static build passed. [The phone guide](https://workbench-mac.vercel.app/phone-presenting/) was deployed to the existing production site from site commit `87f28fb`. Vercel deployment `dpl_7zGQSRTVe99puKJkeKNNqJsEAT6T` reports READY; ten public pages/assets were HTTP 200, matched the reviewed build byte-for-byte and retained `nosniff`. The public downloadable binary remains Preview 3.
 - The pre-change guide archive was saved to the owner's AI OS Drive and verified before material edits. Its private link is intentionally omitted from this public record.
+
+[Draft PR #36](https://github.com/EthDawg/workbench/pull/36) contains this review. Its GitHub Mac, iPhone and iPad checks were still running at handoff; the local results above are complete.
 
 The source review is stacked on PR #35 to preserve the pending multi-overlay, ambient and motion baseline. It does not merge those releases.
 
