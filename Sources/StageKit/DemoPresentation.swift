@@ -207,6 +207,7 @@ private struct DemoStageContent: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var fitToSource = true
+    @State private var motionPaused = false
     @State private var choosingSource = false
     @FocusState private var focusedControl: Control?
     private var liveScene: DemoScene {
@@ -235,7 +236,7 @@ private struct DemoStageContent: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                DemoStageSurface(scene: liveScene, image: backdrop, logo: logo, hand: hand, persona: persona, previewLayer: capture.previewLayer, live: capture.live)
+                DemoStageSurface(scene: liveScene, image: backdrop, logo: logo, hand: hand, persona: persona, previewLayer: capture.previewLayer, live: capture.live, motion: scene.gentleMotion == true && !motionPaused && !reduceMotion)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onTapGesture { if controls.policy.isExpanded { controls.close() } }
                 if scene.showsPhone && !capture.live {
@@ -324,6 +325,12 @@ private struct DemoStageContent: View {
                         .focused($focusedControl, equals: .reconnect).help("Reconnect device · ⌘R")
                 }
                 Spacer()
+                if scene.gentleMotion == true {
+                    Button { motionPaused.toggle() } label: {
+                        Image(systemName: motionPaused ? "play.fill" : "pause.fill")
+                    }.accessibilityLabel(motionPaused ? "Play background motion" : "Pause background motion")
+                        .help(motionPaused ? "Play background motion" : "Pause background motion")
+                }
             }.frame(height: 28)
             Divider()
             HStack {
@@ -386,60 +393,36 @@ private struct DemoStageSurface: NSViewRepresentable {
     let persona: NSImage?
     let previewLayer: AVCaptureVideoPreviewLayer
     let live: Bool
+    let motion: Bool
     func makeNSView(context: Context) -> DemoStageSurfaceView { DemoStageSurfaceView(previewLayer: previewLayer) }
     func updateNSView(_ view: DemoStageSurfaceView, context: Context) {
-        let changed = view.scene != scene || view.backdrop !== image || view.logo !== logo || view.hand !== hand || view.persona !== persona
-        view.scene = scene; view.backdrop = image; view.logo = logo; view.hand = hand; view.persona = persona; view.isLive = live
-        if changed { view.needsDisplay = true; view.needsLayout = true; view.refreshLogo() }
+        view.configure(scene: scene, backdrop: image, logo: logo, hand: hand, persona: persona)
+        view.viewportScene = scene; view.isLive = live
+        view.motionRequested = motion; view.needsLayout = true
     }
+    static func dismantleNSView(_ view: DemoStageSurfaceView, coordinator: ()) { view.motionRequested = false }
 }
 
-/// Clip the actual feed with precisely the same inner radius used by the border.
-final class DemoStageSurfaceView: NSView {
-    var scene: DemoScene?
-    var backdrop: NSImage?
-    var logo: NSImage?
-    var hand: NSImage?
-    var persona: NSImage?
+/// Device video remains between its stationary frame and foreground branding.
+final class DemoStageSurfaceView: MovingSceneView {
+    var viewportScene: DemoScene?
     private let videoLayer: AVCaptureVideoPreviewLayer
-    private let branding = DemoStageLogoView()
-    var isLive = false { didSet { videoLayer.isHidden = !isLive || scene?.showsPhone != true } }
+    var isLive = false { didSet { videoLayer.isHidden = !isLive || viewportScene?.showsPhone != true } }
     init(previewLayer: AVCaptureVideoPreviewLayer) {
         videoLayer = previewLayer
-        super.init(frame: .zero); wantsLayer = true
+        super.init(frame: .zero)
         videoLayer.videoGravity = .resizeAspect; videoLayer.masksToBounds = true
         videoLayer.backgroundColor = NSColor.black.cgColor
-        layer?.addSublayer(videoLayer)
-        // Branding is the top scene layer in exports and live presentations.
-        branding.wantsLayer = true; addSubview(branding)
+        insertVideoLayer(videoLayer)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override func layout() {
         super.layout()
-        guard let scene else { return }
-        branding.frame = bounds; branding.needsDisplay = true
+        guard let scene = viewportScene else { return }
         let geometry = ViewportGeometry(scene: scene, size: bounds.size)
         CATransaction.begin(); CATransaction.setDisableActions(true)
         videoLayer.frame = geometry.screen; videoLayer.cornerRadius = geometry.innerRadius
         videoLayer.isHidden = !scene.showsPhone || !isLive
         CATransaction.commit()
-    }
-    override func draw(_ dirtyRect: NSRect) {
-        guard let scene, let backdrop else { return }
-        SceneRenderer.draw(scene, image: backdrop, size: bounds.size, handImage: hand)
-    }
-    func refreshLogo() { branding.scene = scene; branding.image = logo; branding.persona = persona; branding.needsDisplay = true }
-}
-
-private final class DemoStageLogoView: NSView {
-    var scene: DemoScene?
-    var image: NSImage?
-    var persona: NSImage?
-    override var isOpaque: Bool { false }
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-    override func draw(_ dirtyRect: NSRect) {
-        guard let scene else { return }
-        SceneRenderer.drawLogo(scene, size: bounds.size, image: image)
-        SceneRenderer.drawPersona(scene, size: bounds.size, image: persona)
     }
 }

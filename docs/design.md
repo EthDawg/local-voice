@@ -114,3 +114,9 @@ Source provenance is in [consolidation-source.md](consolidation-source.md). The 
 ## Portable personal scenes
 
 [The personal scene contract](research/personal-scenes.md) owns the shared model and migration/sync rules. SceneSyncKit separates local commits and portable packages from its CloudKit transport; Mac adapts that model to StageKit while iOS renders it natively. Explicit imports create independent scene IDs, and active presentations use frozen copies. The shared test suite runs both photo and scene targets in CI.
+
+## Gentle photograph motion
+
+`SceneSyncKit/GentlePhotoMotion.swift` supplies compositor parameters and a pure eligibility predicate to both native targets. The optional `gentleMotion` scene field preserves legacy still defaults and travels in existing local/portable scene records. No new asset type or cloud service is involved.
+
+`MovingSceneView` separates the Mac photograph layer from stationary foreground artwork and device video. `DesktopMotionController` owns one explicitly started desktop window, independent of a presentation. `SceneMotionPreview` implements the matching iOS photograph layer; editor playback is transient and galleries/export stay still. The [implementation record](gentle-motion.md) explains lifecycle and validation; the structured visual contract and mobile specification retain capability authority.

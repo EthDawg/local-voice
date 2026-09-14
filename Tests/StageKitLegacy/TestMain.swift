@@ -30,6 +30,8 @@ struct TestRunner {
         let scenes = SceneTests()
         let assets = SceneAssetTests()
         let demo = DemoModeTests()
+        let desktopMotion = DesktopMotionTests()
+        let gentleMotion = GentleMotionTests()
         let viewportFit = ViewportFitTests()
         let logoImport = LogoImportTests()
         let personas = PersonaTests()
@@ -136,6 +138,15 @@ struct TestRunner {
             ("native drawing lifecycle and board isolation", integration.testDrawingLifecycleAndBoardIsolation),
             ("global shortcut registration and release", integration.testShortcutRegistrationAndRelease)
         ]
+        tests.insert(contentsOf: [
+            ("motion legacy and portable settings", gentleMotion.testLegacyAndPortableSceneMotion),
+            ("motion export pixels stay still", gentleMotion.testMotionDoesNotChangeStillExport),
+            ("motion foreground remains transparent", gentleMotion.testForegroundExcludesPhotograph),
+            ("motion transparent photo keeps still base", gentleMotion.testTransparentPhotographKeepsStillBase),
+            ("desktop ownership and spaces", desktopMotion.testDesktopOwnershipLossCannotResumeOrFollowAnotherSpace),
+            ("desktop sleep and pause independence", desktopMotion.testDesktopSleepReasonsAndPauseRemainIndependent),
+            ("desktop removal and fresh session", desktopMotion.testDesktopRemovalStopsEvenDuringSleepAndRestartNeedsNewSession)
+        ], at: 5)
         tests.insert(contentsOf: backdropTests, at: 5)
         if backdropOnly {
             tests = backdropTests

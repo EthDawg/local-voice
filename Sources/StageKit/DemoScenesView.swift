@@ -91,6 +91,14 @@ struct DemoScenesView: View {
                                 var value = scene; value.phoneHeight = ViewportGeometry.heightRange.upperBound; model.update(value)
                             }.disabled(!scene.showsPhone).help("Fill the available height while keeping the whole frame visible")
                         }
+                        #if !APP_STORE
+                        HStack {
+                            Toggle("Gentle motion", isOn: Binding(get: { scene.gentleMotion == true }, set: { enabled in
+                                var value = model.selected ?? scene; value.gentleMotion = enabled ? true : nil; model.update(value)
+                            }))
+                            Text("Moves the photo when presenting. Exports stay still.").font(.caption).foregroundStyle(.secondary)
+                        }
+                        #endif
                         logoControls(scene)
                         personaControls(scene)
                         DisclosureGroup("Adjust layout") {
@@ -161,6 +169,9 @@ struct DemoScenesView: View {
                 #endif
             }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }.disabled(model.selected.map { model.isSceneReadOnly($0) } ?? false)
+            #if !APP_STORE
+            DesktopMotionControls(controller: model.desktopMotion).padding(.horizontal, 24)
+            #endif
             if let scene = model.selected, model.image(for: scene) != nil {
                 Divider()
                 VStack(alignment: .leading, spacing: 8) {
@@ -176,6 +187,7 @@ struct DemoScenesView: View {
                         #if !APP_STORE
                         Button("Export image…") { commitName(); model.exportPNG() }
                         Button("Use as desktop") { commitName(); model.applyDesktop() }.disabled(model.desktopBusy || !model.systemIntegrationEnabled)
+                        Button("Use as animated desktop") { commitName(); model.applyDesktop(animate: true) }.disabled(model.desktopBusy || !model.systemIntegrationEnabled)
                         #endif
                         }.fixedSize().accessibilityLabel("More demo actions")
                     }
@@ -499,5 +511,22 @@ final class SceneCanvasView: NSView {
     override func viewWillMove(toWindow newWindow: NSWindow?) {
         if newWindow == nil { dragPreview = nil; initial = nil }
         super.viewWillMove(toWindow: newWindow)
+    }
+}
+
+private struct DesktopMotionControls: View {
+    @ObservedObject var controller: DesktopMotionController
+    var body: some View {
+        if controller.isRunning {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("Desktop motion", systemImage: "photo")
+                    Spacer()
+                    Button(controller.isPaused ? "Resume" : "Pause") { controller.togglePause() }
+                    Button("Stop motion") { controller.stop() }
+                }
+                Text(controller.status).font(.caption).foregroundStyle(.secondary)
+            }.padding(12).background(Workbench.surface, in: RoundedRectangle(cornerRadius: 10))
+        }
     }
 }

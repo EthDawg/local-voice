@@ -19,7 +19,9 @@ Home Screen quick actions are **Capture for scene** and **Dictate**. They route 
 
 Markup and wallpaper use Photos/Files imports, bounded to 64 MB and 50 megapixels. Their PNG exports render the image and edits, cap the long edge at 3,840 pixels and use distinct temporary files. Scene imports use the stricter shared asset/package bounds in the [scene contract](research/personal-scenes.md#current-shared-architecture). Camera and Photos inputs copy selected bytes; no full-library scan is needed. Bundled starter artwork is separate from private customer media.
 
-Wallpaper retains its chosen aspect even when the iPad rotates. Horizontal, vertical and zoom controls accompany gestures. Save to Photos requests add-only access and reports the result; permission or save failures must not claim success. Physical Photos saving remains an acceptance check.
+Scenes have an optional **Gentle motion** setting: a slow photograph-only zoom in the editor preview and subsequent Mac presentation. Pause/Play preview does not change the saved preference. Crop editing, scrolling out of view, app inactivity, Reduce Motion, Low Power Mode and high thermal state suppress preview animation. Gallery thumbnails stay still.
+
+Wallpaper retains its chosen aspect even when the iPad rotates. Horizontal, vertical and zoom controls accompany gestures. Save to Photos requests add-only access and reports the result; permission or save failures must not claim success. Workbench still exports a PNG; it does not make a Live Photo or install wallpaper. The save guidance links Apple’s supported Spatial Scene effect for eligible photos/devices; Apple decides eligibility and the person finishes installation. See [Apple iPhone guidance](https://support.apple.com/en-au/102638) and [current iPad guidance](https://support.apple.com/guide/ipad/create-a-custom-lock-screen-ipad782d4de8/ipados). Physical final wallpaper installation remains separate.
 
 ## Scenes, photos and earlier work
 
@@ -120,3 +122,7 @@ This source update is **not in uploaded build 2**. On iPad Simulator, rapid typi
 The native test helpers now wait for the enabled editor and visible keyboard, check the exact input before cleanup, and scroll the page containing a requested control. The previous generic first ScrollView could be the keyboard accessory strip. The focused iPhone photo naming, Keep, Saved and reopen test passed with the correct page selected. Cleanup expectations were preserved; failures were not hidden with retries or relaxed text comparisons.
 
 The earlier [363abbc CI run](https://github.com/EthDawg/workbench/actions/runs/34766331534) remains part of the record. Its iPhone speech-fixture test timed out waiting five seconds for its first fake inventory recheck; the later cancellation assertions did not fail. That timing failure is not a proven production speech-preparation defect and has not been patched. It must be assessed separately from these focused UI results. Apple sign-in, declarations and physical-device acceptance remain paused at the maintainer's request.
+
+## Gentle motion acceptance — 15 September 2026
+
+The iPhone 17 Pro / iOS 26.5 Simulator passed 14 focused tests: photograph-layer animation and cleanup, crop restoration, power/accessibility/lifecycle eligibility, and actual scene save/reopen/duplicate preservation. Parent native UI checks created Coast, enabled Gentle motion, used Pause/Play and opened Crop backdrop; the preview reported still while cropping and retained the saved motion preference. This is Simulator/source evidence, not an installed phone release or a demonstration of Apple’s final Lock Screen effect. [Cross-platform details and screenshots](gentle-motion.md).

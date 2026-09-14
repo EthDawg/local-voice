@@ -3,7 +3,7 @@
   "id": "visual-experiences",
   "title": "A desktop and a presentation are different commitments",
   "reviewedOn": "2026-09-15",
-  "implementationRevision": "7e45213166a3867a65ad6a7bc022637d8b9899ea",
+  "implementationRevision": "9fe79597366817b69a88b5a08d93c6e16071353e",
   "scope": "Presentation preparation, persistent desktop appearance and optional reuse between them. This contract does not change dictation, reading or annotation lifecycles.",
   "statusMeaning": {
     "implemented": "Verified in source and the stated local checks; this is not a claim that the newest binary is publicly released.",
@@ -79,13 +79,23 @@
     },
     {
       "id": "wallpaper-motion",
-      "name": "A quiet animated desktop, if wanted",
-      "status": "proposed",
-      "entry": "Optional motion control beside an already useful still wallpaper",
-      "effect": "Explicit local playback, muted, with Pause and a chosen still fallback. Motion must never be required to enjoy the picture.",
-      "limit": "Continuous desktop video is not established by the public image setter. Choose a renderer only after focus, energy, sleep, battery, Reduce Motion, Spaces and sharing experiments.",
-      "source": "docs/background-management.md",
-      "evidence": "No motion implementation or energy benchmark. A mockup is not evidence that a proposed renderer meets these requirements."
+      "name": "Gentle desktop motion, while Workbench is open",
+      "status": "implemented",
+      "entry": "Present a device → More beside the presentation buttons → Use as animated desktop (non-App-Store build)",
+      "effect": "Apply and verify the rendered scene as a native still, then show an independent click-through desktop layer. Only the photograph slowly zooms; foreground artwork stays still. Pause/Resume/Stop controls appear in the scene window.",
+      "limit": "App-owned, one display and the current Space only. Stops on Quit or Space change; checks native wallpaper ownership periodically. A direct photo-only wallpaper picker is still proposed. No video import, Lock Screen installation, automatic login restart or energy claim.",
+      "source": "Sources/StageKit/DesktopMotion.swift",
+      "evidence": "Native isolated Mac host checked desktop-layer Start/Pause/Resume/Stop and presentation-End independence without changing the user’s wallpaper. Ownership, nested sleep and removal policies passed unit checks. Actual native still apply is separately implemented; physical multi-display/Spaces and energy remain unverified. The signed Mac Preview at source 9fe7959 was installed and opened with existing scenes present; the new toggle and desktop menu action were confirmed. It is not notarized or in the public download."
+    },
+    {
+      "id": "scene-motion",
+      "name": "Gentle motion in a prepared scene",
+      "status": "implemented",
+      "entry": "Gentle motion beside the scene settings; Pause/Play in presentation controls or the iOS editor preview",
+      "effect": "Opt into a 3.5% photograph-only zoom over 24 seconds each way. Persist the setting in existing portable scenes. Foreground artwork and PNG exports remain still.",
+      "limit": "Mac editor and gallery stay still. iOS animates only the active, visible scene preview; Wallpaper export is a separate still-image job. Reduce Motion, Low Power Mode and serious/critical thermal state suppress animation. Device video and meeting receivers require their own validation.",
+      "source": "Sources/StageKit/MovingSceneView.swift",
+      "evidence": "74 Mac scene checks / 2098 assertions, 73 shared-store tests and 14 focused iPhone Simulator tests passed. Native Mac before/after captures changed the photo while an opaque logo region stayed identical; native iPhone Pause/Play and still crop controls were checked."
     }
   ],
   "events": [
@@ -94,14 +104,14 @@
       "label": "End presentation",
       "status": "implemented",
       "stops": "The presentation window, its device capture, controls and keep-awake activity.",
-      "keeps": "Saved scenes, original assets and any independently applied desktop picture.",
+      "keeps": "Saved scenes, original assets, any independently applied desktop picture and a separately started desktop-motion session.",
       "check": "Do not restore wallpaper, close a meeting, move unrelated windows or change system Stage Manager settings. Check focus returns sensibly; do not promise an exact previous app is always restored."
     },
     {
       "id": "restore-desktop",
       "label": "Restore desktop",
       "status": "implemented",
-      "stops": "Use of Workbench's still output on eligible matched displays, after macOS confirms restoration.",
+      "stops": "The app-owned desktop-motion layer immediately, then use of Workbench’s still output on eligible matched displays after macOS confirms restoration.",
       "keeps": "A later manual picture choice, unmatched recovery records and any active presentation.",
       "check": "Read the current desktop before restoring. A recorded old URL is not authority to overwrite a later user choice."
     },
@@ -109,17 +119,17 @@
       "id": "change-picture",
       "label": "Change a picture in System Settings",
       "status": "implemented",
-      "stops": "Nothing in Workbench automatically. macOS owns the new desktop choice.",
+      "stops": "The desktop-motion layer at its next ownership check if the native picture no longer matches the applied output. macOS owns the new choice.",
       "keeps": "A running presentation and saved compositions. Restoration subsequently skips pictures it no longer owns.",
-      "check": "Do not add a resynchronization daemon. For a future wallpaper manager, recheck observed state before the next explicit apply or restore."
+      "check": "The renderer never reapplies a picture. A five-second timer with tolerance and wake checks verify ownership; unknown state stops the session. Restore still respects later manual choices."
     },
     {
       "id": "pause-motion",
       "label": "Pause wallpaper motion",
-      "status": "proposed",
-      "stops": "The future wallpaper renderer's playback activity.",
-      "keeps": "The chosen still image and independent presentation state.",
-      "check": "No Pause control or empty stub should ship until there is working motion. A still must also cover sleep, missing media and renderer failure; exact automatic-pause rules need measurement."
+      "status": "implemented",
+      "stops": "The desktop layer’s animation and visibility; the underlying native still shows.",
+      "keeps": "The applied still, independent saved scene and any presentation. Resume checks that Workbench still owns the desktop picture.",
+      "check": "Explicit Pause survives sleep/wake. Reduce Motion, Low Power Mode, high thermal state and occlusion separately suppress animation. No automatic login restart."
     },
     {
       "id": "quit",
@@ -127,7 +137,7 @@
       "status": "implemented",
       "stops": "App-owned recording, playback, presentation, drawing, timers and monitors.",
       "keeps": "Saved work, retained desktop output files and recovery records. A still picture set through macOS remains set.",
-      "check": "Future app-rendered motion must stop on Quit and leave the chosen still. Do not restart in the background or restore wallpaper silently."
+      "check": "App-rendered desktop motion stops on Quit; the native still remains. Do not restart in the background or restore wallpaper silently."
     }
   ],
   "acceptance": [
@@ -205,6 +215,15 @@
       "test": "Measure idle CPU/GPU/energy, battery, sleep/wake and Reduce Motion on named hardware before choosing defaults or advertising animation.",
       "status": "not-run",
       "capabilities": [
+        "wallpaper-motion"
+      ]
+    },
+    {
+      "id": "gentle-motion-local",
+      "test": "Native Mac windowed motion, Pause, desktop-layer Pause/Resume/Stop and End independence checked using disposable scenes. iPhone Simulator created Coast, enabled motion, paused/resumed and opened still crop controls. The desktop host used the existing native wallpaper as its ownership token and did not replace it. Current source builds pass; full device-video, Lock Screen, multi-display and energy checks remain separate.",
+      "status": "passed-isolated-native-and-simulator",
+      "capabilities": [
+        "scene-motion",
         "wallpaper-motion"
       ]
     }
