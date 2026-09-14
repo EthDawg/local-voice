@@ -6,6 +6,16 @@ This branch combines Voice and StageMark into one app. Workbench's purpose is de
 
 The separate [iOS/iPadOS 26+ Preview](docs/ios-preview.md) uses native phone/tablet workflows for the same useful jobs. Contributions should name the affected platform and preserve its own input, storage and lifecycle boundaries.
 
+## Start from the current Workbench code
+
+The integration branch is **[`feature/unified-workbench`](https://github.com/EthDawg/local-voice/tree/feature/unified-workbench)**, tracked by [draft PR #13](https://github.com/EthDawg/local-voice/pull/13). `main` still contains the earlier Voice app. Start new Workbench changes from the integration branch and target it in your PR until the consolidation merges. StageKit is included here; a separate StageMark checkout is unnecessary.
+
+Matt ([@mattywhitenz](https://github.com/mattywhitenz)) is a Workbench co-contributor. His next contribution is **Mac screenshot capture and image annotation**. [Issue #18](https://github.com/EthDawg/local-voice/issues/18) contains the earlier native Screenshot handoff idea; use it to coordinate the first slice and engine choice, which remain open. Device video capture already belongs to **Present a device**, and mobile already has its own imported-image markup workflow.
+
+Start with `Sources/StageKit/StageKitController.swift` for the Mac boundary, `Overlay.swift` and `Core.swift` for ink/history, and `BoardExport.swift` for existing board rendering. Board export does not capture the desktop underneath. Keep the existing app lifecycle and preserve original images. This handoff reserves the implementation for Matt; it does not add the feature or settle its design.
+
+Repository collaborators can push their own feature branches after accepting their GitHub invitation. No fork or shared credentials are needed. The working agreement below remains a proposal for Ethan and Matt to agree.
+
 ## Choose a first step
 
 1. Check the [open issues](https://github.com/EthDawg/local-voice/issues). An unassigned [good first issue](https://github.com/EthDawg/local-voice/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22) is a useful starting point. Comment that you want to take it so others can coordinate; no repository write access is needed.
@@ -18,18 +28,31 @@ The separate [iOS/iPadOS 26+ Preview](docs/ios-preview.md) uses native phone/tab
 
 Use an Apple Silicon Mac, macOS 14+, Swift 6.2+ and the macOS 26 SDK. The deployment target and build SDK are different: optional newer Apple features need the newer SDK to compile. Full Xcode is required for App Intents metadata; Command Line Tools support source development.
 
-Fork this repository, then substitute your username. Check out the branch or PR you intend to work on; default-branch and historical release contents may differ from this consolidation.
+Clone the current integration branch. Choose a short branch name for your contribution; Matt can use `feature/screenshot-annotation` in place of the example below.
 
 Before running the tests, quit Workbench, Workbench Preview and earlier Voice/StageMark copies. The suite probes exclusive global shortcuts even in its CI mode; another running copy will cause a real registration conflict.
 
 ```sh
-git clone https://github.com/YOUR-USERNAME/local-voice.git
+git clone --branch feature/unified-workbench https://github.com/EthDawg/local-voice.git
 cd local-voice
-git remote add upstream https://github.com/EthDawg/local-voice.git
 git switch -c improve/small-change
 bash scripts/doctor.sh
 bash scripts/test.sh
 bash scripts/build.sh
+```
+
+**Already have a fork or checkout?** Preserve any unfinished edits first. Fetch the canonical repository and create a new branch from its current integration tip:
+
+```sh
+git fetch https://github.com/EthDawg/local-voice.git feature/unified-workbench
+git switch -c feature/screenshot-annotation FETCH_HEAD
+```
+
+If you do not have repository write access, create a GitHub fork and point your push remote at it after cloning:
+
+```sh
+git remote rename origin upstream
+git remote add origin https://github.com/YOUR-USERNAME/local-voice.git
 ```
 
 The first build downloads the pinned dependency. The default test script covers release tooling, core and integration behaviour, provider contracts/transport, keyboard practice and StageKit. It does not need a speech-model download or microphone access. The ordinary build creates the ad-hoc `dist/Workbench.zip`; it does not install an app.
@@ -93,7 +116,7 @@ git commit -m "Describe the user-visible improvement"
 git push -u origin improve/small-change
 ```
 
-Open **Compare & pull request** on your fork. Explain what improves, link the issue, and describe the evidence and limitations. Use `Closes #123` only when the change fully resolves it. Draft means ready for feedback; it does not mean ready to release. Screenshots or short recordings help with UI changes.
+Open **Compare & pull request** for your branch on GitHub. Set the destination to **`EthDawg/local-voice` → `feature/unified-workbench`**, including when the branch is in your fork. Check the Files changed tab contains only your contribution. Explain what improves, link the issue, and describe the evidence and limitations. Use `Closes #123` only when the change fully resolves it. Draft means ready for feedback; it does not mean ready to release. Screenshots or short recordings help with UI changes.
 
 AI-assisted work has the same ownership and testing expectations. The submitting person must understand the change and check its claims. Never include private prompts, recordings, credentials or customer assets. There is no CLA or DCO signing step. Contributions use this repository's [MIT license](LICENSE); preserve upstream notices and contribute only material you have the right to share.
 

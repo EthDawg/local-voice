@@ -11,6 +11,8 @@ Workbench brings Voice and StageMark into **one native app, one home window and 
 
 **This branch contains the Workbench 2.0 consolidation.** Feature descriptions below describe its implementation, not proof of a published release or successful testing on every supported Mac. The [acceptance record](docs/unification.md) tracks the remaining verification. Older Voice/StageMark releases and their validation records describe those separate apps.
 
+**Contributors:** start from `feature/unified-workbench` and target that branch in your PR while [#13](https://github.com/EthDawg/local-voice/pull/13) is open. `main` still contains the earlier Voice app. The [contributor setup and Matt's screenshot/annotation handoff](CONTRIBUTING.md#start-from-the-current-workbench-code) include exact clone commands and code entry points.
+
 An **iPhone and iPad Preview for iOS/iPadOS 26+** is also in development as a separate native SwiftUI target. It offers foreground dictation, installed-voice reading, PencilKit image markup, independent wallpaper crop/export and editable scenes prepared for Mac. The Mac capabilities below retain their own platform boundaries. See the [mobile scope, build instructions and test record](docs/ios-preview.md) and [mobile research](docs/mobile-research.md); no mobile App Store or TestFlight release is claimed.
 
 **Mac download:** [Workbench Preview 3](https://github.com/EthDawg/local-voice/releases/tag/v2.0.0-preview.3) is Developer ID signed, Apple-notarized and stapled. The exact downloaded ZIP was hash-verified. Its notes distinguish verified packaging from remaining physical-device acceptance. The iOS build is uploaded to App Store Connect, with tester distribution and review still pending.
