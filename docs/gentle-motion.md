@@ -4,7 +4,9 @@ Implemented in source, 15 September 2026. The [visual contract](../site/handbook
 
 ## The experience
 
-One optional treatment: the photograph slowly grows from its authored crop to 103.5%, then returns. Each direction takes 24 seconds with eased endpoints. These are restrained product choices, not measured thresholds for comfort or battery life. Device video, frame, hand cutout, logo, persona and controls do not move with it. Existing scenes remain still until the person chooses **Gentle motion**.
+The [authored ambient starters](research/ambient-scenes.md) extend this foundation with motion limited to clouds or foliage. They use version 2 scene packages and a preserved v1 library backup. The original gentle-zoom behavior below remains available for ordinary photographs.
+
+For an ordinary photograph, the optional treatment is: the photograph slowly grows from its authored crop to 103.5%, then returns. Each direction takes 24 seconds with eased endpoints. These are restrained product choices, not measured thresholds for comfort or battery life. Device video, frame, hand cutout, logo, persona and controls do not move with it. Existing scenes remain still until the person chooses **Gentle motion**.
 
 | Surface | Entry and behaviour | What remains still |
 | --- | --- | --- |
@@ -28,11 +30,11 @@ The [generated study](../site/assets/guide/gentle-motion-concept.png) helped est
 
 ## State and rendering
 
-`PortableScene.gentleMotion` is an optional Boolean: missing means still. The Mac adapter preserves it through the existing validated package and local store. This adds no media files, iCloud containers, permissions, dependencies, background service or automatic account choice. Old clients can display the still; their unknown-field decoding may drop the preference if they resave.
+`PortableScene.gentleMotion` is an optional Boolean: missing means still. The Mac adapter preserves it through the existing validated package and local store. The original zoom treatment adds no media files, iCloud containers, permissions, dependencies, background service or automatic account choice. Old clients can display the still; their unknown-field decoding may drop the preference if they resave.
 
 `GentlePhotoMotion` owns the shared Core Animation parameters and eligibility predicate. A cached photo layer receives the scale animation; there is no app-driven bitmap render or display-link loop. `MovingSceneView` separates the Mac photograph from stationary artwork and captured video. Transparent PNGs reveal the same base fill as the still renderer. `SceneMotionPreview` uses the matching UIKit layer and existing orientation-normalized thumbnail cache.
 
-Pause removes the transform and returns to the authored still crop. iOS also stops while editing crop, outside the visible scroll area, behind another editing sheet or when inactive. Mac observes window occlusion, power, thermal, Reduce Motion and independent computer/display/session sleep reasons. No keep-awake assertion is added for motion.
+Pause removes the transform and returns to the authored still crop. iOS also stops while editing crop, outside the visible scroll area, behind another editing sheet or when inactive. The current native hosts also observe Apple’s animated-image autoplay preference. Mac observes window occlusion, power, thermal, Reduce Motion and independent computer/display/session sleep reasons. No keep-awake assertion is added for motion.
 
 `DesktopMotionController` owns one session on one display and the current Space. It never writes wallpaper. The existing apply method renders the immutable still, journals restoration, requests macOS application and confirms its URL before starting this controller. Its five-second timer with tolerance checks ownership; unknown or changed wallpaper state stops it. Display removal and Space changes stop it. Pause survives sleep; waking rechecks ownership. A subsequent explicit still apply or Restore stops the desktop layer. Ending a presentation does not. No automatic login or relaunch playback is added.
 

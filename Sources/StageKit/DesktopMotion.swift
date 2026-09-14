@@ -81,7 +81,7 @@ final class DesktopMotionController: NSObject, ObservableObject {
     @discardableResult
     func start(scene: DemoScene, backdrop: NSImage, logo: NSImage? = nil,
                hand: NSImage? = nil, persona: NSImage? = nil,
-               screen: NSScreen, expectedStill: URL) -> Bool {
+               screen: NSScreen, expectedStill: URL, ambience: AmbientSceneImages? = nil) -> Bool {
         stop()
         guard let id = Self.displayID(screen), let currentScreen = Self.screen(id),
               var proposed = DesktopMotionSession(displayID: id, expectedStill: expectedStill),
@@ -92,7 +92,7 @@ final class DesktopMotionController: NSObject, ObservableObject {
         for reason in suspended { proposed.suspend(reason, true) }
         let view = MovingSceneView(frame: NSRect(origin: .zero, size: currentScreen.frame.size))
         view.configure(scene: scene, backdrop: Self.snapshot(backdrop), logo: logo.map(Self.snapshot),
-                       hand: hand.map(Self.snapshot), persona: persona.map(Self.snapshot))
+                       hand: hand.map(Self.snapshot), persona: persona.map(Self.snapshot), ambience: ambience)
         view.motionRequested = false
         view.motionSuspended = !suspended.isEmpty
         view.autoresizingMask = [.width, .height]

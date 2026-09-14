@@ -1,10 +1,20 @@
 import AppKit
 import SceneSyncKit
+import Accessibility
+
+struct AmbientSceneImages {
+    let preset: String
+    let cleanPlate: CGImage
+    let detail: CGImage
+}
 
 /// One native photograph layer, with stationary authored foreground. Layout
 /// and image changes redraw; compositor motion never calls the scene renderer.
 class MovingSceneView: NSView {
     private let photograph = CALayer()
+    private let ambient = AmbientPhotoLayer()
+    private var ambientImages: AmbientSceneImages?
+    private var hasAmbience = false
     private let foreground = MovingSceneForeground()
     private let branding = MovingSceneBranding()
     private var scene: DemoScene?
@@ -13,19 +23,20 @@ class MovingSceneView: NSView {
     private var sleepReasons = Set<String>()
     var motionRequested = false { didSet { updateMotion() } }
     var motionSuspended = false { didSet { updateMotion() } }
-    var isAnimating: Bool { photograph.animation(forKey: GentlePhotoMotion.animationKey) != nil }
+    var isAnimating: Bool { ambient.isPlaying || photograph.animation(forKey: GentlePhotoMotion.animationKey) != nil }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true; layer?.masksToBounds = true
         photograph.contentsGravity = .resize; photograph.magnificationFilter = .linear
         layer?.addSublayer(photograph)
+        ambient.isHidden = true; layer?.addSublayer(ambient)
         foreground.wantsLayer = true; branding.wantsLayer = true
         addSubview(foreground); addSubview(branding)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func configure(scene: DemoScene, backdrop: NSImage, logo: NSImage?, hand: NSImage?, persona: NSImage?) {
+    func configure(scene: DemoScene, backdrop: NSImage, logo: NSImage?, hand: NSImage?, persona: NSImage?, ambience: AmbientSceneImages? = nil) {
         let changed = self.scene != scene || self.backdrop !== backdrop
         self.scene = scene
         // PNG transparency must reveal the same base as the still renderer,
@@ -34,6 +45,14 @@ class MovingSceneView: NSView {
         if self.backdrop !== backdrop {
             self.backdrop = backdrop
             photograph.contents = backdrop.cgImage(forProposedRect: nil, context: nil, hints: nil)
+        }
+        if ambientImages?.preset != ambience?.preset || ambientImages?.cleanPlate !== ambience?.cleanPlate || ambientImages?.detail !== ambience?.detail {
+            ambientImages = ambience
+            ambient.setPlaying(false)
+            hasAmbience = ambience.map { ambient.configure(preset: $0.preset, cleanPlate: $0.cleanPlate, detail: $0.detail) } ?? false
+            ambient.isHidden = !hasAmbience; photograph.isHidden = hasAmbience
+            photograph.removeAnimation(forKey: GentlePhotoMotion.animationKey)
+            needsLayout = true
         }
         foreground.configure(scene: scene, backdrop: backdrop, hand: hand)
         branding.configure(scene: scene, logo: logo, persona: persona)
@@ -51,6 +70,7 @@ class MovingSceneView: NSView {
         photograph.frame = CGRect(x: (bounds.width - size.width) * scene.backgroundX,
                                  y: (bounds.height - size.height) * scene.backgroundY,
                                  width: size.width, height: size.height)
+        ambient.frame = photograph.frame; ambient.layoutIfNeeded()
         foreground.frame = bounds; branding.frame = bounds
         foreground.needsDisplay = true; branding.needsDisplay = true
         CATransaction.commit()
@@ -62,6 +82,11 @@ class MovingSceneView: NSView {
         if let window {
             observe(.default, NSWindow.didChangeOcclusionStateNotification, object: window) { $0.updateMotion() }
             observe(.default, .NSProcessInfoPowerStateDidChange) { $0.updateMotion() }
+            if #available(macOS 15.0, *) {
+                observe(.default, AccessibilitySettings.animatedImagesEnabledDidChangeNotification) { $0.updateMotion() }
+            } else {
+                observe(.default, .AXAnimatedImagesEnabledDidChange) { $0.updateMotion() }
+            }
             observe(.default, ProcessInfo.thermalStateDidChangeNotification) { $0.updateMotion() }
             let center = NSWorkspace.shared.notificationCenter
             observe(center, NSWorkspace.accessibilityDisplayOptionsDidChangeNotification) { $0.updateMotion() }
@@ -89,13 +114,24 @@ class MovingSceneView: NSView {
         observers.removeAll()
     }
     private func updateMotion() {
-        let allowed = GentlePhotoMotion.permitted(requested: motionRequested && !motionSuspended && sleepReasons.isEmpty,
+        let playsAnimatedImages: Bool
+        if #available(macOS 15.0, *) { playsAnimatedImages = AccessibilitySettings.animatedImagesEnabled }
+        else { playsAnimatedImages = AXAnimatedImagesEnabled() }
+        let allowed = GentlePhotoMotion.permitted(requested: motionRequested && !motionSuspended && sleepReasons.isEmpty && playsAnimatedImages,
             visible: window?.isVisible == true && window?.occlusionState.contains(.visible) == true && !isHiddenOrHasHiddenAncestor,
             reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
             lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled, thermalState: ProcessInfo.processInfo.thermalState)
-        if allowed && !isAnimating && photograph.contents != nil {
+        if hasAmbience {
+            photograph.removeAnimation(forKey: GentlePhotoMotion.animationKey)
+            ambient.setPlaying(allowed)
+            return
+        }
+        // A missing authored detail keeps its poster still. It must not silently
+        // become a whole-picture zoom of the room, buildings or device.
+        let fallbackAllowed = allowed && scene?.ambience == nil
+        if fallbackAllowed && !isAnimating && photograph.contents != nil {
             photograph.add(GentlePhotoMotion.animation(), forKey: GentlePhotoMotion.animationKey)
-        } else if !allowed && isAnimating { photograph.removeAnimation(forKey: GentlePhotoMotion.animationKey) }
+        } else if !fallbackAllowed && isAnimating { photograph.removeAnimation(forKey: GentlePhotoMotion.animationKey) }
     }
     deinit { removeObservers() }
 }

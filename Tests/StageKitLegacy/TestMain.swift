@@ -32,6 +32,7 @@ struct TestRunner {
         let demo = DemoModeTests()
         let desktopMotion = DesktopMotionTests()
         let gentleMotion = GentleMotionTests()
+        let ambientScenes = AmbientSceneTests()
         let viewportFit = ViewportFitTests()
         let logoImport = LogoImportTests()
         let personas = PersonaTests()
@@ -139,6 +140,11 @@ struct TestRunner {
             ("global shortcut registration and release", integration.testShortcutRegistrationAndRelease)
         ]
         tests.insert(contentsOf: [
+            ("ambient starter exact assets duplicate and reopen", ambientScenes.testAllStartersKeepExactPortableAssetsThroughDuplicateAndReopen),
+            ("ambient crop replacement and original preservation", ambientScenes.testCropKeepsRecipeAndReplacementClearsItWithoutRemovingOriginals),
+            ("ambient stale recipe draft rejection", ambientScenes.testStaleCropAndSceneDraftRejectAnInterveningRecipeChange),
+            ("ambient native scene poster orientation and window mask", ambientScenes.testMovingSceneViewMatchesPosterOrientationAndClipsCloudsToWindow),
+            ("ambient missing detail poster fallback", ambientScenes.testMissingRigAssetKeepsCompletePosterAndDoesNotBecomePhotoZoom),
             ("motion legacy and portable settings", gentleMotion.testLegacyAndPortableSceneMotion),
             ("motion export pixels stay still", gentleMotion.testMotionDoesNotChangeStillExport),
             ("motion foreground remains transparent", gentleMotion.testForegroundExcludesPhotograph),

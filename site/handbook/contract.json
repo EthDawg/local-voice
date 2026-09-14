@@ -3,7 +3,7 @@
   "id": "visual-experiences",
   "title": "A desktop and a presentation are different commitments",
   "reviewedOn": "2026-09-15",
-  "implementationRevision": "9fe79597366817b69a88b5a08d93c6e16071353e",
+  "implementationRevision": "48c00dcdb363b1241cac5da69697af6a5f24dca9",
   "scope": "Presentation preparation, persistent desktop appearance and optional reuse between them. This contract does not change dictation, reading or annotation lifecycles.",
   "statusMeaning": {
     "implemented": "Verified in source and the stated local checks; this is not a claim that the newest binary is publicly released.",
@@ -13,7 +13,7 @@
     "Each job must be useful on its own. Wallpaper must not require creating a phone presentation.",
     "Reuse an original image by choice. Keep each job's crop, layout and playback settings independent.",
     "Make the first useful action obvious; reveal adjustments in context. Do not require an expert setup screen.",
-    "Presentation is video from a device into a Mac window. It does not send Mac input to the phone or manage a meeting.",
+    "A presentation shows a prepared picture with optional device video in a Mac window. It does not send Mac input to the phone or manage a meeting.",
     "Preserve the person's later manual desktop choice. Ending a presentation is not Restore desktop."
   ],
   "capabilities": [
@@ -32,7 +32,7 @@
       "name": "Present a prepared scene",
       "status": "implemented",
       "entry": "Present full screen / Present in window",
-      "effect": "Show device video within a saved composition in a Mac window, with contextual phone-tile controls.",
+      "effect": "Show a saved composition in a Mac window, optionally with device video. The compact controls use a phone icon when the device is enabled and a picture icon otherwise.",
       "limit": "A meeting app chooses what to share. An audience view, USB recovery and a second display need their own checks.",
       "source": "Sources/StageKit/DemoPresentation.swift",
       "evidence": "At da4f0f4, saved name/backdrop/persona edits left a running windowed still unchanged; End/restart adopted them. At 7e45213, the unchanged isolated native host verified all eight expanded positions, a compact-tile drag to Left centre, keyboard reveal and Escape collapse/End through a full-screen transition. Device capture and cloud were off; this is not receiver-view or installed signed-shell verification."
@@ -82,20 +82,20 @@
       "name": "Gentle desktop motion, while Workbench is open",
       "status": "implemented",
       "entry": "Present a device → More beside the presentation buttons → Use as animated desktop (non-App-Store build)",
-      "effect": "Apply and verify the rendered scene as a native still, then show an independent click-through desktop layer. Only the photograph slowly zooms; foreground artwork stays still. Pause/Resume/Stop controls appear in the scene window.",
+      "effect": "Apply and verify a rendered native still, then show an independent click-through desktop layer. Authored starters move clouds or foliage; ordinary photos use gentle zoom. Foreground artwork stays still. Pause/Resume/Stop controls appear in the scene window.",
       "limit": "App-owned, one display and the current Space only. Stops on Quit or Space change; checks native wallpaper ownership periodically. A direct photo-only wallpaper picker is still proposed. No video import, Lock Screen installation, automatic login restart or energy claim.",
       "source": "Sources/StageKit/DesktopMotion.swift",
-      "evidence": "Native isolated Mac host checked desktop-layer Start/Pause/Resume/Stop and presentation-End independence without changing the user’s wallpaper. Ownership, nested sleep and removal policies passed unit checks. Actual native still apply is separately implemented; physical multi-display/Spaces and energy remain unverified. The signed Mac Preview at source 9fe7959 was installed and opened with existing scenes present; the new toggle and desktop menu action were confirmed. It is not notarized or in the public download."
+      "evidence": "Native isolated Mac host checked desktop-layer Start/Pause/Resume/Stop and presentation-End independence without changing the user’s wallpaper. Ownership, nested sleep and removal policies passed unit checks. Actual native still apply is separately implemented; physical multi-display/Spaces and energy remain unverified. The signed Mac Preview at source 9fe7959 was installed and opened with existing scenes present; the new toggle and desktop menu action were confirmed. It is not notarized or in the public download. The authored starter increment at 48c00dc is installed as signed local Preview build 20260914180524; exact archive/resource identity and new gallery verified. Not notarized or in the public download."
     },
     {
       "id": "scene-motion",
       "name": "Gentle motion in a prepared scene",
       "status": "implemented",
-      "entry": "Gentle motion beside the scene settings; Pause/Play in presentation controls or the iOS editor preview",
-      "effect": "Opt into a 3.5% photograph-only zoom over 24 seconds each way. Persist the setting in existing portable scenes. Foreground artwork and PNG exports remain still.",
-      "limit": "Mac editor and gallery stay still. iOS animates only the active, visible scene preview; Wallpaper export is a separate still-image job. Reduce Motion, Low Power Mode and serious/critical thermal state suppress animation. Device video and meeting receivers require their own validation.",
+      "entry": "Choose a starter → Window light, Campus breeze or Coastal sky. Gentle motion in scene settings; Pause/Play in presentation controls or the iOS editor preview.",
+      "effect": "For ordinary photos, an optional 3.5% zoom. Three authored starters instead move clouds or branches while the architecture and foreground remain still. Complete posters, clean plates and details travel in version 2 packages; the prior library manifest is preserved before upgrade.",
+      "limit": "Mac editor and galleries remain still. iOS animates only the active visible scene preview. PNG/Photos exports stay still; no Live Photo export or continuous iOS Home Screen animation. Reduce Motion, disabled animated-image autoplay, low power and high thermal state suppress animation. Device video and meeting receivers need separate validation.",
       "source": "Sources/StageKit/MovingSceneView.swift",
-      "evidence": "74 Mac scene checks / 2098 assertions, 73 shared-store tests and 14 focused iPhone Simulator tests passed. Native Mac before/after captures changed the photo while an opaque logo region stayed identical; native iPhone Pause/Play and still crop controls were checked."
+      "evidence": "79 native Mac scene tests / 2251 assertions and 72 shared-module tests passed. Actual isolated Mac office captures changed only the window sky; fixed room/desk pixels were identical. Native compositor and UIKit poster parity checked for all three rigs. See /scenes/ambient/ for the current source and delivery evidence."
     }
   ],
   "events": [

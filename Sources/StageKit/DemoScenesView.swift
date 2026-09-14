@@ -17,7 +17,7 @@ struct DemoScenesView: View {
             VStack(alignment: .leading, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
                     Label("Scenes", systemImage: "iphone.and.landscape").font(.title2.weight(.semibold))
-                    Text("Your saved mobile presentations.").font(.callout).foregroundStyle(.secondary)
+                    Text("Your pictures, wallpapers and presentations.").font(.callout).foregroundStyle(.secondary)
                 }
                 TextField("Find a customer or scene", text: $model.query).textFieldStyle(.roundedBorder)
                     .accessibilityLabel("Find a scene")
@@ -96,7 +96,7 @@ struct DemoScenesView: View {
                             Toggle("Gentle motion", isOn: Binding(get: { scene.gentleMotion == true }, set: { enabled in
                                 var value = model.selected ?? scene; value.gentleMotion = enabled ? true : nil; model.update(value)
                             }))
-                            Text("Moves the photo when presenting. Exports stay still.").font(.caption).foregroundStyle(.secondary)
+                            Text(scene.ambience == nil ? "Moves the photo when presenting. Exports stay still." : "Moves only the natural details. Exports stay still.").font(.caption).foregroundStyle(.secondary)
                         }
                         #endif
                         logoControls(scene)
@@ -189,10 +189,10 @@ struct DemoScenesView: View {
                         Button("Use as desktop") { commitName(); model.applyDesktop() }.disabled(model.desktopBusy || !model.systemIntegrationEnabled)
                         Button("Use as animated desktop") { commitName(); model.applyDesktop(animate: true) }.disabled(model.desktopBusy || !model.systemIntegrationEnabled)
                         #endif
-                        }.fixedSize().accessibilityLabel("More demo actions")
+                        }.fixedSize().accessibilityLabel("More scene actions")
                     }
                     #if !APP_STORE
-                    Text("Click the phone tile for controls. Esc closes controls, then ends.")
+                    Text("Click the edge tile for controls. Esc closes controls, then ends.")
                         .font(.caption).foregroundStyle(.secondary)
                     #else
                     Text("Export your scene, then position a QuickTime movie preview over its device frame.")
