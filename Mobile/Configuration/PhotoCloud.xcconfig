@@ -1,0 +1,6 @@
+// Optional signed Preview only. Read docs/photo-handoff.md before using this file.
+// Both the iPhone and Developer ID Mac must use the same Production environment.
+WORKBENCH_PHOTO_CLOUD_PROVISIONED = YES
+WORKBENCH_PHOTO_CLOUD_CONTAINER = iCloud.com.ethdawg.workbench.preview
+WORKBENCH_PHOTO_CLOUD_ENVIRONMENT = Production
+CODE_SIGN_ENTITLEMENTS = Configuration/PhotoCloud.entitlements

@@ -42,6 +42,7 @@ struct CaptureHistoryView: View {
                                     } else {
                                         Button("Original") { original = item }
                                         Button("Read aloud") { model.speechText = item.text; model.page = "speak" }
+                                        Button("Save prompt") { model.savePrompt(item.text) }
                                     }
                                     Spacer()
                                     if !compact {

@@ -1,0 +1,25 @@
+{
+  "sourceCommit": "48bc7c09b5b5b0d1b728ebf7bba2fee377b41669",
+  "capture": "Native XCTest screenshots from iPhone 17 Pro Max Simulator, iOS 26.5",
+  "content": "Temporary test libraries and synthetic supplied content; cloud disabled. Unedited pixels.",
+  "images": [
+    {
+      "file": "mobile-tools-release.png",
+      "sha256": "e798c0e0ea3f37d16f1a92964391a1901d4f9e3c0412fb82eca9c7e693dff60b",
+      "width": 1320,
+      "height": 2868
+    },
+    {
+      "file": "mobile-wallpaper-release.png",
+      "sha256": "b33a0e29fcfeb95e12864c5c04873ecb731e6062c3c9139ac7f8846d70cc812f",
+      "width": 1320,
+      "height": 2868
+    },
+    {
+      "file": "mobile-reading-release.png",
+      "sha256": "fab8e4c34623bfb9f5366f85ee167fc15721c1e569a1a3ae5d6bd4607fb313d4",
+      "width": 1320,
+      "height": 2868
+    }
+  ]
+}

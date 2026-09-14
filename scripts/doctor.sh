@@ -27,3 +27,6 @@ if [ "$SWIFT_MAJOR" -lt 6 ] || { [ "$SWIFT_MAJOR" -eq 6 ] && [ "$SWIFT_MINOR" -l
 fi
 printf 'Ready to build. See CONTRIBUTING.md for the next command.
 '
+if ! xcrun --find appintentsmetadataprocessor >/dev/null 2>&1; then
+  printf 'Apple Shortcuts packaging needs full Xcode. Command Line Tools can run source checks; CI requires the metadata processor.\n'
+fi

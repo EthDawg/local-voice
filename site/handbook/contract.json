@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 1,
+  "id": "visual-experiences",
+  "title": "A desktop and a presentation are different commitments",
+  "reviewedOn": "2026-09-13",
+  "implementationRevision": "aa23605a7be29981988c2106b41b61ac040be2d7",
+  "scope": "Presentation preparation, persistent desktop appearance and optional reuse between them. This contract does not change dictation, reading or annotation lifecycles.",
+  "statusMeaning": {
+    "implemented": "Verified in source and the stated local checks; this is not a claim that the newest binary is publicly released.",
+    "proposed": "A product contract for review and implementation. No corresponding feature is promised in the current download."
+  },
+  "principles": [
+    "Each job must be useful on its own. Wallpaper must not require creating a phone presentation.",
+    "Reuse an original image by choice. Keep each job's crop, layout and playback settings independent.",
+    "Make the first useful action obvious; reveal adjustments in context. Do not require an expert setup screen.",
+    "Presentation is video from a device into a Mac window. It does not send Mac input to the phone or manage a meeting.",
+    "Preserve the person's later manual desktop choice. Ending a presentation is not Restore desktop."
+  ],
+  "capabilities": [
+    {
+      "id": "scene-backdrop",
+      "name": "Change a scene backdrop",
+      "status": "implemented",
+      "entry": "Present a device → Change backdrop…",
+      "effect": "Preview a file, starter or saved scene image with the retained foreground; apply only the background and crop.",
+      "limit": "Changes the saved scene and later outputs, not a running presentation or an already-applied desktop image.",
+      "source": "Sources/StageKit/BackdropReplacement.swift",
+      "evidence": "Six focused tests with 126 assertions; native picker Cancel, Escape, Return Apply and missing-image repair checked with disposable scenes."
+    },
+    {
+      "id": "scene-session",
+      "name": "Present a prepared scene",
+      "status": "implemented",
+      "entry": "Present full screen / Present in window",
+      "effect": "Show device video within a saved composition in a Mac window, with contextual phone-tile controls.",
+      "limit": "A meeting app chooses what to share. An audience view, USB recovery and a second display need their own checks.",
+      "source": "Sources/StageKit/DemoPresentation.swift",
+      "evidence": "Window/fullscreen transitions and control placement tested locally; this is not receiver-view verification."
+    },
+    {
+      "id": "desktop-still",
+      "name": "Apply a scene as a desktop picture",
+      "status": "implemented",
+      "entry": "Present a device → More → Use as desktop (Preview build)",
+      "effect": "Render the whole scene to a retained PNG, record recovery information and request the desktop change through macOS.",
+      "limit": "Includes foreground artwork; it is not a background-photo-only picker. Uses the editor window's display or the main display. No dedicated display chooser. Excluded from APP_STORE builds.",
+      "source": "Sources/StageKit/DemoScenes.swift",
+      "evidence": "Source verifies journal-before-write and URL readback; this documentation change did not alter the user's desktop."
+    },
+    {
+      "id": "desktop-restore",
+      "name": "Restore a previous desktop picture",
+      "status": "implemented",
+      "entry": "Restore desktop when recovery information exists",
+      "effect": "Restore recorded image/options only where the current picture still matches a Workbench-owned output.",
+      "limit": "Retains unmatched recovery records. It is not a complete snapshot of Apple's dynamic, aerial, rotation, screen-saver or arbitrary Space configuration.",
+      "source": "Sources/StageKit/DeviceViewport.swift",
+      "evidence": "Recovery planning has deterministic tests; multi-display and multi-Space behavior requires native validation."
+    },
+    {
+      "id": "wallpaper-entry",
+      "name": "Choose a wallpaper without preparing a scene",
+      "status": "proposed",
+      "entry": "A direct Wallpaper entry; final placement to be tested",
+      "effect": "Choose a picture, preview its fit on a named display and apply it. Keep a separate wallpaper preference and previous-picture recovery.",
+      "limit": "No dedicated wallpaper manager exists yet. Do not introduce login launch, scheduling, a sidebar category or an asset migration merely to ship this first job.",
+      "source": "docs/workbench.md",
+      "evidence": "Next proof: a first-time user sets and restores a picture without opening a scene editor; another can use only Dictate without seeing wallpaper setup."
+    },
+    {
+      "id": "asset-reuse",
+      "name": "Reuse a picture between the two jobs",
+      "status": "proposed",
+      "entry": "An explicit Use this picture action in the relevant picker",
+      "effect": "Reference the same original through two independent saved configurations. A still frame may accompany future motion assets.",
+      "limit": "No live synchronization of crop or playback. Existing scene-image reuse is implemented; cross-job wallpaper reuse is not.",
+      "source": "docs/workbench.md",
+      "evidence": "Proof: edit, remove and export each configuration independently; preserve originals referenced by the other job or recovery."
+    },
+    {
+      "id": "wallpaper-motion",
+      "name": "A quiet animated desktop, if wanted",
+      "status": "proposed",
+      "entry": "Optional motion control beside an already useful still wallpaper",
+      "effect": "Explicit local playback, muted, with Pause and a chosen still fallback. Motion must never be required to enjoy the picture.",
+      "limit": "Continuous desktop video is not established by the public image setter. Choose a renderer only after focus, energy, sleep, battery, Reduce Motion, Spaces and sharing experiments.",
+      "source": "docs/background-management.md",
+      "evidence": "No motion implementation or energy benchmark. A mockup is not evidence that a proposed renderer meets these requirements."
+    }
+  ],
+  "events": [
+    {
+      "id": "end-presentation",
+      "label": "End presentation",
+      "status": "implemented",
+      "stops": "The presentation window, its device capture, controls and keep-awake activity.",
+      "keeps": "Saved scenes, original assets and any independently applied desktop picture.",
+      "check": "Do not restore wallpaper, close a meeting, move unrelated windows or change system Stage Manager settings. Check focus returns sensibly; do not promise an exact previous app is always restored."
+    },
+    {
+      "id": "restore-desktop",
+      "label": "Restore desktop",
+      "status": "implemented",
+      "stops": "Use of Workbench's still output on eligible matched displays, after macOS confirms restoration.",
+      "keeps": "A later manual picture choice, unmatched recovery records and any active presentation.",
+      "check": "Read the current desktop before restoring. A recorded old URL is not authority to overwrite a later user choice."
+    },
+    {
+      "id": "change-picture",
+      "label": "Change a picture in System Settings",
+      "status": "implemented",
+      "stops": "Nothing in Workbench automatically. macOS owns the new desktop choice.",
+      "keeps": "A running presentation and saved compositions. Restoration subsequently skips pictures it no longer owns.",
+      "check": "Do not add a resynchronization daemon. For a future wallpaper manager, recheck observed state before the next explicit apply or restore."
+    },
+    {
+      "id": "pause-motion",
+      "label": "Pause wallpaper motion",
+      "status": "proposed",
+      "stops": "The future wallpaper renderer's playback activity.",
+      "keeps": "The chosen still image and independent presentation state.",
+      "check": "No Pause control or empty stub should ship until there is working motion. A still must also cover sleep, missing media and renderer failure; exact automatic-pause rules need measurement."
+    },
+    {
+      "id": "quit",
+      "label": "Quit Workbench",
+      "status": "implemented",
+      "stops": "App-owned recording, playback, presentation, drawing, timers and monitors.",
+      "keeps": "Saved work, retained desktop output files and recovery records. A still picture set through macOS remains set.",
+      "check": "Future app-rendered motion must stop on Quit and leave the chosen still. Do not restart in the background or restore wallpaper silently."
+    }
+  ],
+  "acceptance": [
+    {
+      "id": "independent-entry",
+      "test": "Set a wallpaper from a fresh session without making a presentation. Complete first dictation without wallpaper setup.",
+      "status": "not-run",
+      "capabilities": [
+        "wallpaper-entry"
+      ]
+    },
+    {
+      "id": "independent-state",
+      "test": "Use the same source in both jobs, crop each differently, end a scene and relaunch. Preserve each choice and referenced media.",
+      "status": "not-run",
+      "capabilities": [
+        "asset-reuse"
+      ]
+    },
+    {
+      "id": "ownership",
+      "test": "Apply a still, manually change it in System Settings, then Restore. Preserve the manual choice and report any pending recovery accurately.",
+      "status": "source-and-unit-only",
+      "capabilities": [
+        "wallpaper-entry",
+        "desktop-restore"
+      ]
+    },
+    {
+      "id": "display-spaces",
+      "test": "Two displays and two Spaces; Show on all Spaces on/off; disconnect and reconnect. Record affected surfaces rather than inferring them.",
+      "status": "not-run",
+      "capabilities": [
+        "wallpaper-entry"
+      ]
+    },
+    {
+      "id": "focus",
+      "test": "Check typing destination, desktop clicks, Mission Control and Stage Manager during apply, start, end and future motion. Wallpaper must not take keyboard focus.",
+      "status": "not-run",
+      "capabilities": [
+        "wallpaper-entry",
+        "wallpaper-motion",
+        "scene-session"
+      ]
+    },
+    {
+      "id": "meeting-receiver",
+      "test": "Observe a receiving participant in Teams and Zoom, desktop and browser versions, for window and whole-display sharing. Test separate overlays and control menus.",
+      "status": "not-run",
+      "capabilities": [
+        "scene-session",
+        "wallpaper-motion"
+      ]
+    },
+    {
+      "id": "motion-budget",
+      "test": "Measure idle CPU/GPU/energy, battery, sleep/wake and Reduce Motion on named hardware before choosing defaults or advertising animation.",
+      "status": "not-run",
+      "capabilities": [
+        "wallpaper-motion"
+      ]
+    }
+  ],
+  "agentContract": {
+    "kind": "read-only product specification; not a command endpoint",
+    "beforeWork": [
+      "Read docs/workbench.md and this contract, then inspect the current implementation and release state.",
+      "Choose one capability ID and a bounded user outcome. Agree a new surface or storage migration before implementing it.",
+      "Identify changed source owners, durable state, system effects and evidence needed. Concepts are not instructions to reproduce every pictured control."
+    ],
+    "handoff": [
+      "Capability ID and observable before/after",
+      "Changed files and state owners",
+      "Tests actually run, including hardware/receiver limitations",
+      "Actual screenshot and source revision",
+      "Recovery behavior and remaining decisions"
+    ],
+    "execution": "Use only supported authorized app or development tools. No wallpaper CLI, wallpaper App Intent, MCP server or remote agent integration is provided by this document."
+  },
+  "sources": [
+    {
+      "title": "Workbench: personal scenes",
+      "url": "https://workbench-mac.vercel.app/scenes/",
+      "supports": "Mobile preparation, optional personal sync, persona snapshots and current evidence; wallpaper and voice remain independent."
+    },
+    {
+      "title": "Apple: customise wallpaper",
+      "url": "https://support.apple.com/en-ie/guide/mac-help/-mchlp3013/mac",
+      "supports": "Still pictures, time-of-day Dynamic Wallpapers and aerial transitions are distinct."
+    },
+    {
+      "title": "Apple: Wallpaper settings",
+      "url": "https://support.apple.com/en-ie/guide/mac-help/-mchlp1103/mac",
+      "supports": "Show on all Spaces, screen-saver choices and wallpaper controls."
+    },
+    {
+      "title": "Apple: desktop image setter",
+      "url": "https://developer.apple.com/documentation/appkit/nsworkspace/setdesktopimageurl(_:for:options:)",
+      "supports": "Public image-file URL setter for a screen; does not establish a general continuous-video, aerial or schedule API."
+    },
+    {
+      "title": "Apple: Stage Manager",
+      "url": "https://support.apple.com/guide/mac-help/use-stage-manager-mchl534ba392/mac",
+      "supports": "System-owned window grouping and desktop interaction, separate from wallpaper rendering."
+    },
+    {
+      "title": "Apple: ScreenCaptureKit",
+      "url": "https://developer.apple.com/videos/play/wwdc2022/10155/",
+      "supports": "Capture selection and filtering affect whether separate windows and overlays are included."
+    }
+  ]
+}

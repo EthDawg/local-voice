@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleDisplayName</key><string>Workbench Preview</string>
+<key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+<key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
+<key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>2.1.0</string>
+<key>CFBundleVersion</key><string>2</string>
+<key>ITSAppUsesNonExemptEncryption</key><false/>
+<key>WorkbenchPhotoCloudProvisioned</key><string>$(WORKBENCH_PHOTO_CLOUD_PROVISIONED)</string>
+<key>WorkbenchPhotoCloudContainer</key><string>$(WORKBENCH_PHOTO_CLOUD_CONTAINER)</string>
+<key>WorkbenchPhotoCloudEnvironment</key><string>$(WORKBENCH_PHOTO_CLOUD_ENVIRONMENT)</string>
+<key>LSRequiresIPhoneOS</key><true/>
+<key>NSMicrophoneUsageDescription</key><string>Record when you tap Record, then turn your audio into text on this device.</string>
+<key>NSCameraUsageDescription</key><string>Take a photo you choose to keep in Workbench or send to your Mac through private iCloud.</string>
+<key>NSPhotoLibraryAddUsageDescription</key><string>Save the picture you choose to export as a new image in Photos.</string>
+<key>UILaunchScreen</key><dict/>
+<key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
+<key>UIApplicationShortcutItems</key><array>
+<dict><key>UIApplicationShortcutItemType</key><string>com.ethdawg.workbench.capture-scene</string><key>UIApplicationShortcutItemTitle</key><string>Capture for scene</string><key>UIApplicationShortcutItemIconSymbolName</key><string>camera</string></dict>
+<dict><key>UIApplicationShortcutItemType</key><string>com.ethdawg.workbench.dictate</string><key>UIApplicationShortcutItemTitle</key><string>Dictate</string><key>UIApplicationShortcutItemIconSymbolName</key><string>mic</string></dict>
+</array>
+<key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
+<key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
+<key>UIBackgroundModes</key><array><string>audio</string></array>
+<key>UTExportedTypeDeclarations</key><array><dict>
+<key>UTTypeIdentifier</key><string>com.ethdawg.workbench.scene</string>
+<key>UTTypeDescription</key><string>Workbench scene</string>
+<key>UTTypeConformsTo</key><array><string>public.data</string></array>
+<key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>workbenchscene</string></array></dict>
+</dict></array>
+<key>CFBundleDocumentTypes</key><array><dict>
+<key>CFBundleTypeName</key><string>Workbench scene</string>
+<key>LSItemContentTypes</key><array><string>com.ethdawg.workbench.scene</string></array>
+<key>CFBundleTypeRole</key><string>Editor</string><key>LSHandlerRank</key><string>Owner</string>
+</dict></array>
+<key>LSSupportsOpeningDocumentsInPlace</key><true/>
+</dict></plist>
