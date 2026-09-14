@@ -11,12 +11,18 @@ Workbench 2 combines the existing Voice and StageMark capabilities into one nati
 | `RecognitionEngine` actor | Selected recognition provider, preparation and one transcription at a time | `RecognitionProviders.swift` |
 | `KeyboardCoachModel` | Combined shortcut catalogue, assignment, conflict feedback and safe practice | `KeyboardCoach.swift`; persistence/suspension closures supplied by the host |
 | App Intents | Audio-file transcription returning a typed text result | `Shortcuts.swift` |
+| `PresenterKit` / `PresenterModel` | Typed Chrome routing protocol; existing Saved resources remains authoritative | `PresenterProtocol.swift`, `PresenterSocket.swift`, `PresenterBridge.swift` |
+| Chrome/native adapters | Profile-scoped tab targeting, framed transport, transient native picker | `BrowserExtension/`, `WorkbenchBrowserHost`, `PresenterPanel.swift` |
 
 The internal Swift module remains `LocalVoice` to preserve App Intents type/metadata compatibility. Packaging names the installed binary `Workbench`, or `WorkbenchPreview` in Preview. StageKit is linked into it; Workbench does not launch a second StageMark process.
 
 `StageKitController` exposes views, actions, lifecycle and shortcut descriptors rather than its internal coordinator. Host callbacks route navigation, hide Home before presenting and coordinate busy state. StageKit must not create another menu-bar item or terminate the app independently.
 
 The two modules still have their own internal `Workbench.swift` style helpers and share the appearance preference domain. They are not identical mirrored files. Keep their appearance consistent through the [product contract](workbench.md); do not extract a larger shared framework without a concrete need.
+
+## Chrome destination adapter
+
+The [presenter contract](presenter-direction.md#state-and-security-boundaries) owns Chrome/native routing. `DemoResource.browserTarget` is optional and machine-local; imported and exported libraries strip it. No mobile or SceneSyncKit source depends on PresenterKit. The bundled host has no state or command authority of its own; it forwards bounded native-messaging frames over a current-user Unix socket to the app. Each browser installation owns its UUID, site grants and temporary tab bindings. The app owns conflict/error handling and the existing keyboard catalogue owns Switch to. No network listener, Accessibility permission or backend is added.
 
 ## Native iPhone and iPad target
 

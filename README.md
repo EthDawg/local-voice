@@ -26,6 +26,7 @@ An **iPhone and iPad Preview for iOS/iPadOS 26+** is also in development as a se
 | **Annotate** | Draw, highlight, add shapes/text, emphasise the pointer and use saved boards over a live presentation. |
 | **Present a device** | Prepare a scene with a background, logo and persona, display a supported USB video source, and use a break timer. QuickTime and iPhone Mirroring can be opened separately. |
 | **Saved resources** | Keep searchable prompts, web links and references to local decks, videos and other files. |
+| **Switch to** | In this development build, return to a named demo tab in its paired Chrome profile from any app. [Setup and evidence](docs/presenter-direction.md). |
 | **Keyboard** | See all Workbench assignments, change or disable them, and practise on a virtual keyboard without activating tools. |
 
 The core app requires no account or subscription. Built-in Parakeet recognition and Mac reading work locally after their initial setup. Optional integrations have their own setup and privacy boundaries.
@@ -34,7 +35,7 @@ The core app requires no account or subscription. Built-in Parakeet recognition 
 
 1. Open **Workbench Preview** and choose an action from Home. **Models** prepares the default Parakeet recognizer; its first download can take several minutes.
 2. Try **Dictate** with a short, disposable sentence. Microphone access is requested when recording needs it. Copy works without Accessibility; automatic paste is an optional setting.
-3. Open **Keyboard** to see or practise a shortcut. The defaults include **Control–Option–Space** for dictation, **Control–Option–V** for quick controls and **Control–Option–J** for saved resources.
+3. Open **Keyboard** to see or practise a shortcut. The defaults include **Control–Option–Space** for dictation, **Control–Option–V** for quick controls, **Control–Option–J** for saved resources and **Control–Option–G** for Switch to in this development build.
 4. For a mobile demo, choose **Present a device**, prepare a scene and select an available source. Workbench's device view is video-only. iPhone Mirroring runs in Apple's own window; Workbench does not embed or control it.
 
 The menu-bar icon provides quick access while another app is active. The normal window is for editing and setup. Closing it leaves the utility available; **Quit Workbench** stops the app. **Open Workbench at login** is optional in Settings.

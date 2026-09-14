@@ -170,6 +170,7 @@ struct WorkbenchQuickPanel: View {
             quick("Read aloud", "speaker.wave.2") { open("speak") }
             quick("Draw on screen", "pencil.tip") { draw() }
             quick("Present a device", "iphone") { open("present") }
+            quick("Switch to…", "arrow.up.forward.app") { model.onShowPresenter?() }
             quick("Persona overlay…", "person.crop.rectangle") { personas() }
             quick("Break timer", "timer") { timer() }
             Divider()

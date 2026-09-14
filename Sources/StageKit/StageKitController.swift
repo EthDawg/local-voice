@@ -139,7 +139,7 @@ public final class StageKitController: ObservableObject {
     }
 
     private static func reservedVoiceShortcut(_ code: UInt32, _ modifiers: UInt32) -> String? {
-        guard modifiers == UInt32(controlKey | optionKey), [UInt32(kVK_Space), UInt32(kVK_ANSI_V), UInt32(kVK_ANSI_J)].contains(code) else { return nil }
+        guard modifiers == UInt32(controlKey | optionKey), [UInt32(kVK_Space), UInt32(kVK_ANSI_V), UInt32(kVK_ANSI_J), UInt32(kVK_ANSI_G)].contains(code) else { return nil }
         return "This combination is reserved for Voice. Choose another combination."
     }
 }
