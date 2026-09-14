@@ -54,7 +54,11 @@ struct MobileDictateView: View {
                     PasteButton(payloadType: String.self) { values in
                         if let text = values.first {
                             guard text.count <= 50_000 else { notice = "Choose a passage under 50,000 characters. Your draft is unchanged."; return }
-                            setDraft(text, original: text)
+                            let keptPrevious = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            guard store.replaceDraftWithPaste(text, preserving: draft, original: original, savedID: savedID) else { return }
+                            original = store.document.draftOriginal; draft = store.document.draft
+                            savedID = nil; previousDraft = nil
+                            notice = keptPrevious ? "Previous draft kept in Saved. Pasted text is ready." : "Pasted text is ready."
                         }
                     }.labelStyle(.iconOnly).disabled(speech.isWorking || speech.isRecording)
                 }

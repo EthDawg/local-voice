@@ -54,12 +54,13 @@ enum PersonaGeometry {
 }
 
 enum PersonaError: LocalizedError {
-    case invalidSettings, changedOnDisk, unreadableImage
+    case invalidSettings, changedOnDisk, unreadableImage, outsidePreparedGroup
     var errorDescription: String? {
         switch self {
         case .invalidSettings: return "The saved personas contain unsupported or invalid settings. The original files are unchanged."
         case .changedOnDisk: return "The persona files changed outside this window. Reopen Workbench before saving changes."
         case .unreadableImage: return "This persona image is missing or unreadable. Import the finished image again."
+        case .outsidePreparedGroup: return "Choose a persona in the prepared group."
         }
     }
 }
@@ -593,20 +594,26 @@ final class PersonaLibrary: NSObject, ObservableObject {
         hud?.focusControls()
     }
 
-    func showOverlay() {
-        guard mayBeginInteraction?() != false else { notice = PersonaSessionInteractionError.busy.localizedDescription; return }
-        guard let selected, let image = renderedImage(for: selected) else { notice = PersonaError.unreadableImage.localizedDescription; return }
-        if let group = activeGroup, !group.personaIDs.contains(selected.id) { notice = "Choose a persona in the prepared group."; return }
+    /// Dismissed preparation views must receive the failure, because notice is
+    /// otherwise visible only when Personas is opened again.
+    @discardableResult func showOverlay() -> Result<Void, Error> {
+        do { try showOverlayChecked(); return .success(()) }
+        catch { notice = error.localizedDescription; return .failure(error) }
+    }
+    private func showOverlayChecked() throws {
+        guard mayBeginInteraction?() != false else { throw PersonaSessionInteractionError.busy }
+        guard let selected, let image = renderedImage(for: selected) else { throw PersonaError.unreadableImage }
+        if let group = activeGroup, !group.personaIDs.contains(selected.id) { throw PersonaError.outsidePreparedGroup }
         let candidateIDs = activeGroup?.personaIDs ?? [selected.id]
-        guard candidateIDs.count <= PersonaSessionController.maximumCandidates else { notice = PersonaSessionError.tooManyCandidates.localizedDescription; return }
+        guard candidateIDs.count <= PersonaSessionController.maximumCandidates else { throw PersonaSessionError.tooManyCandidates }
         var frozenImages: [UUID: NSImage] = [:], frozenLabels: [UUID: String] = [:], bytes = 0
         for id in candidateIDs {
             guard let item = items.first(where: { $0.id == id }), let rendered = renderedImage(for: item),
                   let cg = rendered.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-                notice = PersonaSessionError.missingArtwork.localizedDescription; return
+                throw PersonaSessionError.missingArtwork
             }
             bytes += cg.bytesPerRow * cg.height
-            guard bytes <= PersonaSessionController.maximumImageBytes else { notice = PersonaSessionError.tooManyCandidates.localizedDescription; return }
+            guard bytes <= PersonaSessionController.maximumImageBytes else { throw PersonaSessionError.tooManyCandidates }
             frozenImages[id] = NSImage(cgImage: cg, size: rendered.size); frozenLabels[id] = publicLabel(for: item)
         }
         endOverlaySession()

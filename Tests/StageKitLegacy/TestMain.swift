@@ -19,10 +19,15 @@ struct TestRunner {
             BoardPresentationFixture().run()
             return
         }
+        if args == ["--phone-guide-fixture"] || Bundle.main.bundleIdentifier == "app.workbench.phone-route-review" {
+            _ = NSApplication.shared
+            PhonePresentationFixture().run()
+            return
+        }
         let boardPresentationOnly = args == ["--board-presentation-only"]
         let backdropOnly = args == ["--backdrop-only"]
         guard args.isEmpty || args == ["--ci"] || args == ["--scenes-only"] || boardPresentationOnly || backdropOnly else {
-            print("Usage: StageMarkTests [--ci | --scenes-only | --board-presentation-only | --board-presentation-fixture | --backdrop-only | --backdrop-fixture | --persona-session-fixture]")
+            print("Usage: StageMarkTests [--ci | --scenes-only | --board-presentation-only | --board-presentation-fixture | --backdrop-only | --backdrop-fixture | --persona-session-fixture | --phone-guide-fixture]")
             exit(2)
         }
         let scenesOnly = args == ["--scenes-only"]
@@ -35,6 +40,7 @@ struct TestRunner {
         let scenes = SceneTests()
         let assets = SceneAssetTests()
         let demo = DemoModeTests()
+        let phonePresentation = PhonePresentationTests()
         let desktopMotion = DesktopMotionTests()
         let gentleMotion = GentleMotionTests()
         let ambientScenes = AmbientSceneTests()
@@ -64,6 +70,12 @@ struct TestRunner {
             ("board private clipboard image and failure preservation", boardExport.testPrivateClipboardPNGAndFailurePreservation),
             ("presentation window and fullscreen lifecycle", presentationLifecycle.testModeChangesKeepPresentationAndEndClosesOnce),
             ("presentation transition interruption and failure recovery", presentationLifecycle.testEndDuringNativeTransitionsAndFailureRecovery),
+            ("phone: restricted versus denied video access", phonePresentation.testRestrictedCameraGuidanceDoesNotOfferUserPermissionToggle),
+            ("phone: explicit first source selection", phonePresentation.testFirstCaptureRequiresExplicitSelectionEvenForMuxedHint),
+            ("phone: handoff waits for capture and window", phonePresentation.testNativeHandoffWaitsForBothCaptureAndWindowInEitherOrder),
+            ("phone: handoff launch and ordinary close ownership", phonePresentation.testHandoffKeepsFirstRequestAndDoesNotRetryFailedLaunchOrOrdinaryClose),
+            ("phone: handoff native transition failure", phonePresentation.testHandoffWaitsThroughFailedNativeTransitionAndRepeatedEnd),
+            ("phone: capture release retains pending handoff", phonePresentation.testCaptureStopCompletionRetainsHandoffAfterPresenterRelease),
             ("persona sessions: empty return and visible feedback", personaSessions.testEmptySetCanBeRevisitedAndLiveFailuresStayVisible),
             ("persona sessions: opt-in archive migration", personaSessions.testOptInMigrationBacksUpExactArchiveAndPreservesLegacyPlacement),
             ("persona sessions: independent placed copies", personaSessions.testTwoInstancesOwnIndependentGeometryVisibilityLockAndOrder),
@@ -73,6 +85,7 @@ struct TestRunner {
             ("persona sessions: read-only and busy state", personaSessions.testReadOnlySessionsAndInteractionGuardsNeverWriteOrTrapOverlays),
             ("persona sessions: invalid and future archive preservation", personaSessions.testInvalidLayoutsAndFutureArchivePreserveOriginalBytes),
             ("persona sessions: bounded replacement preflight", personaSessions.testBoundedPreflightAlsoProtectsLegacyShowAndCurrentSession),
+            ("persona: visible single-card launch failure", personaSessions.testSingleCardLaunchFailureReturnsErrorAndPreservesExistingOutput),
             ("floating: AllTargetsAreDistinctFiniteAndBounded", floating.testAllTargetsAreDistinctFiniteAndBounded),
             ("floating: GuideLayoutPreservesTargetsAndFlipsDisplayCoordinates", floating.testGuideLayoutPreservesTargetsAndFlipsDisplayCoordinates),
             ("floating: GuideStateClearsWhenDragOrDisplayEnds", floating.testGuideStateClearsWhenDragOrDisplayEnds),
