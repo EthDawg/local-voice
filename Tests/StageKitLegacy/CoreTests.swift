@@ -134,7 +134,10 @@ final class CoreTests: XCTestCase {
         let shortcuts = Action.allCases.map { prefs.shortcut(for: $0) }
         XCTAssertEqual(Set(shortcuts).count, Action.allCases.count)
         XCTAssertEqual(DrawingTool.allCases.count, Action.allCases.filter { $0.tool != nil }.count)
-        XCTAssertTrue(shortcuts.allSatisfy { $0.modifiers != 0 && $0.enabled })
+        XCTAssertTrue(shortcuts.allSatisfy { $0.modifiers != 0 })
+        let optIn: Set<Action> = [.overlayControls, .overlayNext, .overlayPrevious, .overlayVisibility, .overlayEnd]
+        XCTAssertTrue(optIn.allSatisfy { !prefs.shortcut(for: $0).enabled }, "New overlay keys must not take over existing app shortcuts")
+        XCTAssertTrue(Action.allCases.filter { !optIn.contains($0) }.allSatisfy { prefs.shortcut(for: $0).enabled }, "Existing shortcut defaults stay enabled")
     }
     func testPreferencesPersistAndClamp() throws {
         let suite = "StageMarkTests.\(UUID().uuidString)"

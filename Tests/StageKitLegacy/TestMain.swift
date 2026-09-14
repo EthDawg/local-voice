@@ -4,6 +4,11 @@ import AppKit
 struct TestRunner {
     static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
+        if args == ["--persona-session-fixture"] || Bundle.main.bundleIdentifier == "app.workbench.overlay-review" {
+            _ = NSApplication.shared
+            PersonaSessionFixture().run()
+            return
+        }
         if args == ["--backdrop-fixture"] {
             _ = NSApplication.shared
             BackdropReplacementFixture().run()
@@ -17,7 +22,7 @@ struct TestRunner {
         let boardPresentationOnly = args == ["--board-presentation-only"]
         let backdropOnly = args == ["--backdrop-only"]
         guard args.isEmpty || args == ["--ci"] || args == ["--scenes-only"] || boardPresentationOnly || backdropOnly else {
-            print("Usage: StageMarkTests [--ci | --scenes-only | --board-presentation-only | --board-presentation-fixture | --backdrop-only | --backdrop-fixture]")
+            print("Usage: StageMarkTests [--ci | --scenes-only | --board-presentation-only | --board-presentation-fixture | --backdrop-only | --backdrop-fixture | --persona-session-fixture]")
             exit(2)
         }
         let scenesOnly = args == ["--scenes-only"]
@@ -36,6 +41,7 @@ struct TestRunner {
         let viewportFit = ViewportFitTests()
         let logoImport = LogoImportTests()
         let personas = PersonaTests()
+        let personaSessions = PersonaSessionTests()
         let personaStarters = PersonaStarterTests()
         let floating = FloatingControlGeometryTests()
         let sceneSync = SceneSyncAdapterTests()
@@ -58,6 +64,15 @@ struct TestRunner {
             ("board private clipboard image and failure preservation", boardExport.testPrivateClipboardPNGAndFailurePreservation),
             ("presentation window and fullscreen lifecycle", presentationLifecycle.testModeChangesKeepPresentationAndEndClosesOnce),
             ("presentation transition interruption and failure recovery", presentationLifecycle.testEndDuringNativeTransitionsAndFailureRecovery),
+            ("persona sessions: empty return and visible feedback", personaSessions.testEmptySetCanBeRevisitedAndLiveFailuresStayVisible),
+            ("persona sessions: opt-in archive migration", personaSessions.testOptInMigrationBacksUpExactArchiveAndPreservesLegacyPlacement),
+            ("persona sessions: independent placed copies", personaSessions.testTwoInstancesOwnIndependentGeometryVisibilityLockAndOrder),
+            ("persona sessions: paused switching and frozen scope", personaSessions.testPausedGroupSwitchKeepsLayoutsAndFrozenAllowedScope),
+            ("persona sessions: frozen artwork and failed start", personaSessions.testFrozenArtworkSurvivesLibraryEditsAndFailedReplacementStart),
+            ("persona sessions: explicit conflict-aware layout save", personaSessions.testSaveLayoutIsExplicitAtomicAndRejectsChangedPreparation),
+            ("persona sessions: read-only and busy state", personaSessions.testReadOnlySessionsAndInteractionGuardsNeverWriteOrTrapOverlays),
+            ("persona sessions: invalid and future archive preservation", personaSessions.testInvalidLayoutsAndFutureArchivePreserveOriginalBytes),
+            ("persona sessions: bounded replacement preflight", personaSessions.testBoundedPreflightAlsoProtectsLegacyShowAndCurrentSession),
             ("floating: AllTargetsAreDistinctFiniteAndBounded", floating.testAllTargetsAreDistinctFiniteAndBounded),
             ("floating: GuideLayoutPreservesTargetsAndFlipsDisplayCoordinates", floating.testGuideLayoutPreservesTargetsAndFlipsDisplayCoordinates),
             ("floating: GuideStateClearsWhenDragOrDisplayEnds", floating.testGuideStateClearsWhenDragOrDisplayEnds),
