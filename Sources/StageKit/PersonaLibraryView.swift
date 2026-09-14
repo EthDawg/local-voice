@@ -92,7 +92,7 @@ struct PersonaLibraryView: View {
                             Button(library.overlayVisible ? "Hide floating persona" : "Show over browser") {
                                 if library.overlayVisible { library.hideOverlay() }
                                 else { showAfterDismiss = true; dismiss() }
-                            }.disabled(library.renderedImage(for: selected) == nil)
+                            }.disabled(!library.overlayVisible && library.renderedImage(for: selected) == nil)
                             if let onChoose {
                                 Button("Use in scene") { onChoose(selected); dismiss() }
                                     .disabled(library.renderedImage(for: selected) == nil)
@@ -127,14 +127,14 @@ struct PersonaLibraryView: View {
                                     .accessibilityLabel("Move later in group").disabled(library.isReadOnly || index == group.personaIDs.count - 1)
                             }
                         }
-                        if library.overlayVisible, library.liveSelection != nil {
-                            Button("Focus floating controls for keyboard") { library.focusOverlayControls() }
-                        }
                     } else {
                         Image(systemName: "person.crop.rectangle.stack").font(.system(size: 38)).foregroundStyle(.secondary)
                         Text("Choose or import a persona").font(.headline)
                         Text("Use the same saved image over your browser or inside a mobile scene.")
                             .font(.callout).foregroundStyle(.secondary)
+                    }
+                    if library.overlayVisible {
+                        Button("Focus floating controls for keyboard") { library.focusOverlayControls() }
                     }
                 }.frame(width: 320, alignment: .leading)
             }

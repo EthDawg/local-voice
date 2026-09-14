@@ -48,12 +48,14 @@ final class PersonaHUDController: NSWindowController {
     private var placement = PersonaHUDPlacement()
     private var savedData: Data?
     private let url: URL
+    private let allowsSaving: Bool
     private var storageBlocked = false
     private var screens: AnyCancellable?
     private var guides: FloatingControlGuideController?
 
-    init(root: URL) {
+    init(root: URL, allowsSaving: Bool = true) {
         url = root.appendingPathComponent("persona-controls.json")
+        self.allowsSaving = allowsSaving
         let panel = PersonaHUDPanel(contentRect: CGRect(x: 0, y: 0, width: 332, height: 44),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         super.init(window: panel)
@@ -109,7 +111,11 @@ final class PersonaHUDController: NSWindowController {
         }
         if let index = items.firstIndex(where: { $0.id == selectedID }) { picker.selectItem(at: index) }
         previous.isEnabled = items.count > 1; next.isEnabled = items.count > 1
-        picker.setAccessibilityHelp("Only the prepared group's \(items.count) personas are available.")
+        picker.isEnabled = items.count > 1
+        picker.setAccessibilityLabel(items.count > 1 ? "Choose a persona in the prepared group" : "Displayed persona")
+        picker.setAccessibilityHelp(items.count > 1
+            ? "Only the prepared group's \(items.count) personas are available."
+            : "Only the displayed persona is available. Prepare a group to switch personas.")
         rebuildOptions()
         if window?.isVisible != true { position(near: artwork); window?.orderFrontRegardless() }
     }
@@ -126,7 +132,7 @@ final class PersonaHUDController: NSWindowController {
     /// Called only through an explicit keyboard-access control in preparation.
     func focusControls() {
         guard let panel = window as? PersonaHUDPanel, panel.isVisible else { return }
-        panel.keyboardMode = true; panel.makeKey(); panel.makeFirstResponder(picker)
+        panel.keyboardMode = true; panel.makeKey(); panel.makeFirstResponder(picker.isEnabled ? picker : options)
     }
 
     private func configureButton(_ button: NSButton, symbol: String, label: String, action: Selector) {
@@ -198,7 +204,7 @@ final class PersonaHUDController: NSWindowController {
     }
     private func hideGuides() { MainActor.assumeIsolated { guides?.hide() } }
     private func save() {
-        guard !storageBlocked else { return }
+        guard allowsSaving, !storageBlocked else { return }
         do { savedData = try PersonaStorage.write(placement.validated(), to: url, expected: savedData) }
         catch { storageBlocked = true; notice = "Persona controls could not save their position. The previous file is preserved." }
     }

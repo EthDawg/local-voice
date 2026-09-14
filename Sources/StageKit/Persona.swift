@@ -469,9 +469,12 @@ final class PersonaLibrary: NSObject, ObservableObject {
         return label.isEmpty ? "Floating persona" : label
     }
     private func refreshHUD() {
-        guard overlayVisible, let session = liveSelection, let current = session.currentID else { hud?.hide(); return }
+        guard overlayVisible, let current = displayedID else { hud?.hide(); return }
+        // Browsing the preparation library never changes a running overlay.
+        // Ungrouped artwork gets the same controls, scoped to that one item.
+        let candidateIDs = liveSelection?.candidateIDs ?? [current]
         if hud == nil {
-            let controls = PersonaHUDController(root: root)
+            let controls = PersonaHUDController(root: root, allowsSaving: !isReadOnly)
             controls.onSelect = { [weak self] in self?.selectLivePersona($0) }
             controls.onStep = { [weak self] in self?.stepLivePersona($0) }
             controls.onHide = { [weak self] in self?.hideOverlay() }
@@ -480,7 +483,7 @@ final class PersonaLibrary: NSObject, ObservableObject {
             if let message = controls.notice { notice = message }
             hud = controls
         }
-        let candidates = session.candidateIDs.enumerated().compactMap { index, id -> PersonaHUDItem? in
+        let candidates = candidateIDs.enumerated().compactMap { index, id -> PersonaHUDItem? in
             guard let persona = items.first(where: { $0.id == id }) else { return nil }
             return PersonaHUDItem.make(persona: persona, ordinal: index + 1, image: renderedImage(for: persona))
         }
@@ -515,7 +518,6 @@ final class PersonaLibrary: NSObject, ObservableObject {
                 notice = error.localizedDescription; return
             }
         }
-        if overlayVisible, selectedID != displayedID { hideOverlay() }
         refreshOverlay()
     }
     private func writable() -> Bool {
