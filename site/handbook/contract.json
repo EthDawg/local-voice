@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "visual-experiences",
   "title": "A desktop and a presentation are different commitments",
-  "reviewedOn": "2026-09-13",
-  "implementationRevision": "aa23605a7be29981988c2106b41b61ac040be2d7",
+  "reviewedOn": "2026-09-15",
+  "implementationRevision": "7e45213166a3867a65ad6a7bc022637d8b9899ea",
   "scope": "Presentation preparation, persistent desktop appearance and optional reuse between them. This contract does not change dictation, reading or annotation lifecycles.",
   "statusMeaning": {
     "implemented": "Verified in source and the stated local checks; this is not a claim that the newest binary is publicly released.",
@@ -35,7 +35,7 @@
       "effect": "Show device video within a saved composition in a Mac window, with contextual phone-tile controls.",
       "limit": "A meeting app chooses what to share. An audience view, USB recovery and a second display need their own checks.",
       "source": "Sources/StageKit/DemoPresentation.swift",
-      "evidence": "Window/fullscreen transitions and control placement tested locally; this is not receiver-view verification."
+      "evidence": "At da4f0f4, saved name/backdrop/persona edits left a running windowed still unchanged; End/restart adopted them. At 7e45213, the unchanged isolated native host verified all eight expanded positions, a compact-tile drag to Left centre, keyboard reveal and Escape collapse/End through a full-screen transition. Device capture and cloud were off; this is not receiver-view or installed signed-shell verification."
     },
     {
       "id": "desktop-still",
@@ -131,6 +131,23 @@
     }
   ],
   "acceptance": [
+    {
+      "id": "presentation-snapshot",
+      "test": "At da4f0f4, start a windowed synthetic still in the native Mac host, change the saved name/backdrop and remove the placed persona, then revisit the running presentation. It stayed unchanged; End/restart adopted the saved changes. Device capture and cloud were off. Live video, incoming sync, fullscreen and receiving-participant behavior remain unverified.",
+      "status": "passed-windowed-still",
+      "capabilities": [
+        "scene-session",
+        "scene-backdrop"
+      ]
+    },
+    {
+      "id": "presentation-controls",
+      "test": "At 7e45213, select each of the eight named positions in an isolated native windowed still presentation; Position and End stayed reachable. Drag the compact tile from Bottom right to Left centre; release kept it collapsed with no guides remaining. Command Slash reopened it. A native full-screen transition retained controls; first Escape collapsed them, second Escape ended and returned to Scenes. Every drag target, guides during drag, multiple displays, VoiceOver, live capture and receiver views remain separate.",
+      "status": "passed-single-display-still",
+      "capabilities": [
+        "scene-session"
+      ]
+    },
     {
       "id": "independent-entry",
       "test": "Set a wallpaper from a fresh session without making a presentation. Complete first dictation without wallpaper setup.",

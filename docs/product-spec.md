@@ -58,6 +58,14 @@ Presentation defaults to right edge centre; persona to bottom right; dictation t
 
 Whole-display sharing includes visible overlays. Browser-tab capture excludes separate native windows. A persona embedded in a scene belongs to that scene's rendering. Receiver-side tests are required before claiming individual-window inclusion or hidden controls in Teams/Zoom. Window sharing flags do not guarantee exclusion from another app's capture. Customer artwork remains separate from controls and original images are preserved.
 
+### Persona controls and group boundaries
+
+Showing a persona always provides nearby Hide, Lock and Size controls, including an older or ungrouped image. **Focus floating controls** provides keyboard access. An ungrouped overlay has one candidate: the displayed persona. It never gains access to the rest of the library through the floating picker or previous/next buttons.
+
+For a prepared group, freeze the allowed candidates when the overlay is shown. Browsing another library item does not change the displayed artwork or expand that set. Preparing a different group ends the display session; showing again uses that group's selection. The controls use public card labels, never private saved names. Hiding also ends the display session. Removing the displayed persona hides its overlay and controls. Read-only library browsing and temporary placement must not write the saved archive.
+
+The ungrouped-controls correction is a source update awaiting a new Preview build. The release record must distinguish its code and regression checks from an installed or published app.
+
 ## Scope
 
 Implement contextual presentation controls, compact/expanded recording HUD, shared placement, local refinement management, and persona overlays. Logo web discovery and animated backdrop playback are separate extensions of the asset library, not reasons for a universal mode picker. The earlier publication hold was superseded by the maintainer’s 14 September release instruction. Mac Preview 3 is now notarized and published; iOS is uploaded to App Store Connect with testing and review stages still separate.

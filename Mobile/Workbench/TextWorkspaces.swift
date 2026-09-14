@@ -62,8 +62,9 @@ struct MobileDictateView: View {
                     if draft.isEmpty { Text("Speak, paste or type something you want to keep.").foregroundStyle(.tertiary).padding(.top, 12).padding(.leading, 5).allowsHitTesting(false) }
                     // A user edit retires cleanup Undo, even if later edits return
                     // to identical text. Programmatic cleanup retains its snapshot.
+                    // Commit native text before invalidating its dependent Undo UI.
                     TextEditor(text: Binding(get: { draft }, set: { value in
-                        if value != draft { previousDraft = nil; draft = value }
+                        if value != draft { draft = value; previousDraft = nil }
                     })).frame(minHeight: 200).scrollContentBackground(.hidden).focused($editing).accessibilityLabel("Draft text").accessibilityIdentifier("dictate.draft").disabled(speech.isWorking || speech.isRecording)
                 }.padding(12).background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
                 if !draft.isEmpty {
