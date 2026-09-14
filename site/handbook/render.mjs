@@ -19,7 +19,7 @@ export function renderEvent(event) {
 }
 export function renderHandbook(template, contract) {
   validateContract(contract);
-  const sourceURL = path => `https://github.com/EthDawg/local-voice/blob/${path.startsWith('Sources/') ? contract.implementationRevision : 'feature/unified-workbench'}/${path}`;
+  const sourceURL = path => `https://github.com/EthDawg/workbench/blob/${path.startsWith('Sources/') ? contract.implementationRevision : 'main'}/${path}`;
   const blocks = {
     EVENT_BUTTONS: contract.events.map((event, index) => `<button type="button" data-event="${escape(event.id)}" aria-controls="event-output" aria-pressed="${index === 0}">${escape(event.label)}</button>`).join(''),
     FIRST_EVENT: renderEvent(contract.events[0]),

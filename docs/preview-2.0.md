@@ -1,8 +1,8 @@
 # Workbench 2 Preview: current evidence
 
-Updated 14 September 2026. Voice and StageMark share one app. [Preview 3](https://github.com/EthDawg/local-voice/releases/tag/v2.0.0-preview.3) from `48bc7c0` is Developer ID signed, notarized, stapled and published. The downloaded ZIP passed checksum and Gatekeeper verification, then installed while retaining existing scenes and the saved photo. The earlier publication hold is superseded. iOS 2.1.0 (1) completed Apple processing and is awaiting remaining store preparation and physical acceptance; see [the iOS guide](ios-preview.md#release-preparation--14-september-2026).
+Updated 14 September 2026. Voice and StageMark share one app. [Preview 3](https://github.com/EthDawg/workbench/releases/tag/v2.0.0-preview.3) from `48bc7c0` is Developer ID signed, notarized, stapled and published. The downloaded ZIP passed checksum and Gatekeeper verification, then installed while retaining existing scenes and the saved photo. The earlier publication hold is superseded. iOS 2.1.0 (1) completed Apple processing and is awaiting remaining store preparation and physical acceptance; see [the iOS guide](ios-preview.md#release-preparation--14-september-2026).
 
-The exact release source passed Mac, iPhone and iPad [CI](https://github.com/EthDawg/local-voice/actions/runs/34761974846). The final Mac regression run included **91 StageKit checks / 2,165 assertions / 0 failures**, native global-input checks, speech/audio round trips, required cloud capabilities and Shortcuts metadata. Installed smoke checks covered opening the retained scene, presentation controls, the stale-frame message with a locked phone, and ending the presentation. A fresh live feed and audience receiver were not established. Publication does not mean all acceptance checks pass; earlier increments below are dated evidence.
+The exact release source passed Mac, iPhone and iPad [CI](https://github.com/EthDawg/workbench/actions/runs/34761974846). The final Mac regression run included **91 StageKit checks / 2,165 assertions / 0 failures**, native global-input checks, speech/audio round trips, required cloud capabilities and Shortcuts metadata. Installed smoke checks covered opening the retained scene, presentation controls, the stale-frame message with a locked phone, and ending the presentation. A fresh live feed and audience receiver were not established. Publication does not mean all acceptance checks pass; earlier increments below are dated evidence.
 
 ## Current implementation
 
@@ -73,7 +73,7 @@ They establish what was checked then, not fresh acceptance of the current packag
 | Mac interaction | Physical microphone dictation pasted into a scratch Mac text field. Drawing, Undo, saved boards, timer controls and keyboard practice were exercised. | This does not establish input forwarding to a physical phone. |
 | USB device feed | With Camera permission, the native iPhone feed reached 1320 × 2868. After manual Reconnect, it eventually resumed. | Physical unplug/replug and automatic hardware recovery were not established. |
 | Capture recovery | Tests verified that teardown invalidates old frame tokens, so queued frames cannot mark a replacement session live. | Policy coverage is distinct from physical cable testing. |
-| CI | [Run 34686749639](https://github.com/EthDawg/local-voice/actions/runs/34686749639) passed at `0651133`. | This is a historical commit, not evidence for subsequent changes. |
+| CI | [Run 34686749639](https://github.com/EthDawg/workbench/actions/runs/34686749639) passed at `0651133`. | This is a historical commit, not evidence for subsequent changes. |
 
 An earlier presentation toolbar used top-edge hover reveal and a visibility
 pin. That interaction has been superseded by the current click-only tile;
@@ -95,10 +95,10 @@ Workbench did not send it or claim delivery.
 
 ## Published evaluation Preview
 
-[2.0.0-preview.1](https://github.com/EthDawg/local-voice/releases/tag/v2.0.0-preview.1)
+[2.0.0-preview.1](https://github.com/EthDawg/workbench/releases/tag/v2.0.0-preview.1)
 was published on 12 September 2026 from app source
 `67eef5111016548524729633f14d449f15ed26e5`, build `20260912133744`.
-[GitHub CI 34697004573](https://github.com/EthDawg/local-voice/actions/runs/34697004573)
+[GitHub CI 34697004573](https://github.com/EthDawg/workbench/actions/runs/34697004573)
 passed for that exact source, including packaging and native Shortcuts metadata.
 The final local rerun also passed, including all thirteen draft-cleanup checks.
 

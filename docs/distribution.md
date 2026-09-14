@@ -6,7 +6,7 @@ Workbench is a free, MIT-licensed native Mac app. Developer ID signing and Apple
 
 The Workbench 2 consolidation is a locally installed, Developer ID-signed Preview. Its notarized public download is still pending. The authoritative workflow evidence and remaining tests are in [Preview 2.0](preview-2.0.md).
 
-As checked on 12 September 2026, the public `local-voice` releases still contain the earlier Voice app, most recently [Voice 1.3.0](https://github.com/EthDawg/local-voice/releases/tag/v1.3.0). Earlier Voice and StageMark notarization records describe those specific packages. They are not signing, notarization or hardware evidence for the new single-app package.
+As checked on 12 September 2026, the public `local-voice` releases still contain the earlier Voice app, most recently [Voice 1.3.0](https://github.com/EthDawg/workbench/releases/tag/v1.3.0). Earlier Voice and StageMark notarization records describe those specific packages. They are not signing, notarization or hardware evidence for the new single-app package.
 
 The unified identities are `com.ethdawg.workbench` and `com.ethdawg.workbench.preview`. The Preview installer uses `~/Applications/Workbench Preview.app`; manual installs and later replacements should use that same location. Quit the existing copy before replacing it. Do not leave another Preview in Downloads or the system Applications folder and alternate between them.
 

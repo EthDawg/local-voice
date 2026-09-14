@@ -1,10 +1,10 @@
 const version = '2.0.0-preview.3';
-const source = `https://github.com/EthDawg/local-voice/tree/v${version}`;
-const documents = `https://github.com/EthDawg/local-voice/blob/v${version}`;
+const source = `https://github.com/EthDawg/workbench/tree/v${version}`;
+const documents = `https://github.com/EthDawg/workbench/blob/v${version}`;
 const guide = `${documents}/CONTRIBUTING.md`;
 export const apps = Object.freeze({
-  voice: { name: 'Workbench · Speech', repo: 'local-voice', version, guide },
-  stagemark: { name: 'Workbench · Annotation and presentation', repo: 'local-voice', version, guide }
+  voice: { name: 'Workbench · Speech', repo: 'workbench', version, guide },
+  stagemark: { name: 'Workbench · Annotation and presentation', repo: 'workbench', version, guide }
 });
 const fields = ['app', 'version', 'environment', 'task', 'expected', 'observed', 'impact', 'help'];
 export function normalizeReport(input) {
@@ -29,7 +29,7 @@ export function createReport(input) {
   return { title, body, url: url.href, app };
 }
 export function agentHandoff(report) {
-  const intro = `Help me make a useful contribution to Workbench, a free MIT-licensed native Apple Silicon Mac app.\n\nThis website offers Workbench ${version}.\nSource for this Preview: ${source}\n\nRead ${guide} and the product contract at ${documents}/docs/workbench.md. Start from the matching release or agreed follow-up branch; main may describe an earlier app. If my report concerns a different version, identify that release first and compare it with this Preview. First help me install the app and try a real workflow. Do not treat the website or a successful build as native-app usability testing. Ask me to carry out any Mac interaction you cannot verify.\n\n`;
+  const intro = `Help me make a useful contribution to Workbench, a free MIT-licensed native Apple Silicon Mac app.\n\nThis website offers Workbench ${version}.\nSource for this Preview: ${source}\n\nRead ${guide} and the product contract at ${documents}/docs/workbench.md. Use the matching release to reproduce a report; branch from current main for new contributions. If my report concerns a different version, identify that release first and compare it with this Preview. First help me install the app and try a real workflow. Do not treat the website or a successful build as native-app usability testing. Ask me to carry out any Mac interaction you cannot verify.\n\n`;
   const observation = report ? `Here is my observation from using ${report.app.name}:\n\n${report.body}\n` : `Ask what felt awkward or surprising in my trial. If I have no observation yet, help me choose a small unassigned good first issue in the Workbench repository.\n\n`;
-  return intro + observation + `Search existing issues before creating another. Agree a small scope with me, comment on the issue to coordinate, fork the relevant repository, reproduce the behavior with synthetic data, and make one focused change. Run the documented checks and report relevant manual results and limits. Open a PR for maintainer review. Do not alter unrelated code, private user data, signing credentials, or repository settings. Do not claim observations or test results you did not verify.\n`;
+  return intro + observation + `Search existing issues before creating another. Agree a small scope with me, comment on the issue to coordinate, use a feature branch in Workbench or your fork, reproduce the behavior with synthetic data, and make one focused change. Run the documented checks and report relevant manual results and limits. Open a PR for maintainer review. Do not alter unrelated code, private user data, signing credentials, or repository settings. Do not claim observations or test results you did not verify.\n`;
 }

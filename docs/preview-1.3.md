@@ -1,6 +1,6 @@
 # Workbench Preview 1.3
 
-Local test release · 9 September 2026
+Historical local test release · 9 September 2026. The separate-app setup below is superseded by [consolidated Workbench](workbench.md); retain this document as evidence for that earlier release.
 
 Voice and StageMark remain two independent native apps. This release connects preparation and recovery through a small resource library and reusable presentation scenes, with a separate installation channel that retains its data across updates.
 

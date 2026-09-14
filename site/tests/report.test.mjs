@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { apps, createReport, agentHandoff } from '../report.mjs';
 const input = { app:'voice',version:'1.2.1',environment:'M2, macOS 26',task:'Copy a capture & preserve “café”',expected:'The original words',observed:'Different text\nSecond line',impact:'Small friction',help:'I can test a fix' };
 test('routes both Workbench areas to the unified repository and preserves feedback through URL encoding',()=>{
-  for(const [app,repo] of [['voice','local-voice'],['stagemark','local-voice']]){
+  for(const [app,repo] of [['voice','workbench'],['stagemark','workbench']]){
     const report=createReport({...input,app});const url=new URL(report.url);
     assert.equal(url.origin,'https://github.com');assert.equal(url.pathname,`/EthDawg/${repo}/issues/new`);
     assert.equal(url.searchParams.get('body'),report.body);assert.match(report.body,/“café”/);assert.match(report.body,/Different text\nSecond line/);
@@ -19,8 +19,8 @@ test('rejects invalid destinations and incomplete observations',()=>{
 test('agent handoff carries evidence and avoids inventing native verification',()=>{
   const report=createReport(input);const handoff=agentHandoff(report);
   assert.ok(handoff.includes(report.body));assert.match(handoff,/Do not claim observations or test results you did not verify/);
-  assert.ok(handoff.includes(`https://github.com/EthDawg/local-voice/tree/v${apps.voice.version}`));
-  assert.ok(handoff.includes(`https://github.com/EthDawg/local-voice/blob/v${apps.voice.version}/docs/workbench.md`));
+  assert.ok(handoff.includes(`https://github.com/EthDawg/workbench/tree/v${apps.voice.version}`));
+  assert.ok(handoff.includes(`https://github.com/EthDawg/workbench/blob/v${apps.voice.version}/docs/workbench.md`));
   assert.ok(handoff.includes(apps.voice.guide));
   assert.match(agentHandoff(),/small unassigned good first issue/);
 });

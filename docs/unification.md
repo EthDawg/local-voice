@@ -1,5 +1,7 @@
 # Workbench consolidation
 
+Workbench is now the single project at [`EthDawg/workbench`](https://github.com/EthDawg/workbench), with consolidated development on `main`. The former `local-voice` repository was renamed in place; StageMark is historical source provenance. The decision to consolidate does not mark the native acceptance items below complete or publish a new binary.
+
 ## Purpose
 
 Free everyday Mac tools for speaking, explaining and presenting. Improve the commodity baseline through better local models and small, dependable workflows. Existing native macOS features are the baseline to improve against. Workbench 2 combines Voice and StageMark in one application process, one home window and one menu-bar item; speech and presentation remain separate internal modules.
@@ -24,8 +26,8 @@ This is a working acceptance record, not a claim that any unchecked item is deli
 Current evidence and remaining installed workflows: [Workbench 2 Preview](preview-2.0.md).
 
 On 12 September 2026, GitHub workflow scope was granted with the user's
-authorization. [Draft PR #13](https://github.com/EthDawg/local-voice/pull/13)
-is open, and [CI run 34686749639](https://github.com/EthDawg/local-voice/actions/runs/34686749639)
+authorization. [Consolidation PR #13](https://github.com/EthDawg/workbench/pull/13)
+records the integration, and [CI run 34686749639](https://github.com/EthDawg/workbench/actions/runs/34686749639)
 passed at `0651133`. The initial runner lacked `rg`; `scripts/test-stage.sh`
 now uses the system `grep` to check the result. Review and public release
 remain separate steps.
@@ -47,4 +49,4 @@ remain separate steps.
 
 ## Source preservation
 
-Voice branch base: 1a68b50. StageMark source imported from feature/demo-preview at e7022b7, including the existing uncommitted presenter polish. Original checkouts are not reset or overwritten. Consolidation branch: feature/unified-workbench in the existing local-voice repository. This avoids prematurely renaming or moving the public repositories while the new app is under review.
+Voice branch base: 1a68b50. StageMark source imported from feature/demo-preview at e7022b7, including the existing uncommitted presenter polish. The initial integration used `feature/unified-workbench` in the former `local-voice` repository. On 14 September 2026, Ethan confirmed consolidated Workbench as the continuing project: one repository, `main` as the development base, one issue queue and StageMark retained as an archive. Original history and unfinished local work are preserved. Internal Swift module names and installed-app data identities are unchanged.

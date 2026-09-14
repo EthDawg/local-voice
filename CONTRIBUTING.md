@@ -2,15 +2,15 @@
 
 A small, useful improvement is a good first contribution. Bug reports, documentation, accessibility checks, design feedback and hardware testing all count.
 
-This branch combines Voice and StageMark into one app. Workbench's purpose is dependable everyday Mac utilities for speaking, annotating and presenting. Improve a concrete workflow and compare against what macOS already offers before adding another feature.
+Workbench combines Voice and StageMark into one app. Its purpose is dependable everyday Mac utilities for speaking, annotating and presenting. Improve a concrete workflow and compare against what macOS already offers before adding another feature.
 
 The separate [iOS/iPadOS 26+ Preview](docs/ios-preview.md) uses native phone/tablet workflows for the same useful jobs. Contributions should name the affected platform and preserve its own input, storage and lifecycle boundaries.
 
 ## Start from the current Workbench code
 
-The integration branch is **[`feature/unified-workbench`](https://github.com/EthDawg/local-voice/tree/feature/unified-workbench)**, tracked by [draft PR #13](https://github.com/EthDawg/local-voice/pull/13). `main` still contains the earlier Voice app. Start new Workbench changes from the integration branch and target it in your PR until the consolidation merges. StageKit is included here; a separate StageMark checkout is unnecessary.
+The canonical repository is **[`EthDawg/workbench`](https://github.com/EthDawg/workbench)** and the development base is **`main`**. Start new changes from `main` and target it in your PR. StageKit and the native mobile target are included here; a separate Voice or StageMark checkout is unnecessary. The former `local-voice` repository URL redirects here, preserving existing issues, PRs and releases.
 
-Matt ([@mattywhitenz](https://github.com/mattywhitenz)) is a Workbench co-contributor. His next contribution is **Mac screenshot capture and image annotation**. [Issue #18](https://github.com/EthDawg/local-voice/issues/18) contains the earlier native Screenshot handoff idea; use it to coordinate the first slice and engine choice, which remain open. Device video capture already belongs to **Present a device**, and mobile already has its own imported-image markup workflow.
+Matt ([@mattywhitenz](https://github.com/mattywhitenz)) is a Workbench co-contributor. His next contribution is **Mac screenshot capture and image annotation**. [Issue #18](https://github.com/EthDawg/workbench/issues/18) contains the earlier native Screenshot handoff idea; use it to coordinate the first slice and engine choice, which remain open. Device video capture already belongs to **Present a device**, and mobile already has its own imported-image markup workflow.
 
 Start with `Sources/StageKit/StageKitController.swift` for the Mac boundary, `Overlay.swift` and `Core.swift` for ink/history, and `BoardExport.swift` for existing board rendering. Board export does not capture the desktop underneath. Keep the existing app lifecycle and preserve original images. This handoff reserves the implementation for Matt; it does not add the feature or settle its design.
 
@@ -18,8 +18,8 @@ Repository collaborators can push their own feature branches after accepting the
 
 ## Choose a first step
 
-1. Check the [open issues](https://github.com/EthDawg/local-voice/issues). An unassigned [good first issue](https://github.com/EthDawg/local-voice/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22) is a useful starting point. Comment that you want to take it so others can coordinate; no repository write access is needed.
-2. A typo or clear, small fix can go directly to a PR. Discuss a larger feature in an issue or [Discussions](https://github.com/EthDawg/local-voice/discussions) first. Agree the smallest useful outcome and who is working on it.
+1. Check the [open issues](https://github.com/EthDawg/workbench/issues). An unassigned [good first issue](https://github.com/EthDawg/workbench/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22) is a useful starting point. Comment that you want to take it so others can coordinate; no repository write access is needed.
+2. A typo or clear, small fix can go directly to a PR. Discuss a larger feature in an issue or [Discussions](https://github.com/EthDawg/workbench/discussions) first. Agree the smallest useful outcome and who is working on it.
 3. Ask for help on the issue when stuck. Incomplete attempts and draft PRs are welcome. Coordinate before replacing work another contributor has offered to do.
 
 **No Mac or no Swift experience?** Edit documentation through GitHub's pencil and fork/PR workflow. Say “documentation only” in the PR; native checks are unnecessary for that change. Hardware findings can be an issue comment with the Mac/device/OS versions and steps tried.
@@ -28,23 +28,23 @@ Repository collaborators can push their own feature branches after accepting the
 
 Use an Apple Silicon Mac, macOS 14+, Swift 6.2+ and the macOS 26 SDK. The deployment target and build SDK are different: optional newer Apple features need the newer SDK to compile. Full Xcode is required for App Intents metadata; Command Line Tools support source development.
 
-Clone the current integration branch. Choose a short branch name for your contribution; Matt can use `feature/screenshot-annotation` in place of the example below.
+Clone the current source. Choose a short branch name for your contribution; Matt can use `feature/screenshot-annotation` in place of the example below.
 
 Before running the tests, quit Workbench, Workbench Preview and earlier Voice/StageMark copies. The suite probes exclusive global shortcuts even in its CI mode; another running copy will cause a real registration conflict.
 
 ```sh
-git clone --branch feature/unified-workbench https://github.com/EthDawg/local-voice.git
-cd local-voice
+git clone https://github.com/EthDawg/workbench.git
+cd workbench
 git switch -c improve/small-change
 bash scripts/doctor.sh
 bash scripts/test.sh
 bash scripts/build.sh
 ```
 
-**Already have a fork or checkout?** Preserve any unfinished edits first. Fetch the canonical repository and create a new branch from its current integration tip:
+**Already have a fork or checkout?** Preserve any unfinished edits first. Fetch the canonical repository and create a new branch from its current `main`:
 
 ```sh
-git fetch https://github.com/EthDawg/local-voice.git feature/unified-workbench
+git fetch https://github.com/EthDawg/workbench.git main
 git switch -c feature/screenshot-annotation FETCH_HEAD
 ```
 
@@ -52,7 +52,7 @@ If you do not have repository write access, create a GitHub fork and point your 
 
 ```sh
 git remote rename origin upstream
-git remote add origin https://github.com/YOUR-USERNAME/local-voice.git
+git remote add origin https://github.com/YOUR-USERNAME/workbench.git
 ```
 
 The first build downloads the pinned dependency. The default test script covers release tooling, core and integration behaviour, provider contracts/transport, keyboard practice and StageKit. It does not need a speech-model download or microphone access. The ordinary build creates the ad-hoc `dist/Workbench.zip`; it does not install an app.
@@ -116,7 +116,7 @@ git commit -m "Describe the user-visible improvement"
 git push -u origin improve/small-change
 ```
 
-Open **Compare & pull request** for your branch on GitHub. Set the destination to **`EthDawg/local-voice` → `feature/unified-workbench`**, including when the branch is in your fork. Check the Files changed tab contains only your contribution. Explain what improves, link the issue, and describe the evidence and limitations. Use `Closes #123` only when the change fully resolves it. Draft means ready for feedback; it does not mean ready to release. Screenshots or short recordings help with UI changes.
+Open **Compare & pull request** for your branch on GitHub. Set the destination to **`EthDawg/workbench` → `main`**, including when the branch is in your fork. Check the Files changed tab contains only your contribution. Explain what improves, link the issue, and describe the evidence and limitations. Use `Closes #123` only when the change fully resolves it. Draft means ready for feedback; it does not mean ready to release. Screenshots or short recordings help with UI changes.
 
 AI-assisted work has the same ownership and testing expectations. The submitting person must understand the change and check its claims. Never include private prompts, recordings, credentials or customer assets. There is no CLA or DCO signing step. Contributions use this repository's [MIT license](LICENSE); preserve upstream notices and contribute only material you have the right to share.
 

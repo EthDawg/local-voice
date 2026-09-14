@@ -1,5 +1,7 @@
 # Working on Workbench
 
+The active project is `EthDawg/workbench`, with contributions branching from and returning to `main`. Voice and StageKit are modules here; the old StageMark repository is an archive. Use this repository's issues and PRs for all new work. Preserve historical names in module identifiers and data-migration paths.
+
 Read [the product contract](docs/workbench.md), [the source map](docs/design.md) and [CONTRIBUTING](CONTRIBUTING.md) before changing behavior. Inspect current source and release state; an illustration, passing build or another agent's answer is not proof of a working feature.
 
 For Mac wallpaper and presentation, [the structured experience contract](site/handbook/contract.json) owns capability status, lifecycle and acceptance scenarios. The website generates its human and agent records from it. For the separate iOS target, [the mobile specification](docs/ios-preview.md) owns scope, platform limits and acceptance; the site links that same Markdown. For selected-photo iPhone/Mac transfer, [the photo handoff contract](docs/photo-handoff.md) owns account, transport, deletion and delivery evidence. Mobile image export does not change the status of a Mac desktop capability. Update the owning record when the implemented contract changes; use GitHub issues for agreed work rather than creating another backlog.

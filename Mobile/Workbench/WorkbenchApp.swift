@@ -214,7 +214,7 @@ struct MobileAboutView: View {
                     Link("Privacy Policy", destination: URL(string: "https://workbench-mac.vercel.app/privacy.html")!)
                         .accessibilityIdentifier("about.privacyPolicy")
                     Link("Mobile guide", destination: URL(string: "https://workbench-mac.vercel.app/mobile/")!)
-                    Link("Source and feedback", destination: URL(string: "https://github.com/EthDawg/local-voice")!)
+                    Link("Source and feedback", destination: URL(string: "https://github.com/EthDawg/workbench")!)
                 }
             }.navigationTitle("About").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }

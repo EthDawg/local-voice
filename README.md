@@ -2,20 +2,20 @@
 
 **Free everyday Mac tools for speaking, explaining and presenting.**
 
-[![CI](https://github.com/EthDawg/local-voice/actions/workflows/ci.yml/badge.svg)](https://github.com/EthDawg/local-voice/actions/workflows/ci.yml)
+[![CI](https://github.com/EthDawg/workbench/actions/workflows/ci.yml/badge.svg)](https://github.com/EthDawg/workbench/actions/workflows/ci.yml)
 [![MIT license](https://img.shields.io/badge/license-MIT-mintcream.svg)](LICENSE)
 
-[Product guide](https://workbench-mac.vercel.app/guide/) · [Contribute](CONTRIBUTING.md) · [Issues](https://github.com/EthDawg/local-voice/issues) · [Project website](https://workbench-mac.vercel.app)
+[Product guide](https://workbench-mac.vercel.app/guide/) · [Contribute](CONTRIBUTING.md) · [Issues](https://github.com/EthDawg/workbench/issues) · [Project website](https://workbench-mac.vercel.app)
 
 Workbench brings Voice and StageMark into **one native app, one home window and one menu-bar icon**. Dictate a thought, read a draft, draw over a live demo, or give a connected phone a presentation scene. The aim is a useful baseline that improves with better models and small, dependable workflows.
 
-**This branch contains the Workbench 2.0 consolidation.** Feature descriptions below describe its implementation, not proof of a published release or successful testing on every supported Mac. The [acceptance record](docs/unification.md) tracks the remaining verification. Older Voice/StageMark releases and their validation records describe those separate apps.
+**Workbench is the active project, developed on `main` in this repository.** Feature descriptions below describe its implementation, not proof of a published release or successful testing on every supported Mac. The [acceptance record](docs/unification.md) tracks the remaining verification. Older Voice/StageMark releases and their validation records describe those separate apps; StageMark is retained as an archive.
 
-**Contributors:** start from `feature/unified-workbench` and target that branch in your PR while [#13](https://github.com/EthDawg/local-voice/pull/13) is open. `main` still contains the earlier Voice app. The [contributor setup and Matt's screenshot/annotation handoff](CONTRIBUTING.md#start-from-the-current-workbench-code) include exact clone commands and code entry points.
+**Contributors:** branch from `main` and send PRs back to `main`. The [contributor setup and Matt's screenshot/annotation handoff](CONTRIBUTING.md#start-from-the-current-workbench-code) include exact clone commands and code entry points. Issues, reviews and releases all live in this repository.
 
 An **iPhone and iPad Preview for iOS/iPadOS 26+** is also in development as a separate native SwiftUI target. It offers foreground dictation, installed-voice reading, PencilKit image markup, independent wallpaper crop/export and editable scenes prepared for Mac. The Mac capabilities below retain their own platform boundaries. See the [mobile scope, build instructions and test record](docs/ios-preview.md) and [mobile research](docs/mobile-research.md); no mobile App Store or TestFlight release is claimed.
 
-**Mac download:** [Workbench Preview 3](https://github.com/EthDawg/local-voice/releases/tag/v2.0.0-preview.3) is Developer ID signed, Apple-notarized and stapled. The exact downloaded ZIP was hash-verified. Its notes distinguish verified packaging from remaining physical-device acceptance. The iOS build is uploaded to App Store Connect, with tester distribution and review still pending.
+**Mac download:** [Workbench Preview 3](https://github.com/EthDawg/workbench/releases/tag/v2.0.0-preview.3) is Developer ID signed, Apple-notarized and stapled. The exact downloaded ZIP was hash-verified. Its notes distinguish verified packaging from remaining physical-device acceptance. The iOS build is uploaded to App Store Connect, with tester distribution and review still pending.
 
 ## What is in the app?
 
@@ -118,7 +118,7 @@ Mac reading is limited to 50,000 characters per reading; Speko to 5,000. The loc
 
 ## Contribute and verify
 
-A useful first contribution can be a confusing instruction, an accessibility improvement, a synthetic test case or a hardware report. Use [Issues](https://github.com/EthDawg/local-voice/issues) as the work queue and discuss substantial changes before implementing them. [CONTRIBUTING](CONTRIBUTING.md) explains the workflow and proposed two-maintainer practices.
+A useful first contribution can be a confusing instruction, an accessibility improvement, a synthetic test case or a hardware report. Use [Issues](https://github.com/EthDawg/workbench/issues) as the work queue and discuss substantial changes before implementing them. [CONTRIBUTING](CONTRIBUTING.md) explains the workflow and proposed two-maintainer practices.
 
 `bash scripts/test.sh` runs release-tool checks, core/cleanup/history/library/integration/keyboard checks, provider checks and StageKit regressions. Checks use synthetic input; model downloads, real microphone input, other apps' focus, signed-package permissions and actual device sharing require additional evidence. See [the current acceptance record](docs/unification.md), [product contract](docs/workbench.md) and [implementation map](docs/design.md).
 
@@ -129,6 +129,6 @@ A useful first contribution can be a confusing instruction, an accessibility imp
 - [Parakeet TDT v2 CoreML](https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml): see its upstream model card and license.
 - Apple AppKit, SwiftUI, AVFoundation and installed macOS voices.
 - Workflow inspiration: [Pat Simmons's local Wispr Flow replacement](https://www.youtube.com/watch?v=IMQw3aHjf2Q&t=437s).
-- Matt ([@mattywhitenz](https://github.com/mattywhitenz)) proposed Apple Shortcuts dictation and optional Speko reading in [#10](https://github.com/EthDawg/local-voice/issues/10) and [#11](https://github.com/EthDawg/local-voice/issues/11).
+- Matt ([@mattywhitenz](https://github.com/mattywhitenz)) proposed Apple Shortcuts dictation and optional Speko reading in [#10](https://github.com/EthDawg/workbench/issues/10) and [#11](https://github.com/EthDawg/workbench/issues/11).
 
 The app code is [MIT licensed](LICENSE). Third-party components retain their own licenses. Contribution credit does not imply a GitHub permission level or approval of this branch.

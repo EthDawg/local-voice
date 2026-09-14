@@ -11,16 +11,16 @@ Review date: 13 September 2026. Scope: the existing Workbench categories, not ne
 | Device presentation | QuickTime, iPhone Mirroring; Reflector, DeskPad | Official docs and native Workbench window/capture code were reviewed. Apple's apps had been opened in the earlier native pass. Normal window sharing is a useful composition point; no Teams/Zoom receiver, physical phone or competitor capture benchmark was completed in this increment. |
 | Saved resources | Finder Quick Look; Raycast actions, file search, Quicklinks | Finder Quick Look was exercised on a synthetic text file. Raycast was researched through official docs. Source review found the more immediate gap: search selection lacked a Return action, and clipboard failure could report success. |
 
-Wispr Flow and Superwhisper were already explored through their installed settings and replacement forms. That separate [dictation comparison](dictation-comparison.md) records versions and limits. Its next two ideas are now [contextual insertion #14](https://github.com/EthDawg/local-voice/issues/14) and [first successful dictation #15](https://github.com/EthDawg/local-voice/issues/15).
+Wispr Flow and Superwhisper were already explored through their installed settings and replacement forms. That separate [dictation comparison](dictation-comparison.md) records versions and limits. Its next two ideas are now [contextual insertion #14](https://github.com/EthDawg/workbench/issues/14) and [first successful dictation #15](https://github.com/EthDawg/workbench/issues/15).
 
 ## Top three in each category
 
 | Category | 1 — implemented in this increment | 2 — contributor idea | 3 — contributor idea |
 | --- | --- | --- | --- |
-| Read aloud | Scrub and skip ±15 seconds in existing audio | [Cancel local and remote generation consistently #16](https://github.com/EthDawg/local-voice/issues/16) | [Read selected text through a Mac Service #17](https://github.com/EthDawg/local-voice/issues/17) |
-| Annotation / screenshots | Copy board or save its PNG | [Native Screenshot handoff with ink preserved #18](https://github.com/EthDawg/local-voice/issues/18) | [Select/move an annotation with Undo #19](https://github.com/EthDawg/local-voice/issues/19) |
-| Device presentation | Present in a resizable window; leaving fullscreen keeps it active | [One fresh branded scene snapshot #20](https://github.com/EthDawg/local-voice/issues/20) | [Remember break-timer placement #21](https://github.com/EthDawg/local-voice/issues/21) |
-| Saved resources | Return performs the selected copy/open action; truthful copy feedback | [Explicit native Quick Look #22](https://github.com/EthDawg/local-voice/issues/22) | [Review shared-library import changes #23](https://github.com/EthDawg/local-voice/issues/23) |
+| Read aloud | Scrub and skip ±15 seconds in existing audio | [Cancel local and remote generation consistently #16](https://github.com/EthDawg/workbench/issues/16) | [Read selected text through a Mac Service #17](https://github.com/EthDawg/workbench/issues/17) |
+| Annotation / screenshots | Copy board or save its PNG | [Native Screenshot handoff with ink preserved #18](https://github.com/EthDawg/workbench/issues/18) | [Select/move an annotation with Undo #19](https://github.com/EthDawg/workbench/issues/19) |
+| Device presentation | Present in a resizable window; leaving fullscreen keeps it active | [One fresh branded scene snapshot #20](https://github.com/EthDawg/workbench/issues/20) | [Remember break-timer placement #21](https://github.com/EthDawg/workbench/issues/21) |
+| Saved resources | Return performs the selected copy/open action; truthful copy feedback | [Explicit native Quick Look #22](https://github.com/EthDawg/workbench/issues/22) | [Review shared-library import changes #23](https://github.com/EthDawg/workbench/issues/23) |
 
 These are priorities within each job, not a promise that every idea will ship. Personas and the break timer remain parts of presenting. Logo discovery and stock motion backgrounds remain asset-library work, outside these four targeted improvements.
 

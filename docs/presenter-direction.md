@@ -1,6 +1,6 @@
 # Presenter direction
 
-Decision recorded 10 September 2026. The sketches express ideas, not a target interface.
+Historical presenter direction recorded 10 September 2026. The independent-app boundary below was superseded by [the consolidated Workbench contract](workbench.md); Voice and StageKit now share one app. The sketches express ideas, not a target interface.
 
 ## One useful promise
 
