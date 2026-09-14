@@ -16,7 +16,7 @@ This is submission copy and a release handoff, not evidence of store approval or
 
 **Support:** https://github.com/EthDawg/workbench/issues
 
-**Privacy policy:** https://workbench-mac.vercel.app/privacy.html — publish the browser-specific disclosure in `privacy-policy-draft.md` there before submission. The packaged `privacy.html` provides the corresponding in-product policy.
+**Privacy policy:** https://workbench-mac.vercel.app/privacy.html#chrome — the browser-specific disclosure was published and byte-verified on 15 September 2026. The packaged `privacy.html` provides the corresponding in-product policy.
 
 ## Detailed description
 
@@ -84,6 +84,7 @@ Provide the exact public native build URL and its supported macOS version in the
 - 128px icon: `BrowserExtension/icons/icon128.png`; 16/32/48px icons are also packaged.
 - Small promotional image: `BrowserExtension/store/promo-440x280.png`, 440×280 pixels, derived from the existing Workbench icon. It is branding artwork, not a screenshot.
 - Required screenshot: capture the actual packaged extension with synthetic destinations at **1280×800** or **640×400**. No screenshot is fabricated by the packager. The final changed popup still needs visual/live verification.
+- The installed Mac candidate is 2.0.0 build `20260914230155`, Developer ID signed with the existing Production CloudKit capability. It is not yet notarized or publicly downloadable; public Preview 3 lacks the browser companion.
 - Verify developer registration, contact verification and the current dashboard distribution/review requirements.
 - Uploading a draft, submitting for review, approval and publication are separate states. Preserve this distinction in the release record.
 
